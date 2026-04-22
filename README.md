@@ -1,4 +1,4 @@
-[![badge](./README/badge.png)](https://zc.tencent.com/competition/competitionHackathon?code=cha004) ![badge2](./README/badge2.png)
+![badge](./README/badge.png)
 # Cairn
 > TCH·腾讯云黑客松第二届智能渗透挑战赛唯一 AK 战队（Bytex@起零衍迹实验室） / 线上第四名
 >
