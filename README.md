@@ -1,7 +1,8 @@
+[![badge](./README/badge.png)](https://zc.tencent.com/competition/competitionHackathon?code=cha004) ![badge2](./README/badge2.png)
 # Cairn
-> AI 自动化通用问题解决 / AI 自动化渗透测试系统
+> TCH·腾讯云黑客松第二届智能渗透挑战赛唯一 AK 战队（Bytex@起零衍迹实验室） / 线上第四名
 >
-> TCH·腾讯云黑客松第二届智能渗透挑战赛唯一 AK 战队 / 线上第四名
+> 比赛复盘文章：https://mp.weixin.qq.com/s/DlpEH7bVr0xi0VawPJs3XA
 
 代码还在整理中，预计近期开源...
 
