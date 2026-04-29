@@ -15,7 +15,7 @@ RUN sudo apt update && \
     dirsearch yq krb5-user gitleaks naabu nikto netexec adb && \
     sudo apt clean && \
     sudo rm -rf /var/lib/apt/lists/* && \
-    pip3 install -i https://mirrors.ustc.edu.cn/pypi/simple/ pwntools pymongo --break-system-packages && \
+    pip3 install pwntools pymongo --break-system-packages && \
     sudo npm install -g @playwright/cli@latest && \
     cd /tmp && playwright-cli install
 
@@ -25,13 +25,13 @@ RUN cd /tmp && \
     wget -q "https://github.com/hahwul/dalfox/releases/download/v2.12.0/dalfox-linux-amd64.tar.gz" -O dalfox.tar.gz && \
     wget -q "https://github.com/BishopFox/cloudfox/releases/download/v2.0.1/cloudfox-linux-amd64.zip" -O cloudfox.zip && \
     wget -q "https://github.com/ropnop/kerbrute/releases/download/v1.0.3/kerbrute_linux_amd64" -O kerbrute && \
-    nuclei -ut && \
     git clone --depth 1 "https://github.com/projectdiscovery/nuclei-templates.git" /home/kali/.local/nuclei-templates && \
     unzip -q katana.zip katana && sudo mv katana /usr/local/bin/ && \
     unzip -q nuclei.zip nuclei && sudo mv nuclei /usr/local/bin/ && \
     tar -xzf dalfox.tar.gz && sudo mv dalfox-linux-amd64 /usr/local/bin/dalfox && \
     unzip -q cloudfox.zip cloudfox/cloudfox && sudo mv cloudfox/cloudfox /usr/local/bin/ && \
     sudo cp kerbrute /usr/local/bin/ && \
+    nuclei -ut && \
     sudo rm -rf /tmp/*
 
 RUN mkdir -p /home/kali/knowledges && cd /home/kali/knowledges && \
@@ -43,7 +43,7 @@ RUN mkdir -p /home/kali/knowledges && cd /home/kali/knowledges && \
 RUN mkdir -p /home/kali/tools && cd /home/kali/tools && \
     wget -q "https://github.com/frohoff/ysoserial/releases/download/v0.0.6/ysoserial-all.jar" -O ysoserial.jar && \
     git clone --depth=1 https://github.com/ticarpi/jwt_tool.git && \
-    cd jwt_tool && pip3 install -i https://mirrors.ustc.edu.cn/pypi/simple/ -r requirements.txt --break-system-packages && \
+    cd jwt_tool && pip3 install -r requirements.txt --break-system-packages && \
     git clone --depth=1 https://github.com/IOActive/jdwp-shellifier.git
 
 RUN mkdir -p /home/kali/pocs && cd /home/kali/pocs && \
