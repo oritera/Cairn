@@ -1,7 +1,0 @@
-FROM --platform=amd64 docker.m.daocloud.io/kalilinux/kali-rolling:latest
-
-RUN sed -i 's|http://http.kali.org/kali|http://mirrors.ustc.edu.cn/kali|g' /etc/apt/sources.list && \
-    apt update && \
-    apt -y install kali-linux-headless && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/*
