@@ -9,16 +9,65 @@ def parse_json_output(stdout: str) -> dict[str, Any]:
     return extract_json_object(stdout)
 
 
+def _unwrap_wrapped_payload(payload: dict[str, Any]) -> tuple[bool | None, dict[str, Any] | None]:
+    accepted = payload.get("accepted")
+    if accepted is False:
+        return False, None
+    if accepted is True:
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            raise ValueError("data must be an object")
+        return True, data
+    return None, None
+
+
+def _is_dict(value: Any) -> bool:
+    return isinstance(value, dict)
+
+
+def _looks_like_reason_data(payload: dict[str, Any]) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    keys = set(payload)
+    if keys == {"complete"}:
+        complete = payload["complete"]
+        return isinstance(complete, dict) and "from" in complete and "description" in complete
+    if keys == {"intents"}:
+        return isinstance(payload["intents"], list)
+    if keys == {"intent"}:
+        intent = payload["intent"]
+        return isinstance(intent, dict) and "from" in intent and "description" in intent
+    return False
+
+
+def _looks_like_bootstrap_execute_data(payload: dict[str, Any]) -> bool:
+    if not isinstance(payload, dict) or set(payload) != {"fact", "complete"}:
+        return False
+    return _is_dict(payload.get("fact")) and _is_dict(payload.get("complete"))
+
+
+def _looks_like_bootstrap_conclude_data(payload: dict[str, Any]) -> bool:
+    if not isinstance(payload, dict) or set(payload) != {"fact"}:
+        return False
+    return _is_dict(payload.get("fact"))
+
+
+def _looks_like_explore_data(payload: dict[str, Any]) -> bool:
+    return isinstance(payload, dict) and set(payload) == {"description"}
+
+
 def validate_reason_payload(
     payload: dict[str, Any], open_intents_empty: bool, max_intents: int,
 ) -> tuple[str, dict[str, Any] | list[dict[str, Any]] | None]:
-    if payload.get("accepted") is False:
+    accepted, data = _unwrap_wrapped_payload(payload)
+    if accepted is False:
         return "rejected", None
-    if payload.get("accepted") is not True:
-        raise ValueError("accepted must be true or false")
-    data = payload.get("data")
+    if accepted is None:
+        if not _looks_like_reason_data(payload):
+            raise ValueError("accepted must be true or false")
+        data = payload
     if not isinstance(data, dict):
-        raise ValueError("data must be an object")
+        raise ValueError("accepted must be true or false")
     complete = data.get("complete")
     intents = data.get("intents")
     # backward compat: accept singular "intent" key from LLMs
@@ -50,13 +99,15 @@ def validate_reason_payload(
 
 
 def validate_bootstrap_execute_payload(payload: dict[str, Any]) -> tuple[str, dict[str, str] | None]:
-    if payload.get("accepted") is False:
+    accepted, data = _unwrap_wrapped_payload(payload)
+    if accepted is False:
         return "rejected", None
-    if payload.get("accepted") is not True:
-        raise ValueError("accepted must be true or false")
-    data = payload.get("data")
+    if accepted is None:
+        if not _looks_like_bootstrap_execute_data(payload):
+            raise ValueError("accepted must be true or false")
+        data = payload
     if not isinstance(data, dict):
-        raise ValueError("data must be an object")
+        raise ValueError("accepted must be true or false")
 
     fact = data.get("fact")
     if not isinstance(fact, dict):
@@ -79,13 +130,15 @@ def validate_bootstrap_execute_payload(payload: dict[str, Any]) -> tuple[str, di
 
 
 def validate_bootstrap_conclude_payload(payload: dict[str, Any]) -> tuple[str, str | None]:
-    if payload.get("accepted") is False:
+    accepted, data = _unwrap_wrapped_payload(payload)
+    if accepted is False:
         return "rejected", None
-    if payload.get("accepted") is not True:
-        raise ValueError("accepted must be true or false")
-    data = payload.get("data")
+    if accepted is None:
+        if not _looks_like_bootstrap_conclude_data(payload):
+            raise ValueError("accepted must be true or false")
+        data = payload
     if not isinstance(data, dict):
-        raise ValueError("data must be an object")
+        raise ValueError("accepted must be true or false")
 
     if data.get("complete") is not None:
         raise ValueError("complete is not allowed")
@@ -99,13 +152,15 @@ def validate_bootstrap_conclude_payload(payload: dict[str, Any]) -> tuple[str, s
 
 
 def validate_explore_payload(payload: dict[str, Any]) -> tuple[str, str | None]:
-    if payload.get("accepted") is False:
+    accepted, data = _unwrap_wrapped_payload(payload)
+    if accepted is False:
         return "rejected", None
-    if payload.get("accepted") is not True:
-        raise ValueError("accepted must be true or false")
-    data = payload.get("data")
+    if accepted is None:
+        if not _looks_like_explore_data(payload):
+            raise ValueError("accepted must be true or false")
+        data = payload
     if not isinstance(data, dict):
-        raise ValueError("data must be an object")
+        raise ValueError("accepted must be true or false")
     description = data.get("description")
     if not isinstance(description, str) or not description.strip():
         raise ValueError("description is required")
