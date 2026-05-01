@@ -1,16 +1,14 @@
-![badge](./README/badge.png)
-# Cairn
-> TCH·腾讯云黑客松第二届智能渗透挑战赛唯一 AK 战队（Bytex@起零衍迹实验室） / 线上第四名
->
-> 比赛复盘文章：https://mp.weixin.qq.com/s/DlpEH7bVr0xi0VawPJs3XA
+<div align="center">
 
-代码还在整理中，预计近期开源...
+<img src="cairn/src/cairn/server/static/favicon.svg" alt="HexStrike AI Logo" width="220" style="margin-bottom: 20px;"/>
 
-![image-20260419134411483](./README/image-20260419134411483.png)
+# Cairn AI
+### More Than Just AI Penetration Testing — Towards General State-Space Search
+<img src="./README/tencent.png" style="width: 250px; height: 55px;" width="250" height="55"/>
 
-![image-20260419113415063](./README/image-20260419113415063.png)
+Cairn is a general-purpose problem-solving engine that goes beyond traditional AI Penetration Testing. <br/>It defines no roles, no workflows. Given an origin and a goal, it searches for a path through an unknown state space.
 
-![image-20260419113431523](./README/image-20260419113431523.png)
+</div>
 
 # ⚖️ License
 This project is licensed under **GNU AGPLv3** for personal and educational use.
