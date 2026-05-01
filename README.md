@@ -112,7 +112,7 @@ docker pull --platform=linux/amd64 ghcr.io/oritera/cairn-worker-container:latest
  
 ### Docker Compose (recommended)
  
-Pull the base image used to build and run Cairn:
+Pull the base image used to build Cairn:
  
 ```bash
 docker pull ghcr.io/astral-sh/uv:python3.13-trixie
