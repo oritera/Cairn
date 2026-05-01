@@ -9,7 +9,7 @@ runtime:
   max_workers: 8
   max_running_projects: 3
   max_project_workers: 4
-  healthcheck_timeout: 22
+  healthcheck_timeout: 20
   prompt_group: "default"
 
 tasks:
@@ -33,50 +33,24 @@ container:
 
 
 workers:
-  - name: "claudecode_claude-opus-4-7"
+  - name: "claudecode_deepseek-v4-flash"
     type: "claudecode"
     task_types: [bootstrap, reason, explore]
-    max_running: 12
+    max_running: 2
     priority: 0
     env:
-      ANTHROPIC_MODEL: "claude-opus-4-7"
-      ANTHROPIC_BASE_URL: "http://xxx"
-      ANTHROPIC_AUTH_TOKEN: "xxx"
+      ANTHROPIC_MODEL: "deepseek-v4-flash"
+      ANTHROPIC_BASE_URL: "https://api.deepseek.com/anthropic"
+      ANTHROPIC_AUTH_TOKEN: "sk-xxx"
 
-  - name: "codex_gpt-5.4"
+  - name: "codex_qwen3.6-flash"
     type: "codex"
     task_types: [bootstrap,reason,explore]
-    max_running: 12
+    max_running: 2
     priority: 0
     env:
-      CODEX_MODEL: "gpt-5.4"
-      CODEX_BASE_URL: "http://xxx"
-      OPENAI_API_KEY: "xxx"
+      CODEX_MODEL: "qwen3.6-flash"
+      CODEX_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      OPENAI_API_KEY: "sk-xxx"
 
 
-
-
-
-
-
-
-
-
-
-
-# 兜底 ----------------------------
-
-
-  # https://bailian.console.aliyun.com/cn-beijing?tab=model#/api-key
-  # leixiao172
-  # https://dashscope.aliyuncs.com/apps/anthropic
-  # http://10.0.0.24/160_xliqqb1o
-  - name: "claudecode_glm-5_al_bre"
-    type: "claudecode"
-    task_types: [bootstrap, reason, explore]
-    max_running: 3
-    priority: 9
-    env:
-      ANTHROPIC_MODEL: "glm-5"
-      ANTHROPIC_BASE_URL: "http://10.0.0.24/160_xliqqb1o"
-      ANTHROPIC_AUTH_TOKEN: "sk-de8c117c2d6e48b3a0f0b728e8570b8c"
