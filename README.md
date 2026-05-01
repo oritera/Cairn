@@ -75,9 +75,9 @@ System architecture:
      └──────────────────┘     └─────────────────────┘
 ```
 
-**Server** maintains graph consistency only.
+**Cairn Server** maintains graph consistency only.
 
-**Dispatcher** reads the graph, schedules tasks, spins up and tears down worker containers, and is the sole writer to the protocol. Each project gets its own Worker Container; multiple Agent Workers run concurrently inside it. Agent Workers only receive a prompt and return structured output.
+**Cairn Dispatcher** reads the graph, schedules tasks, spins up and tears down worker containers, and is the sole writer to the protocol. Each project gets its own Worker Container; multiple Agent Workers run concurrently inside it. Agent Workers only receive a prompt and return structured output.
 
 ## Results
 
@@ -94,7 +94,52 @@ System architecture:
 
 
 ## Getting Started
-...
+
+**Prerequisites**
+ 
+- macOS or Linux
+- Python ≥ 3.12
+- Docker
+
+
+### Pull required images
+ 
+Both setup methods require the worker container image:
+ 
+```bash
+docker pull --platform=linux/amd64 ghcr.io/oritera/cairn-worker-container:latest
+```
+ 
+### Docker Compose (recommended)
+ 
+Pull the base image used to build and run Cairn:
+ 
+```bash
+docker pull ghcr.io/astral-sh/uv:python3.13-trixie
+```
+ 
+Edit `dispatch.yaml` and fill in your LLM endpoints and API keys, then start both services:
+ 
+```bash
+docker compose up --build
+```
+ 
+This starts `cairn-server` on port `8000` and `cairn-dispatcher` once the server passes its health check. The dispatcher mounts `dispatch.yaml` from the project root and connects to Docker via the host socket. Data is persisted to `./datas/cairn/`.
+ 
+### Manual
+ 
+Edit `dispatch.yaml` and fill in your LLM endpoints and API keys, then:
+ 
+```bash
+# Start the server
+uv run --project cairn cairn serve
+ 
+# Run the dispatcher
+uv run --project cairn cairn dispatch --config dispatch.yaml
+ 
+# Run startup health checks only
+uv run --project cairn cairn dispatch --config dispatch.yaml --startup-healthcheck-only
+```
 
 
 ## ⚖️ License
