@@ -342,6 +342,15 @@ def _try_conclude_fallback(
         return "failed"
     try:
         payload = parse_json_output(result.stdout)
+        conclude_data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+        if isinstance(conclude_data, dict) and isinstance(conclude_data.get("complete"), dict):
+            LOG.warning(
+                "bootstrap conclude returned unexpected complete payload project=%s intent=%s worker=%s complete_preview=%s",
+                project.project.id,
+                intent.id,
+                worker.name,
+                preview(str(conclude_data.get("complete"))),
+            )
         kind, fact_description = validate_bootstrap_conclude_payload(payload)
     except Exception as exc:
         LOG.warning(

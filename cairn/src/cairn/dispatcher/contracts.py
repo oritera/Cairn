@@ -47,7 +47,10 @@ def _looks_like_bootstrap_execute_data(payload: dict[str, Any]) -> bool:
 
 
 def _looks_like_bootstrap_conclude_data(payload: dict[str, Any]) -> bool:
-    if not isinstance(payload, dict) or set(payload) != {"fact"}:
+    if not isinstance(payload, dict):
+        return False
+    keys = set(payload)
+    if keys not in ({"fact"}, {"fact", "complete"}):
         return False
     return _is_dict(payload.get("fact"))
 
@@ -139,9 +142,9 @@ def validate_bootstrap_conclude_payload(payload: dict[str, Any]) -> tuple[str, s
         data = payload
     if not isinstance(data, dict):
         raise ValueError("accepted must be true or false")
-
-    if data.get("complete") is not None:
-        raise ValueError("complete is not allowed")
+    extra_keys = set(data) - {"fact", "complete"}
+    if extra_keys:
+        raise ValueError("unexpected keys in conclude payload")
     fact = data.get("fact")
     if not isinstance(fact, dict):
         raise ValueError("fact is required")
