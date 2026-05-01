@@ -26,7 +26,7 @@ This structure is not unique to penetration testing. Vulnerability research, mat
 
 Cairn is built for this class of problems. Penetration testing is the first domain it has been validated on.
 
-The engine is built on a **Blackboard Architecture** driven by a DAG graph. Three primitives are all it needs:
+The engine is built on a **Blackboard Architecture** with an explicit fact-intent graph. Three primitives are all it needs:
 
 | Concept | Meaning |
 |---------|---------|
@@ -88,7 +88,7 @@ System architecture:
 | Metric | Value |
 |--------|-------|
 | Problems solved | **54 / 54 — only team to AK** |
-| Final ranking | 3th |
+| Final ranking | 3rd |
 
 > The system had never been tested before the competition. The full pipeline came online for the first time at 4 AM on race day. No training, no tuning, no domain-specific tooling. Zero MCP tools, zero RAG, zero predefined agent roles.
 
