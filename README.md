@@ -2,7 +2,7 @@
 
 <img src="cairn/src/cairn/server/static/favicon.svg" alt="Cairn Logo" width="220" />
 
-# Cairn AI
+# Cairn
 ### More Than Just AI Penetration Testing — Towards General State-Space Search
 
 <p>
@@ -10,11 +10,14 @@
   <img src="./README/tch.png" alt="TCH" height="55" />
 </p>
 
-Cairn is a general-purpose problem-solving engine that goes beyond traditional AI Penetration Testing. <br/>It defines no roles, no workflows. Given an origin and a goal, it searches for a path through an unknown state space.
+Cairn is a general-purpose problem-solving engine. <br/>It defines no roles, no workflows. Given an origin and a goal, it searches for a path through an unknown state space. <br/>AI Penetration Testing is one such problem — and a proven one.
 
 </div>
 
-# ⚖️ License
+## What is Cairn?
+
+
+## ⚖️ License
 This project is licensed under **GNU AGPLv3** for personal and educational use.
 
 **Commercial Use**: If you wish to use this project in a commercial or proprietary environment without the AGPL-3.0 open-source obligations, **please contact me to obtain a commercial license.**
