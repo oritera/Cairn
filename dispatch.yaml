@@ -36,7 +36,7 @@ workers:
   - name: "claudecode_deepseek-v4-pro"
     type: "claudecode"
     task_types: [bootstrap, reason, explore]
-    max_running: 1
+    max_running: 2
     priority: 0
     env:
       ANTHROPIC_MODEL: "deepseek-v4-pro"
@@ -46,7 +46,7 @@ workers:
   - name: "codex_qwen3.6-plus"
     type: "codex"
     task_types: [bootstrap,reason,explore]
-    max_running: 1
+    max_running: 2
     priority: 0
     env:
       CODEX_MODEL: "qwen3.6-plus"
