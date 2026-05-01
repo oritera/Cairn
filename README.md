@@ -1,10 +1,14 @@
 <div align="center">
 
-<img src="cairn/src/cairn/server/static/favicon.svg" width="220" style="margin-bottom: 20px;"/>
+<img src="cairn/src/cairn/server/static/favicon.svg" alt="Cairn Logo" width="220" />
 
 # Cairn AI
 ### More Than Just AI Penetration Testing — Towards General State-Space Search
-<img src="./README/tencent.png" style="width: 250px; height: 55px;" width="250" height="55"/>
+
+<p>
+  <img src="./README/tencent.png" alt="Tencent" height="55" />
+  <img src="./README/tch.png" alt="TCH" height="55" />
+</p>
 
 Cairn is a general-purpose problem-solving engine that goes beyond traditional AI Penetration Testing. <br/>It defines no roles, no workflows. Given an origin and a goal, it searches for a path through an unknown state space.
 
