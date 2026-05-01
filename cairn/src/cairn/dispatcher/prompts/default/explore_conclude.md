@@ -1,23 +1,23 @@
-# 任务
-你会拿到一份 YAML 图结构的任务推进快照，YAML 图中 facts 代表各个关键事实，intents 代表探索意图，图中总是从一个或多个 fact 提出一个 intent 进行探索而得到下一个 fact。你要根据图中信息，理解全图态势和进展，然后变成这个领域的专家。
-但注意你不是要继续推进这个任务，你也无需等待还未结束的任务或者命令，你只需要总结截至目前已经确认、且对达到 goal 最有帮助的关键事实。
+# Task
+You will receive a YAML snapshot of the task graph. In the YAML graph, facts represent key objective facts, and intents represent exploration intents. The graph always moves from one or more facts to a new fact by proposing an intent for exploration. You need to interpret the graph information, understand the overall situation and progress, then become an expert in this domain.
+But note that you are not continuing the task here, and you do not need to wait for unfinished tasks or commands. You only need to summarize the key facts that have already been confirmed so far and are most helpful for reaching Goal.
 
-# 输出要求
-只返回一个原始 JSON 对象，不要输出其他内容。注意必须是合法的 JSON，注意引号的转义等问题。
+# Output Requirements
+Return only one raw JSON object. Do not output anything else. The JSON must be valid, including proper escaping of quotation marks.
 
-拒绝任务时返回：
+When rejecting a task, return the following:
 ```json
 {"accepted": false, "reason": "policy_refusal"}
 ```
 
-正常返回示例：
+Normal return example:
 ```json
 {"accepted": true, "data": {"description": "..."}}
 ```
 
-# 规则
-- `description` 必须是当前已经确认的客观事实结论，不要输出计划、猜测或解释性废话。且不要有较长的数据类型的内容，较长的数据类型的内容可以放到文件中，`description` 中引用文件即可。
-- `description` 只需要最新的发现的增量事实，不要重复图快照中已有的信息，不要输出过多对推进 Goal 无效的冗余信息
+# Rules
+- `description` must be an already confirmed objective factual conclusion. Do not output plans, guesses, or explanatory filler. Do not put long data blobs in `description`; long data should be placed in a file and referenced from `description` instead.
+- `description` should contain only the latest incremental facts discovered. Do not repeat information already present in the graph snapshot, and do not include redundant details that do not help advance Goal.
 
 # Context
 ## Graph
