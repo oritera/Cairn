@@ -14,14 +14,14 @@ runtime:
 
 tasks:
   bootstrap:
-    timeout: 600
-    conclude_timeout: 180
+    timeout: 300
+    conclude_timeout: 90
   reason:
     timeout: 300
     max_intents: 2
   explore:
-    timeout: 600
-    conclude_timeout: 180
+    timeout: 300
+    conclude_timeout: 90
 
 container:
   image: "ghcr.io/oritera/cairn-worker-container:latest"
@@ -33,23 +33,23 @@ container:
 
 
 workers:
-  - name: "claudecode_deepseek-v4-flash"
+  - name: "claudecode_deepseek-v4-pro"
     type: "claudecode"
     task_types: [bootstrap, reason, explore]
-    max_running: 2
+    max_running: 1
     priority: 0
     env:
-      ANTHROPIC_MODEL: "deepseek-v4-flash"
+      ANTHROPIC_MODEL: "deepseek-v4-pro"
       ANTHROPIC_BASE_URL: "https://api.deepseek.com/anthropic"
       ANTHROPIC_AUTH_TOKEN: "sk-xxx"
 
-  - name: "codex_qwen3.6-flash"
+  - name: "codex_qwen3.6-plus"
     type: "codex"
     task_types: [bootstrap,reason,explore]
-    max_running: 2
+    max_running: 1
     priority: 0
     env:
-      CODEX_MODEL: "qwen3.6-flash"
+      CODEX_MODEL: "qwen3.6-plus"
       CODEX_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
       OPENAI_API_KEY: "sk-xxx"
 
