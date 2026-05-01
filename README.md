@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="cairn/src/cairn/server/static/favicon.svg" alt="HexStrike AI Logo" width="220" style="margin-bottom: 20px;"/>
+<img src="cairn/src/cairn/server/static/favicon.svg" width="220" style="margin-bottom: 20px;"/>
 
 # Cairn AI
 ### More Than Just AI Penetration Testing — Towards General State-Space Search
