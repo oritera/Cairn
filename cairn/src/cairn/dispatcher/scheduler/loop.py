@@ -21,8 +21,8 @@ from cairn.dispatcher.tasks.reason import run_reason_task
 from cairn.server.models import Intent, ProjectDetail, ProjectSummary
 
 LOG = logging.getLogger(__name__)
-UNHEALTHY_RETRY_AFTER_SECONDS = 2
-REJECTED_RETRY_AFTER_SECONDS = 2
+UNHEALTHY_RETRY_AFTER_SECONDS = 5
+REJECTED_RETRY_AFTER_SECONDS = 5
 BOOTSTRAP_INTENT_DESCRIPTION = "bootstrap"
 BOOTSTRAP_INTENT_CREATOR = "dispatcher.bootstrap"
 
