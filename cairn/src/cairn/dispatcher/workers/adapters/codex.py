@@ -94,7 +94,7 @@ class CodexDriver(RegexSessionDriver):
 
     @staticmethod
     def _healthcheck_url(worker: WorkerConfig) -> str:
-        return f"{worker.env['CODEX_BASE_URL']}/chat/completions"
+        return f"{worker.env['CODEX_BASE_URL']}/responses"
 
     @staticmethod
     def _healthcheck_headers(worker: WorkerConfig) -> list[str]:
@@ -108,7 +108,7 @@ class CodexDriver(RegexSessionDriver):
     @staticmethod
     def _healthcheck_payload(worker: WorkerConfig) -> str:
         return (
-            '{"messages":[{"role":"user","content":"ping"}],'
+            '{"input":[{"content":"ping","role":"user"}],'
             '"model":"'
             + worker.env["CODEX_MODEL"]
             + '","stream":false}'
