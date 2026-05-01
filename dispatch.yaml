@@ -1,0 +1,82 @@
+server: "http://cairn-server:8000"
+
+common_env:
+  TSEC_SERVER_HOST: "10.0.0.44:8000"
+  TSEC_AGENT_TOKEN: "xxx"
+
+runtime:
+  interval: 3
+  max_workers: 8
+  max_running_projects: 3
+  max_project_workers: 4
+  healthcheck_timeout: 22
+  prompt_group: "default"
+
+tasks:
+  bootstrap:
+    timeout: 600
+    conclude_timeout: 180
+  reason:
+    timeout: 300
+    max_intents: 2
+  explore:
+    timeout: 600
+    conclude_timeout: 180
+
+container:
+  image: "ghcr.io/oritera/cairn-worker-container:latest"
+  network_mode: "host"
+  completed_action: "stop"
+  # cap_add:
+  #   - "NET_RAW"
+  #   - "NET_ADMIN"
+
+
+workers:
+  - name: "claudecode_claude-opus-4-7"
+    type: "claudecode"
+    task_types: [bootstrap, reason, explore]
+    max_running: 12
+    priority: 0
+    env:
+      ANTHROPIC_MODEL: "claude-opus-4-7"
+      ANTHROPIC_BASE_URL: "http://xxx"
+      ANTHROPIC_AUTH_TOKEN: "xxx"
+
+  - name: "codex_gpt-5.4"
+    type: "codex"
+    task_types: [bootstrap,reason,explore]
+    max_running: 12
+    priority: 0
+    env:
+      CODEX_MODEL: "gpt-5.4"
+      CODEX_BASE_URL: "http://xxx"
+      OPENAI_API_KEY: "xxx"
+
+
+
+
+
+
+
+
+
+
+
+
+# 兜底 ----------------------------
+
+
+  # https://bailian.console.aliyun.com/cn-beijing?tab=model#/api-key
+  # leixiao172
+  # https://dashscope.aliyuncs.com/apps/anthropic
+  # http://10.0.0.24/160_xliqqb1o
+  - name: "claudecode_glm-5_al_bre"
+    type: "claudecode"
+    task_types: [bootstrap, reason, explore]
+    max_running: 3
+    priority: 9
+    env:
+      ANTHROPIC_MODEL: "glm-5"
+      ANTHROPIC_BASE_URL: "http://10.0.0.24/160_xliqqb1o"
+      ANTHROPIC_AUTH_TOKEN: "sk-de8c117c2d6e48b3a0f0b728e8570b8c"

@@ -1,0 +1,3377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cairn</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<script src="/static/vendor/tailwindcss.js"></script>
+<script src="/static/vendor/dagre.min.js"></script>
+<script src="/static/vendor/cytoscape.min.js"></script>
+<script src="/static/vendor/cytoscape-dagre.js"></script>
+<script src="/static/vendor/klay.js"></script>
+<script src="/static/vendor/cytoscape-klay.js"></script>
+<script src="/static/vendor/elk.bundled.js"></script>
+<script src="/static/vendor/cytoscape-elk.js"></script>
+<script defer src="/static/vendor/alpine.min.js"></script>
+<style>
+  [x-cloak] { display: none !important; }
+  #cy { width: 100%; height: 100%; }
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  .overlay { background: rgba(15,23,42,0.25); backdrop-filter: blur(6px); }
+  .timeline-flash { animation: timelineFlash 1s ease-out; }
+  .reason-chip-running { animation: reasonChipGlow 1.8s ease-in-out infinite; }
+  .intent-chip-running { animation: intentChipGlow 1.8s ease-in-out infinite; }
+  .reason-panel-running::before {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 22px;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.14), rgba(56, 189, 248, 0));
+    animation: reasonPanelPulse 2.1s ease-out infinite;
+    pointer-events: none;
+  }
+  .reason-beacon {
+    position: relative;
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: #0ea5e9;
+    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.16);
+  }
+  .reason-beacon::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(14, 165, 233, 0.34);
+    animation: reasonBeaconPulse 1.8s ease-out infinite;
+  }
+  .reason-graph-scan {
+    position: absolute;
+    inset: 8px;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: 18px;
+  }
+  .reason-graph-scan::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow:
+      inset 0 0 0 1px rgba(125, 211, 252, 0.32),
+      inset 0 0 30px rgba(125, 211, 252, 0.06),
+      inset 0 0 64px rgba(56, 189, 248, 0.03);
+    animation: reasonFramePulse 2.8s ease-in-out infinite;
+  }
+  .reason-graph-scan::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    inset: 12px;
+    border-radius: 12px;
+    background:
+      linear-gradient(90deg, rgba(125, 211, 252, 0.85), rgba(125, 211, 252, 0.18)),
+      linear-gradient(180deg, rgba(125, 211, 252, 0.85), rgba(125, 211, 252, 0.18)),
+      linear-gradient(270deg, rgba(125, 211, 252, 0.85), rgba(125, 211, 252, 0.18)),
+      linear-gradient(0deg, rgba(125, 211, 252, 0.85), rgba(125, 211, 252, 0.18));
+    background-size: 18px 2px, 2px 18px, 18px 2px, 2px 18px;
+    background-position: left top, left top, right bottom, right bottom;
+    background-repeat: no-repeat;
+    opacity: 0.6;
+  }
+  .reason-graph-scan > span {
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
+  .reason-graph-grid {
+    inset: 12px;
+    border-radius: 12px;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        rgba(186, 230, 253, 0) 0,
+        rgba(186, 230, 253, 0) 35px,
+        rgba(186, 230, 253, 0.045) 36px,
+        rgba(186, 230, 253, 0.045) 37px
+      ),
+      repeating-linear-gradient(
+        180deg,
+        rgba(186, 230, 253, 0) 0,
+        rgba(186, 230, 253, 0) 35px,
+        rgba(186, 230, 253, 0.04) 36px,
+        rgba(186, 230, 253, 0.04) 37px
+      );
+    opacity: 0.42;
+  }
+  .reason-graph-ambient {
+    inset: 0;
+    background:
+      radial-gradient(circle at 12% 18%, rgba(56, 189, 248, 0.11), rgba(56, 189, 248, 0) 30%),
+      radial-gradient(circle at 84% 16%, rgba(59, 130, 246, 0.08), rgba(59, 130, 246, 0) 24%),
+      linear-gradient(180deg, rgba(186, 230, 253, 0.055), rgba(255, 255, 255, 0) 46%);
+    animation: reasonAmbientPulse 2.4s ease-in-out infinite alternate;
+  }
+  .reason-graph-scanline {
+    inset: 0;
+  }
+  .reason-graph-scanline::before {
+    content: "";
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    height: 2px;
+    top: 12%;
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0), rgba(186, 230, 253, 0.96), rgba(56, 189, 248, 0));
+    box-shadow:
+      0 0 18px rgba(125, 211, 252, 0.42),
+      0 0 34px rgba(186, 230, 253, 0.16);
+    animation: reasonGraphScanline 4.2s linear infinite;
+  }
+  .reason-graph-sweep {
+    inset: -18%;
+    background: linear-gradient(
+      103deg,
+      rgba(14, 165, 233, 0) 40%,
+      rgba(56, 189, 248, 0.04) 47%,
+      rgba(255, 255, 255, 0.22) 50%,
+      rgba(125, 211, 252, 0.1) 53%,
+      rgba(14, 165, 233, 0) 60%
+    );
+    transform: translateX(-86%) skewX(-14deg);
+    animation: reasonGraphSweep 4.6s ease-in-out infinite;
+  }
+  .title-action-trigger {
+    min-width: 0;
+  }
+  .title-action-button {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition: opacity 180ms ease, transform 180ms ease, background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .title-action-button {
+      opacity: 0;
+      transform: translateY(2px);
+      pointer-events: none;
+    }
+    .title-action-trigger:hover .title-action-button,
+    .title-action-trigger:focus-within .title-action-button {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+  }
+  @keyframes timelineFlash {
+    0% { background: rgba(99, 102, 241, 0.18); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.2); }
+    35% { background: rgba(99, 102, 241, 0.12); box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.08); }
+    100% { background: rgba(99, 102, 241, 0); box-shadow: 0 0 0 14px rgba(99, 102, 241, 0); }
+  }
+  @keyframes reasonBeaconPulse {
+    0% { transform: scale(0.72); opacity: 0.9; }
+    70% { transform: scale(1.45); opacity: 0; }
+    100% { transform: scale(1.45); opacity: 0; }
+  }
+  @keyframes reasonPanelPulse {
+    0% { transform: scale(0.96); opacity: 0; }
+    18% { opacity: 1; }
+    70% { transform: scale(1.02); opacity: 0.18; }
+    100% { transform: scale(1.03); opacity: 0; }
+  }
+  @keyframes reasonChipGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.18); }
+    50% { box-shadow: 0 0 0 7px rgba(56, 189, 248, 0.08); }
+  }
+  @keyframes intentChipGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.18); }
+    50% { box-shadow: 0 0 0 7px rgba(251, 191, 36, 0.08); }
+  }
+  @keyframes reasonGraphSweep {
+    0% { transform: translateX(-86%) skewX(-14deg); opacity: 0; }
+    18% { opacity: 1; }
+    82% { opacity: 1; }
+    100% { transform: translateX(88%) skewX(-14deg); opacity: 0; }
+  }
+  @keyframes reasonAmbientPulse {
+    0% { opacity: 0.75; }
+    100% { opacity: 1; }
+  }
+  @keyframes reasonGraphScanline {
+    0% { top: 11%; opacity: 0.18; }
+    8% { opacity: 0.55; }
+    50% { opacity: 0.42; }
+    92% { opacity: 0.55; }
+    100% { top: 87%; opacity: 0.18; }
+  }
+  @keyframes reasonFramePulse {
+    0%, 100% { opacity: 0.72; }
+    50% { opacity: 1; }
+  }
+</style>
+<script>
+  tailwind.config = {
+    theme: {
+      fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','Inter','Segoe UI','sans-serif'] },
+      extend: {
+        colors: {
+          brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' }
+        }
+      }
+    }
+  }
+</script>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden" :class="{ 'select-none cursor-col-resize': isResizingPanel }" x-data="cairnApp()">
+
+<!-- ═══════════ PROJECT LIST VIEW ═══════════ -->
+<div x-show="view === 'list'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+  <header class="bg-white/80 backdrop-blur border-b border-slate-200/60 px-4 py-2.5 flex items-center gap-3 shrink-0">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <div class="h-8 w-8 rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/40 flex items-center justify-center shrink-0 overflow-hidden">
+        <img src="/static/favicon.svg" alt="" class="w-5 h-5 block">
+      </div>
+      <span class="font-semibold text-slate-700 tracking-tight">Cairn</span>
+    </div>
+    <div class="flex-1"></div>
+    <div class="flex items-center gap-3 text-[11px] text-slate-400">
+      <span class="inline-flex items-center gap-1.5 shrink-0" title="All projects">
+        <span class="font-medium uppercase tracking-[0.12em] text-slate-400">All</span>
+        <span class="font-semibold text-slate-600 tabular-nums" x-text="projects.length"></span>
+      </span>
+      <span class="inline-flex items-center gap-1.5 shrink-0" title="Active projects">
+        <span class="h-1.5 w-1.5 rounded-full bg-teal-500"></span>
+        <span class="font-semibold text-teal-700 tabular-nums" x-text="countProjectsByStatus('active')"></span>
+      </span>
+      <span class="inline-flex items-center gap-1.5 shrink-0" title="Stopped projects">
+        <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+        <span class="font-semibold text-amber-700 tabular-nums" x-text="countProjectsByStatus('stopped')"></span>
+      </span>
+      <span class="inline-flex items-center gap-1.5 shrink-0" title="Completed projects">
+        <span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+        <span class="font-semibold text-slate-600 tabular-nums" x-text="countProjectsByStatus('completed')"></span>
+      </span>
+      <button type="button"
+        @click="stopAllActiveProjects()"
+        :disabled="!hasActiveProjects() || isStoppingAllProjects"
+        class="h-7 px-2.5 rounded-lg border border-amber-200 text-xs text-amber-700 hover:bg-amber-50 transition inline-flex items-center gap-1.5 shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
+        title="Stop all active projects">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+        <span x-text="isStoppingAllProjects ? 'Stopping...' : 'Stop Active'"></span>
+      </button>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <button @click="showNewProject = true" class="h-7 px-2.5 rounded-lg border border-brand-200 text-xs text-brand-600 hover:bg-brand-50 transition inline-flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        New Project
+      </button>
+    </div>
+    <div class="flex items-center gap-1.5 ml-1">
+      <button @click="showLocalPrefs = true" class="h-7 max-w-40 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center shrink-0">
+        <span class="truncate block" x-text="actorName()"></span>
+      </button>
+      <button @click="loadSettings(); showSettings = true" class="h-7 w-7 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition inline-flex items-center justify-center shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7 7 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a7 7 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a7 7 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a7 7 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path d="M15 12a3 3 0 1 1-6 0-3 3 0 0 1 6 0Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div x-ref="projectListScroll" @scroll.passive="rememberProjectListScroll()" class="flex-1 overflow-y-auto p-4">
+    <template x-if="projects.length === 0">
+      <div class="flex flex-col items-center justify-center h-full text-slate-400">
+        <img src="/static/favicon.svg" alt="" class="w-20 h-20 mb-5 opacity-30">
+        <p class="text-lg font-medium text-slate-500">No projects yet</p>
+        <p class="text-sm mt-1">Create a project to start exploring</p>
+      </div>
+    </template>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      <template x-for="p in projects" :key="p.id">
+        <div @click="openProject(p.id)"
+          class="group h-full flex flex-col bg-white rounded-2xl border border-slate-200/60 p-5 cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-slate-200/50 hover:border-slate-300 hover:-translate-y-0.5">
+          <div class="flex items-start justify-between mb-3">
+            <span class="text-[11px] font-mono text-slate-400 tracking-wide" x-text="p.id"></span>
+            <span class="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-[0.12em]"
+              :class="projectStatusBadgeClass(p.status)"
+              x-text="p.status"></span>
+          </div>
+          <div class="mb-3 flex-1">
+            <div class="title-action-trigger flex items-start gap-2">
+              <h3 class="min-w-0 flex-1 text-[15px] font-semibold text-slate-700 break-words [overflow-wrap:anywhere] group-hover:text-brand-600 transition-colors" x-text="p.title"></h3>
+              <button type="button"
+                @click.stop="openRenameProject(p.id, p.title)"
+                class="title-action-button mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400"
+                title="Rename project"
+                :aria-label="`Rename ${p.title}`">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m16.862 4.487 1.65-1.65a1.875 1.875 0 1 1 2.652 2.652l-9.193 9.193a4.5 4.5 0 0 1-1.897 1.13L6 17l1.188-4.074a4.5 4.5 0 0 1 1.13-1.897l8.544-8.542Z"/><path d="M19.5 7.125 16.875 4.5"/><path d="M5.25 18.75h13.5"/></svg>
+              </button>
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+              <template x-if="p.reason">
+                <div class="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-medium text-sky-700 reason-chip-running">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 3v3"/><path d="M18.364 5.636 16.95 7.05"/><path d="M21 12h-3"/><path d="m18.364 18.364-1.414-1.414"/><path d="M12 21v-3"/><path d="m7.05 16.95-1.414 1.414"/><path d="M6 12H3"/><path d="M7.05 7.05 5.636 5.636"/><circle cx="12" cy="12" r="3.5"/></svg>
+                  <span x-text="reasonBadgeText(p.reason, true)"></span>
+                </div>
+              </template>
+              <template x-if="p.working_intent_count > 0">
+                <div class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700 intent-chip-running">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="8.5"/></svg>
+                  <span x-text="workingIntentBadgeText(p.working_intent_count)"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 text-[11px] text-slate-400">
+            <span class="flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-7.07l-2.83 2.83M9.76 14.24l-2.83 2.83m11.14 0l-2.83-2.83M9.76 9.76L6.93 6.93"/></svg>
+              <span x-text="p.fact_count"></span>
+            </span>
+            <span class="flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+              <span x-text="p.intent_count"></span>
+            </span>
+            <template x-if="p.working_intent_count > 0">
+              <span class="flex items-center gap-1 text-amber-500">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="10"/></svg>
+                <span x-text="p.working_intent_count"></span>
+              </span>
+            </template>
+            <template x-if="p.unclaimed_intent_count > 0">
+              <span class="flex items-center gap-1 text-slate-400">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                <span x-text="p.unclaimed_intent_count"></span>
+              </span>
+            </template>
+            <span class="flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z"/></svg>
+              <span x-text="p.hint_count"></span>
+            </span>
+          </div>
+          <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-400">
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M8 2v3M16 2v3"/><path d="M3.5 9.5h17"/><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M8 13h3M8 16h6"/></svg>
+            <span x-text="formatDate(p.created_at)"></span>
+          </div>
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-end gap-1.5">
+            <div class="flex items-center justify-end gap-1.5 flex-wrap">
+              <button type="button" @click.stop="viewProjectYaml(p.id, p.title)"
+                class="px-2 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M14.25 3H7.5A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V8.25L14.25 3Z"/><path d="M14.25 3v5.25h4.5"/><path d="M8.25 12h7.5M8.25 15h5.25"/></svg>
+                Snapshot
+              </button>
+              <template x-if="p.status !== 'completed'">
+                <button type="button" @click.stop="toggleProjectStopById(p.id, p.status)"
+                  class="px-2 py-1 rounded-lg border text-[11px] transition flex items-center gap-1"
+                  :class="p.status === 'active'
+                    ? 'border-amber-200 text-amber-600 hover:bg-amber-50'
+                    : 'border-teal-200 text-teal-600 hover:bg-teal-50'">
+                  <svg x-show="p.status === 'active'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                  <svg x-show="p.status === 'stopped'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg>
+                  <span x-text="p.status === 'active' ? 'Stop' : 'Resume'"></span>
+                </button>
+              </template>
+              <template x-if="p.status === 'completed'">
+                <button type="button" @click.stop="openReopenProject(p.id, p.title)"
+                  class="px-2 py-1 rounded-lg border border-sky-200 text-[11px] text-sky-600 hover:bg-sky-50 transition flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.708"/><path d="M3 3v6h6"/></svg>
+                  Reopen
+                </button>
+              </template>
+              <button type="button" @click.stop="deleteProjectById(p.id, p.title)"
+                class="px-2 py-1 rounded-lg border border-rose-200 text-[11px] text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6"/><path d="M19 6l-.63 11.338A2 2 0 0 1 16.37 19.5H7.63a2 2 0 0 1-1.997-2.162L5 6"/><path d="M10 10.5v5"/><path d="M14 10.5v5"/></svg>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ GRAPH VIEW ═══════════ -->
+<template x-if="view === 'graph'">
+<div class="flex-1 flex flex-col overflow-hidden">
+  <header class="bg-white/80 backdrop-blur border-b border-slate-200/60 px-4 py-2.5 flex items-center gap-3 shrink-0 z-20">
+    <button @click="backToList()" class="p-1.5 rounded-lg hover:bg-slate-100 transition text-slate-400 hover:text-slate-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="title-action-trigger flex items-center gap-2 min-w-0">
+      <span class="text-[11px] font-mono text-slate-400" x-text="project.project.id"></span>
+      <h2 class="text-[15px] font-semibold text-slate-700 truncate" x-text="project.project.title"></h2>
+      <button x-show="!replay.active" @click="openRenameProject(project.project.id, project.project.title)"
+        class="title-action-button inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400"
+        title="Rename project"
+        :aria-label="`Rename ${project.project.title}`">
+        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m16.862 4.487 1.65-1.65a1.875 1.875 0 1 1 2.652 2.652l-9.193 9.193a4.5 4.5 0 0 1-1.897 1.13L6 17l1.188-4.074a4.5 4.5 0 0 1 1.13-1.897l8.544-8.542Z"/><path d="M19.5 7.125 16.875 4.5"/><path d="M5.25 18.75h13.5"/></svg>
+      </button>
+      <span class="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-[0.12em] shrink-0"
+        :class="projectStatusBadgeClass(project.project.status)"
+        x-text="project.project.status"></span>
+    </div>
+    <div class="flex-1"></div>
+    <div class="flex items-center gap-4 text-xs text-slate-400">
+      <span x-text="`${project.facts.length} facts`"></span>
+      <span x-text="`${project.intents.length} intents`"></span>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <template x-if="!replay.active">
+        <button @click="startProjectReplay()" class="px-2.5 py-1 rounded-lg border border-violet-200 text-xs text-violet-600 hover:bg-violet-50 transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/><path d="M4 5v14"/></svg>
+          Replay
+        </button>
+      </template>
+      <template x-if="replay.active">
+        <div class="flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50/80 px-2 py-1 text-xs text-violet-700">
+          <span class="font-medium whitespace-nowrap" x-text="replayProgressLabel()"></span>
+          <button @click="toggleProjectReplayPlayback()" class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 hover:bg-white transition" :title="replay.playing ? 'Pause replay' : 'Resume replay'">
+            <svg x-show="replay.playing" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 6h3v12H8zM13 6h3v12h-3z"/></svg>
+            <svg x-show="!replay.playing" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg>
+          </button>
+          <button @click="restartProjectReplay()" class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 hover:bg-white transition" title="Restart replay">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.708"/><path d="M3 3v6h6"/></svg>
+          </button>
+          <select x-model="replay.stepMs" @change="updateReplaySpeed()" class="h-6 rounded-md border border-violet-200 bg-white/80 px-1.5 text-[11px] text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-100">
+            <option value="700">Fast</option>
+            <option value="1100">Normal</option>
+            <option value="1600">Slow</option>
+          </select>
+          <button @click="exitProjectReplay()" class="inline-flex h-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 px-2 hover:bg-white transition">
+            Exit
+          </button>
+        </div>
+      </template>
+      <button @click="viewProjectYaml(selectedProjectId, project.project.title)" class="px-2.5 py-1 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M14.25 3H7.5A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V8.25L14.25 3Z"/><path d="M14.25 3v5.25h4.5"/><path d="M8.25 12h7.5M8.25 15h5.25"/></svg>
+        Snapshot
+      </button>
+      <template x-if="!replay.active && project.project.status !== 'completed'">
+        <button @click="toggleProjectStop()"
+          class="px-2.5 py-1 rounded-lg border text-xs transition flex items-center gap-1.5"
+          :class="project.project.status === 'active'
+            ? 'border-amber-200 text-amber-600 hover:bg-amber-50'
+            : 'border-teal-200 text-teal-600 hover:bg-teal-50'">
+          <svg x-show="project.project.status === 'active'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+          <svg x-show="project.project.status === 'stopped'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg>
+          <span x-text="project.project.status === 'active' ? 'Stop' : 'Resume'"></span>
+        </button>
+      </template>
+      <template x-if="!replay.active && project.project.status === 'completed'">
+        <button @click="openReopenProject(project.project.id, project.project.title)"
+          class="px-2.5 py-1 rounded-lg border border-sky-200 text-xs text-sky-600 hover:bg-sky-50 transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.708"/><path d="M3 3v6h6"/></svg>
+          Reopen
+        </button>
+      </template>
+      <button x-show="!replay.active" @click="deleteProject()" class="px-2.5 py-1 rounded-lg border border-rose-200 text-xs text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6"/><path d="M19 6l-.63 11.338A2 2 0 0 1 16.37 19.5H7.63a2 2 0 0 1-1.997-2.162L5 6"/><path d="M10 10.5v5"/><path d="M14 10.5v5"/></svg>
+        Delete
+      </button>
+    </div>
+    <div class="flex items-center gap-1.5 ml-1">
+      <button @click="showLocalPrefs = true" class="h-7 max-w-40 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center shrink-0">
+        <span class="truncate block" x-text="actorName()"></span>
+      </button>
+      <button @click="loadSettings(); showSettings = true" class="h-7 w-7 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition inline-flex items-center justify-center shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7 7 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a7 7 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a7 7 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a7 7 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path d="M15 12a3 3 0 1 1-6 0-3 3 0 0 1 6 0Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden" id="graphLayout">
+    <!-- Graph -->
+    <div class="flex-1 relative min-w-0">
+      <div class="absolute top-3 left-3 z-10 flex items-center gap-1.5">
+        <button @click="fitGraph()" class="h-7 w-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 text-slate-500 hover:text-slate-700 hover:bg-white transition inline-flex items-center justify-center" title="Fit graph" aria-label="Fit graph">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+        <select x-model="layoutMode" @change="applySelectedLayout()"
+          class="h-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 px-2.5 text-xs text-slate-600 hover:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 transition">
+          <option value="dagre_tb">Dagre ↓</option>
+          <option value="dagre_lr">Dagre →</option>
+          <option value="klay_tb">Klay ↓</option>
+          <option value="klay_lr">Klay →</option>
+          <option value="elk_tb">ELK ↓</option>
+          <option value="elk_lr">ELK →</option>
+        </select>
+      </div>
+
+      <template x-if="project.project.reason">
+        <div class="absolute top-14 right-3 z-10 max-w-80">
+          <div class="reason-panel-running relative overflow-hidden rounded-2xl border border-sky-200/80 bg-white/92 px-3.5 py-3 shadow-lg shadow-sky-100/60 backdrop-blur">
+            <div class="flex items-start gap-3">
+              <span class="reason-beacon mt-1 shrink-0"></span>
+              <div class="min-w-0">
+                <div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-500">Reason Running</div>
+                <div class="mt-0.5 text-sm font-semibold text-slate-700 truncate" x-text="project.project.reason.worker"></div>
+                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                  <span x-show="project.project.reason.trigger" x-text="`Trigger ${project.project.reason.trigger}`"></span>
+                  <span x-text="`Heartbeat ${formatTime(project.project.reason.last_heartbeat_at)}`"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="project.project.reason">
+        <div class="reason-graph-scan z-[1]">
+          <span class="reason-graph-grid"></span>
+          <span class="reason-graph-ambient"></span>
+          <span class="reason-graph-scanline"></span>
+          <span class="reason-graph-sweep"></span>
+        </div>
+      </template>
+
+      <div class="absolute top-3 right-3 z-10 flex flex-wrap justify-end gap-2">
+        <div class="flex gap-1.5" x-show="projectIsActive()">
+          <button @click="openCreateIntent()" :disabled="!canActOnSelectedFacts()"
+            class="px-3 py-1.5 bg-white/90 backdrop-blur border border-brand-200 text-brand-600 rounded-lg shadow-sm text-xs font-medium hover:bg-brand-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+            Intent
+          </button>
+          <button @click="openCompleteProject()" :disabled="!canActOnSelectedFacts()"
+            class="px-3 py-1.5 bg-white/90 backdrop-blur border border-teal-200 text-teal-600 rounded-lg shadow-sm text-xs font-medium hover:bg-teal-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+            Complete
+          </button>
+        </div>
+        <div class="flex gap-1.5" x-show="projectCanWriteHints()">
+          <button @click="openHintModal()"
+            class="px-3 py-1.5 bg-white/90 backdrop-blur border border-amber-200 text-amber-600 rounded-lg shadow-sm text-xs font-medium hover:bg-amber-50 transition flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z"/></svg>
+            Hint
+          </button>
+        </div>
+        <div class="flex gap-1.5" x-show="projectIsActive()">
+          <button @click="sendHeartbeatForSelectedIntent()" :disabled="!selectedActionableOpenIntentRecord()"
+            class="px-3 py-1.5 bg-white/90 backdrop-blur border border-slate-200 text-slate-600 rounded-lg shadow-sm text-xs font-medium hover:bg-slate-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 12h3.5l2.75-6 3.5 12 2.75-7H21"/></svg>
+            <span x-text="selectedIntentPrimaryActionLabel()"></span>
+          </button>
+          <button @click="releaseSelectedIntent()" :disabled="!selectedReleasableOpenIntentRecord()"
+            class="px-3 py-1.5 bg-white/90 backdrop-blur border border-amber-200 text-amber-700 rounded-lg shadow-sm text-xs font-medium hover:bg-amber-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 10V7.75A3.75 3.75 0 1 1 16.5 7"/><path d="M7.5 10.5h9A1.5 1.5 0 0 1 18 12v6A1.5 1.5 0 0 1 16.5 19.5h-9A1.5 1.5 0 0 1 6 18v-6A1.5 1.5 0 0 1 7.5 10.5Z"/><path d="M12 14.25v1.5"/></svg>
+            Release
+          </button>
+          <button @click="selectedActionableOpenIntentRecord() && openConclude(selectedActionableOpenIntentRecord())" :disabled="!selectedActionableOpenIntentRecord()"
+            class="px-3 py-1.5 bg-white/90 backdrop-blur border border-teal-200 text-teal-600 rounded-lg shadow-sm text-xs font-medium hover:bg-teal-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.25 3H7.5A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V8.25L14.25 3Z"/><path d="M14.25 3v5.25h4.5"/><path d="M9 13.5 10.875 15.375 15 11.25"/></svg>
+            Conclude
+          </button>
+        </div>
+      </div>
+
+      <div id="cy" class="relative z-0 flex-1 h-full"></div>
+    </div>
+
+    <div @pointerdown.prevent="startPanelResize($event)" class="w-2 shrink-0 cursor-col-resize group flex items-stretch justify-center touch-none relative z-20">
+      <div class="w-px bg-slate-200/70 transition group-hover:bg-brand-300" :class="{ 'bg-brand-400': isResizingPanel }"></div>
+    </div>
+
+    <!-- Side panel -->
+    <div class="border-l border-slate-200/60 bg-white flex flex-col overflow-hidden shrink-0 relative z-20" :style="{ width: sidePanelWidth + 'px', minWidth: sidePanelWidth + 'px', flexBasis: sidePanelWidth + 'px' }">
+      <div class="flex border-b border-slate-100 shrink-0">
+        <button @click="sideTab = 'detail'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
+          :class="sideTab === 'detail' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Detail</button>
+        <button @click="sideTab = 'hints'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
+          :class="sideTab === 'hints' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">
+          Hints <span class="ml-0.5 text-[10px] opacity-60" x-text="project.hints.length"></span>
+        </button>
+        <button @click="sideTab = 'log'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
+          :class="sideTab === 'log' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Log</button>
+      </div>
+
+      <!-- Detail -->
+      <div x-show="sideTab === 'detail'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/40">
+        <template x-if="!selectedNode">
+          <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-5 py-10 text-center shadow-sm">
+            <p class="text-sm text-slate-400">Click a node or edge</p>
+            <p class="text-xs text-slate-300 mt-1">Shift+click for multi-select</p>
+          </div>
+        </template>
+        <template x-if="selectedNode && selectedNode.type === 'fact' && selectedFacts.length > 1">
+          <div class="space-y-3">
+            <template x-for="fact in selectedFactRecords()" :key="fact.id">
+              <article class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold shrink-0"
+                        :class="{
+                          'bg-teal-50 text-teal-700': fact.id === 'origin',
+                          'bg-rose-50 text-rose-600': fact.id === 'goal',
+                          'bg-brand-50 text-brand-700': fact.id !== 'origin' && fact.id !== 'goal'
+                        }" x-text="fact.id"></span>
+                      <span class="text-[11px] text-slate-400 uppercase tracking-wider">Fact</span>
+                    </div>
+                    <button type="button" @click="removeFactSelection(fact.id)"
+                      class="text-[11px] text-slate-400 hover:text-slate-600 transition">Remove</button>
+                  </div>
+                </div>
+                <div class="p-4 space-y-3">
+                  <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="fact.description"></p>
+                  <div class="text-xs text-slate-400 space-y-1.5">
+                    <template x-if="fact.id === 'origin'">
+                      <p>Project starting point</p>
+                    </template>
+                    <template x-if="fact.id === 'goal'">
+                      <p>Project target fact</p>
+                    </template>
+                    <template x-if="fact.id !== 'origin' && fact.id !== 'goal' && getProducingIntent(fact.id)">
+                      <p x-text="`Produced by ${getProducingIntent(fact.id).id} from ${getProducingIntent(fact.id).from.join(', ')}`"></p>
+                    </template>
+                  </div>
+                </div>
+              </article>
+            </template>
+          </div>
+        </template>
+        <template x-if="selectedNode && selectedNode.type === 'fact' && selectedFactRecord() && selectedFacts.length <= 1">
+          <section class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold"
+                  :class="{
+                    'bg-teal-50 text-teal-700': selectedFactId() === 'origin',
+                    'bg-rose-50 text-rose-600': selectedFactId() === 'goal',
+                    'bg-brand-50 text-brand-700': selectedFactId() !== 'origin' && selectedFactId() !== 'goal'
+                  }" x-text="selectedFactId()"></span>
+                <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Fact</span>
+              </div>
+            </div>
+            <div class="p-4 space-y-4">
+              <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="selectedFactRecord().description"></p>
+              <div class="space-y-3 text-xs">
+                <template x-if="selectedFactId() === 'origin'">
+                  <div class="pt-4 border-t border-slate-100">
+                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Origin</p>
+                    <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Role</span><span class="text-slate-600 text-right break-words">Project starting point</span></div>
+                  </div>
+                </template>
+                <template x-if="selectedFactId() === 'goal'">
+                  <div class="pt-4 border-t border-slate-100 space-y-3">
+                    <p class="text-[10px] font-semibold text-rose-500 uppercase tracking-widest">Goal</p>
+                    <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Role</span><span class="text-slate-600 text-right break-words">Project target fact</span></div>
+                    <template x-if="selectedFactProducingIntent()">
+                      <div class="pt-1 space-y-3">
+                        <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Completed By</span><span class="font-mono text-slate-600 text-right break-all" x-text="selectedFactProducingIntent().id"></span></div>
+                        <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Worker</span><span class="text-slate-600 text-right break-all" x-text="selectedFactProducingIntent().worker || '—'"></span></div>
+                        <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Concluded</span><span class="text-slate-600 text-right break-words" x-text="formatTime(selectedFactProducingIntent().concluded_at || selectedFactProducingIntent().created_at)"></span></div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="selectedFactId() !== 'origin' && selectedFactId() !== 'goal' && selectedFactProducingIntent()">
+                  <div class="pt-4 border-t border-slate-100 space-y-3">
+                    <p class="text-[10px] font-semibold text-brand-500 uppercase tracking-widest">Produced By</p>
+                    <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Intent</span><span class="font-mono text-slate-600 text-right break-all" x-text="selectedFactProducingIntent().id"></span></div>
+                    <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">From</span><span class="font-mono text-slate-600 text-right break-all" x-text="selectedFactProducingIntent().from.join(', ')"></span></div>
+                    <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Creator</span><span class="text-slate-600 text-right break-all" x-text="selectedFactProducingIntent().creator"></span></div>
+                    <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Worker</span><span class="text-slate-600 text-right break-all" x-text="selectedFactProducingIntent().worker || '—'"></span></div>
+                    <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Concluded</span><span class="text-slate-600 text-right break-words" x-text="formatTime(selectedFactProducingIntent().concluded_at || selectedFactProducingIntent().created_at)"></span></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </section>
+        </template>
+        <template x-if="selectedNode && selectedNode.type === 'intent' && selectedIntentRecord()">
+          <section class="rounded-2xl border border-violet-200/80 bg-white shadow-sm overflow-hidden">
+            <div class="px-4 py-3 border-b border-violet-100 bg-violet-50/70">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[10px] font-mono font-bold" x-text="selectedIntentId()"></span>
+                <span class="text-[11px] font-medium" :class="intentStatusClass(selectedIntentRecord())" x-text="intentStatusLabel(selectedIntentRecord())"></span>
+              </div>
+            </div>
+            <div class="p-4 space-y-4">
+              <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="selectedIntentRecord().description"></p>
+              <div class="pt-4 border-t border-slate-100 space-y-3 text-xs">
+                <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">From</span><span class="font-mono text-slate-600 text-right break-all" x-text="selectedIntentRecord().from.join(', ')"></span></div>
+                <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">To</span><span class="font-mono text-slate-600 text-right break-all" x-text="selectedIntentRecord().to || '—'"></span></div>
+                <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Creator</span><span class="text-slate-600 text-right break-all" x-text="selectedIntentRecord().creator"></span></div>
+                <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Worker</span><span class="text-slate-600 text-right break-all" x-text="selectedIntentRecord().worker || '—'"></span></div>
+                <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Heartbeat</span><span class="text-slate-600 text-right break-words" x-text="selectedIntentRecord().last_heartbeat_at ? formatTime(selectedIntentRecord().last_heartbeat_at) : '—'"></span></div>
+                <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Created</span><span class="text-slate-600 text-right break-words" x-text="formatTime(selectedIntentRecord().created_at)"></span></div>
+                <template x-if="selectedIntentRecord().concluded_at">
+                  <div class="flex items-start justify-between gap-3"><span class="text-slate-400 shrink-0">Concluded</span><span class="text-slate-600 text-right break-words" x-text="formatTime(selectedIntentRecord().concluded_at)"></span></div>
+                </template>
+              </div>
+            </div>
+          </section>
+        </template>
+      </div>
+
+      <!-- Hints -->
+      <div x-show="sideTab === 'hints'" class="flex-1 overflow-y-auto p-4 space-y-3 bg-amber-50/25">
+        <template x-if="project.hints.length === 0">
+          <div class="rounded-2xl border border-dashed border-amber-200 bg-white/80 px-5 py-10 text-center shadow-sm">
+            <p class="text-sm text-slate-300">No hints yet</p>
+          </div>
+        </template>
+        <template x-for="h in project.hints" :key="h.id">
+          <button type="button" @click="openHintTimelineEntry(h.id)"
+            class="w-full text-left rounded-2xl border border-amber-200/80 bg-white shadow-sm overflow-hidden transition hover:bg-amber-50/40">
+            <div class="px-4 py-3 border-b border-amber-100 bg-amber-50/80">
+              <div class="flex items-center justify-between gap-3 text-[11px]">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+                  <span class="font-medium text-amber-800 truncate" x-text="h.creator"></span>
+                </div>
+                <span class="text-amber-600/80 shrink-0 tabular-nums" x-text="formatTime(h.created_at)"></span>
+              </div>
+            </div>
+            <div class="p-4">
+              <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="h.content"></p>
+            </div>
+          </button>
+        </template>
+      </div>
+
+      <!-- Log -->
+      <div x-show="sideTab === 'log'" class="flex-1 overflow-y-auto p-4 space-y-3">
+        <template x-if="selectedTimelineSummary()">
+          <section class="sticky top-0 z-10 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
+            <div class="space-y-2.5">
+              <div class="space-y-1">
+                <div class="flex items-center justify-between gap-3 text-[11px]">
+                  <span class="text-slate-400">Sequence</span>
+                  <span class="font-mono text-slate-600" x-text="selectedTimelineSummary().sequenceLabel"></span>
+                </div>
+                <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div class="h-full rounded-full bg-brand-400 transition-all duration-300" :style="`width:${selectedTimelineSummary().sequencePercent}%`"></div>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <div class="flex items-center justify-between gap-3 text-[11px]">
+                  <span class="text-slate-400">Time Span</span>
+                  <span class="font-mono text-slate-600 text-right" x-text="selectedTimelineSummary().timeLabel"></span>
+                </div>
+                <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div class="h-full rounded-full bg-teal-400 transition-all duration-300" :style="`width:${selectedTimelineSummary().timePercent}%`"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </template>
+        <template x-if="timelineEvents().length === 0">
+          <p class="text-sm text-slate-300 text-center mt-12">No activity yet</p>
+        </template>
+        <template x-for="entry in timelineEvents()" :key="entry.id">
+          <div class="flex items-stretch gap-3" :id="timelineEntryDomId(entry.id)">
+            <div class="flex flex-col items-center shrink-0">
+              <div class="w-2.5 h-2.5 rounded-full mt-1.5" :class="timelineEventDotClass(entry)"></div>
+              <div class="w-px flex-1 bg-slate-100 mt-2" x-show="!entry.isLast"></div>
+            </div>
+            <button type="button" @click="openTimelineEntry(entry)"
+              class="min-w-0 flex-1 text-left rounded-xl px-0.5 py-0.5 transition"
+              :class="timelineEntryButtonClass(entry)">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[11px] font-medium text-slate-400 tabular-nums" x-text="formatTime(entry.timestamp)"></span>
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide"
+                  :class="timelineEventBadgeClass(entry)" x-text="timelineEventBadge(entry)"></span>
+                <span class="text-[11px] text-slate-300" x-text="formatTimelineDate(entry.timestamp)"></span>
+              </div>
+              <template x-if="entry.title">
+                <p class="text-sm text-slate-700 leading-relaxed break-words mt-1" x-text="entry.title"></p>
+              </template>
+              <template x-if="entry.actor || entry.meta.length > 0">
+                <p class="text-[11px] text-slate-400 mt-1 break-words" x-text="[entry.actor, ...entry.meta].filter(Boolean).join(' · ')"></p>
+              </template>
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
+</template>
+
+<!-- ═══════════ MODALS ═══════════ -->
+
+<!-- New Project -->
+<div x-show="showNewProject" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showNewProject = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
+    <h3 class="text-base font-semibold text-slate-700 mb-4">New Project</h3>
+    <div class="space-y-3">
+      <input x-model="newProject.title" placeholder="Project title" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
+      <textarea x-model="newProject.origin" placeholder="Origin — starting point" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
+      <textarea x-model="newProject.goal" placeholder="Goal — what to achieve" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
+
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Hints (optional)</span>
+          <button type="button" @click="newProject.hints.push({ content: '' })" class="text-[11px] text-brand-500 hover:text-brand-600 font-medium">+ Add</button>
+        </div>
+        <template x-for="(hint, idx) in newProject.hints" :key="idx">
+          <div class="flex gap-2 mb-2">
+            <input x-model="hint.content" placeholder="Hint content" class="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
+            <button type="button" @click="newProject.hints.splice(idx, 1)" x-show="newProject.hints.length > 1" class="px-2 text-slate-300 hover:text-red-400 transition text-sm">&times;</button>
+          </div>
+        </template>
+        <p class="text-[11px] text-slate-400">Hint creator uses local actor: <span class="font-medium text-slate-600" x-text="actorName()"></span></p>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showNewProject = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="createProject()" :disabled="!newProject.title || !newProject.origin || !newProject.goal"
+        class="px-5 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition disabled:opacity-30 shadow-sm shadow-brand-200">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Intent -->
+<div x-show="showIntentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showIntentModal = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
+    <h3 class="text-base font-semibold text-slate-700 mb-1">New Intent</h3>
+    <div class="mb-4">
+      <label class="text-[11px] text-slate-400 mb-1 block font-medium">From facts</label>
+      <div class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 min-h-[42px] flex flex-wrap gap-1.5 items-center">
+        <template x-for="fid in selectedFacts" :key="`intent-from-${fid}`">
+          <span class="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-mono text-slate-600" x-text="fid"></span>
+        </template>
+      </div>
+    </div>
+    <div class="space-y-3">
+      <textarea x-model="intentForm.description" placeholder="What will you explore?" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
+      <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
+        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showIntentModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="createIntent(false)" :disabled="!intentForm.description"
+        class="px-5 py-2 text-sm border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition disabled:opacity-30">Declare</button>
+      <button @click="createIntent(true)" :disabled="!intentForm.description"
+        class="px-5 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition disabled:opacity-30 shadow-sm shadow-brand-200">Declare &amp; Claim</button>
+    </div>
+  </div>
+</div>
+
+<!-- Conclude -->
+<div x-show="showConcludeModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showConcludeModal = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
+    <h3 class="text-base font-semibold text-slate-700 mb-1">Conclude Intent</h3>
+    <p class="text-xs text-slate-400 mb-4 font-mono" x-text="concludeForm.intentId"></p>
+    <div class="space-y-3">
+      <textarea x-model="concludeForm.description" placeholder="What did you find? (new fact)" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
+      <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
+        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showConcludeModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="concludeIntent()" :disabled="!concludeForm.description"
+        class="px-5 py-2 text-sm bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600 transition disabled:opacity-30 shadow-sm shadow-teal-200">Conclude</button>
+    </div>
+  </div>
+</div>
+
+<!-- Complete Project -->
+<div x-show="showCompleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showCompleteModal = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
+    <h3 class="text-base font-semibold text-slate-700 mb-1">Complete Project</h3>
+    <p class="text-xs text-slate-400 mb-4">Mark project as completed</p>
+    <div class="space-y-3">
+      <div>
+        <label class="text-[11px] text-slate-400 mb-1 block font-medium">From facts</label>
+        <div class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 min-h-[42px] flex flex-wrap gap-1.5 items-center">
+          <template x-for="fid in selectedFacts" :key="`complete-from-${fid}`">
+            <span class="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-mono text-slate-600" x-text="fid"></span>
+          </template>
+        </div>
+      </div>
+      <textarea x-model="completeForm.description" placeholder="Why is the goal met?" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
+      <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
+        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showCompleteModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="completeProject()" :disabled="selectedFacts.length === 0 || !completeForm.description"
+        class="px-5 py-2 text-sm bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600 transition disabled:opacity-30 shadow-sm shadow-teal-200">Complete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hint -->
+<div x-show="showHintModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showHintModal = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
+    <h3 class="text-base font-semibold text-slate-700 mb-4">Add Hint</h3>
+    <div class="space-y-3">
+      <textarea x-model="hintForm.content" placeholder="Strategy advice or note..." rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
+      <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
+        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showHintModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="addHint()" :disabled="!hintForm.content"
+        class="px-5 py-2 text-sm bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition disabled:opacity-30 shadow-sm shadow-amber-200">Add</button>
+    </div>
+</div>
+</div>
+
+<!-- Reopen -->
+<div x-show="showReopenModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showReopenModal = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
+    <h3 class="text-base font-semibold text-slate-700 mb-1">Reopen Project</h3>
+    <p class="text-xs text-slate-400 mb-4" x-text="projectLabel(reopenForm.projectId, reopenForm.projectTitle)"></p>
+    <div class="space-y-3">
+      <textarea x-model="reopenForm.description" placeholder="Why is this project not actually complete?" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
+      <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
+        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showReopenModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="reopenProject()" :disabled="!reopenForm.projectId || !reopenForm.description"
+        class="px-5 py-2 text-sm bg-sky-500 text-white rounded-xl font-medium hover:bg-sky-600 transition disabled:opacity-30 shadow-sm shadow-sky-200">Reopen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename Project -->
+<div x-show="showRenameModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showRenameModal = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
+    <h3 class="text-base font-semibold text-slate-700 mb-1">Rename Project</h3>
+    <p class="text-xs text-slate-400 mb-4" x-text="projectLabel(renameForm.projectId, renameForm.originalTitle)"></p>
+    <div class="space-y-3">
+      <input x-ref="renameTitleInput" x-model="renameForm.title" @keydown.enter.prevent="renameProject()" placeholder="Project title" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
+      <p class="text-[11px] text-slate-400">This only changes the project title and is allowed in any project status.</p>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showRenameModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="renameProject()" :disabled="!renameForm.projectId || !renameForm.title"
+        class="px-5 py-2 text-sm bg-slate-800 text-white rounded-xl font-medium hover:bg-slate-900 transition disabled:opacity-30 shadow-sm">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Local Preferences -->
+<div x-show="showLocalPrefs" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showLocalPrefs = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200/60" @click.stop>
+    <h3 class="text-base font-semibold text-slate-700 mb-4">Local Preferences</h3>
+    <div class="space-y-4">
+      <div>
+        <label class="text-[11px] text-slate-400 mb-1 block font-medium">Actor</label>
+        <input x-model="localPrefs.actor_name" placeholder="Your name" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
+      </div>
+      <div>
+        <label class="text-[11px] text-slate-400 mb-1 block font-medium">Default layout</label>
+        <select x-model="localPrefs.layout_mode" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+          <option value="dagre_tb">Dagre ↓</option>
+          <option value="dagre_lr">Dagre →</option>
+          <option value="klay_tb">Klay ↓</option>
+          <option value="klay_lr">Klay →</option>
+          <option value="elk_tb">ELK ↓</option>
+          <option value="elk_lr">ELK →</option>
+        </select>
+      </div>
+      <p class="text-[11px] text-slate-400">Stored only in this browser.</p>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showLocalPrefs = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
+      <button @click="saveLocalSettings()" class="px-4 py-2 text-sm bg-slate-800 text-white rounded-xl font-medium hover:bg-slate-900 transition shadow-sm">Save Local</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showSettings = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-slate-200/60" @click.stop>
+    <h3 class="text-base font-semibold text-slate-700 mb-4">Server Settings</h3>
+    <div>
+      <label class="text-[11px] text-slate-400 mb-1 block font-medium">Intent timeout (seconds)</label>
+      <input type="number" x-model.number="settingsForm.intent_timeout" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+    </div>
+    <div class="mt-4">
+      <label class="text-[11px] text-slate-400 mb-1 block font-medium">Reason timeout (seconds)</label>
+      <input type="number" x-model.number="settingsForm.reason_timeout" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+      <p class="text-[11px] text-slate-400 mt-2">Shared backend configuration.</p>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showSettings = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
+      <button @click="saveServerSettings()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200">Save Server</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export Preview -->
+<div x-show="showYamlModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showYamlModal = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 border border-slate-200/60 overflow-hidden" @click.stop>
+    <div class="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between gap-4">
+      <div class="min-w-0 flex items-center gap-3">
+        <div class="flex rounded-lg border border-slate-200 overflow-hidden shrink-0">
+          <button @click="switchExportTab('yaml')" class="px-2.5 py-1 text-xs font-medium transition"
+            :class="exportTab === 'yaml' ? 'bg-slate-100 text-slate-700' : 'text-slate-400 hover:text-slate-600'">YAML</button>
+          <button @click="switchExportTab('timeline')" class="px-2.5 py-1 text-xs font-medium transition"
+            :class="exportTab === 'timeline' ? 'bg-slate-100 text-slate-700' : 'text-slate-400 hover:text-slate-600'">Timeline</button>
+        </div>
+        <p class="text-xs text-slate-400 truncate" x-text="yamlPreviewTitle"></p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button @click="copyYamlPreview()" class="px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Copy</button>
+        <button @click="showYamlModal = false" class="px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
+      </div>
+    </div>
+    <div class="max-h-[75vh] overflow-auto bg-slate-50 p-4">
+      <div class="rounded-xl border border-slate-200 bg-white overflow-auto shadow-sm">
+        <div class="min-w-max p-0 text-[12px] leading-6 font-mono select-text" x-html="yamlPreviewHtml"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Project -->
+<div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="closeDeleteModal()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200/60" @click.stop>
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6"/><path d="M19 6l-.63 11.338A2 2 0 0 1 16.37 19.5H7.63a2 2 0 0 1-1.997-2.162L5 6"/><path d="M10 10.5v5"/><path d="M14 10.5v5"/></svg>
+      </div>
+      <div class="min-w-0 flex-1">
+        <h3 class="text-base font-semibold text-slate-700">Delete Project</h3>
+        <p class="text-sm text-slate-500 mt-1 leading-relaxed">
+          This will permanently remove
+          <span class="font-medium text-slate-700 break-all" x-text="deleteConfirmLabel()"></span>.
+        </p>
+        <p class="text-xs text-slate-400 mt-3">This action cannot be undone.</p>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-6">
+      <button @click="closeDeleteModal()" :disabled="isDeletingProject" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed">Cancel</button>
+      <button @click="confirmDeleteProject()" :disabled="isDeletingProject" class="px-4 py-2 text-sm bg-rose-500 text-white rounded-xl font-medium hover:bg-rose-600 transition shadow-sm shadow-rose-200 disabled:opacity-40 disabled:cursor-not-allowed">
+        <span x-text="isDeletingProject ? 'Deleting...' : 'Delete'"></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div x-show="toast.show" x-cloak
+  x-transition:enter="transition ease-out duration-300"
+  x-transition:enter-start="opacity-0 translate-y-2"
+  x-transition:enter-end="opacity-100 translate-y-0"
+  x-transition:leave="transition ease-in duration-200"
+  x-transition:leave-start="opacity-100"
+  x-transition:leave-end="opacity-0 translate-y-2"
+  class="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium"
+  :class="toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'">
+  <span x-text="toast.message"></span>
+</div>
+
+<script>
+function cairnApp() {
+  return {
+    view: 'list',
+    projects: [],
+    project: null,
+    selectedProjectId: '',
+    polling: true,
+    pollTimer: null,
+    cy: null,
+    sideTab: 'detail',
+    selectedNode: null,
+    selectedFacts: [],
+    selectedTimelineEntryId: null,
+    layoutMode: 'dagre_tb',
+    sidePanelWidth: 320,
+    isResizingPanel: false,
+
+    showNewProject: false,
+    showIntentModal: false,
+    showConcludeModal: false,
+    showCompleteModal: false,
+    showHintModal: false,
+    showReopenModal: false,
+    showRenameModal: false,
+    showLocalPrefs: false,
+    showSettings: false,
+    showYamlModal: false,
+    exportTab: 'yaml',
+    exportProjectId: '',
+    showDeleteModal: false,
+
+    newProject: { title: '', origin: '', goal: '', hints: [{ content: '' }] },
+    intentForm: { description: '' },
+    concludeForm: { description: '', intentId: '' },
+    completeForm: { description: '' },
+    hintForm: { content: '' },
+    reopenForm: { projectId: '', projectTitle: '', description: '' },
+    renameForm: { projectId: '', originalTitle: '', title: '' },
+    localPrefs: { actor_name: 'Human', layout_mode: 'dagre_tb' },
+    settingsForm: { intent_timeout: 5, reason_timeout: 5 },
+    deleteConfirm: { id: '', title: '' },
+    isDeletingProject: false,
+    yamlPreviewTitle: '',
+    yamlPreviewText: '',
+    yamlPreviewHtml: '',
+    toast: { show: false, message: '', type: 'info' },
+    replay: {
+      active: false,
+      playing: false,
+      stepMs: '1600',
+      frameIndex: -1,
+      frames: [],
+      visibleEvents: [],
+      sourceProject: null,
+      timer: null,
+    },
+    _timelineEventsCacheProject: null,
+    _timelineEventsCache: [],
+    _centerAnimation: null,
+    projectListScrollTop: 0,
+    shouldRestoreProjectListScroll: false,
+    isStoppingAllProjects: false,
+
+    async init() {
+      this._panelResizeMove = (e) => this.onPanelResize(e);
+      this._panelResizeStop = () => this.stopPanelResize();
+      window.addEventListener('pointermove', this._panelResizeMove);
+      window.addEventListener('pointerup', this._panelResizeStop);
+      this.loadLocalPrefs();
+      await this.loadProjects();
+      await this.loadSettings();
+      this.startPolling();
+      window.addEventListener('hashchange', () => this.handleRoute());
+      this.handleRoute();
+    },
+
+    handleRoute() {
+      const hash = location.hash || '#/';
+      const m = hash.match(/^#\/projects\/(.+)$/);
+      if (m) {
+        const id = m[1];
+        if (this.selectedProjectId !== id || this.view !== 'graph') {
+          this.openProject(id);
+        }
+      } else {
+        if (this.view !== 'list') this.backToList(true);
+      }
+    },
+
+    async api(method, path, body) {
+      const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      if (body) opts.body = JSON.stringify(body);
+      const r = await fetch(path, opts);
+      if (r.status === 204) return null;
+      const data = await r.json();
+      if (!r.ok) {
+        let msg = `HTTP ${r.status}`;
+        if (typeof data.detail === 'string') msg = data.detail;
+        else if (Array.isArray(data.detail)) msg = data.detail.map(e => e.msg).join('; ');
+        throw new Error(msg);
+      }
+      return data;
+    },
+
+    async fetchText(path) {
+      const r = await fetch(path);
+      const text = await r.text();
+      if (!r.ok) {
+        let detail = text;
+        try {
+          const data = JSON.parse(text);
+          detail = data.detail || text;
+        } catch {}
+        throw new Error(detail || `HTTP ${r.status}`);
+      }
+      return text;
+    },
+
+    showToast(msg, type = 'info') {
+      this.toast = { show: true, message: msg, type };
+      setTimeout(() => this.toast.show = false, 3000);
+    },
+
+    cloneData(value) {
+      try {
+        return JSON.parse(JSON.stringify(value));
+      } catch (error) {
+        if (typeof structuredClone === 'function') return structuredClone(value);
+        throw error;
+      }
+    },
+
+    isValidLayoutMode(mode) {
+      return ['dagre_tb', 'dagre_lr', 'klay_tb', 'klay_lr', 'elk_tb', 'elk_lr'].includes(mode);
+    },
+
+    layoutEngine(mode = this.layoutMode) {
+      if (mode.startsWith('elk')) return 'elk';
+      return mode.startsWith('klay') ? 'klay' : 'dagre';
+    },
+
+    layoutDirection(mode = this.layoutMode) {
+      return mode.endsWith('_lr') ? 'LR' : 'TB';
+    },
+
+    loadLocalPrefs() {
+      try {
+        const raw = localStorage.getItem('cairn.localPrefs');
+        if (!raw) {
+          this.localPrefs.actor_name = 'Human';
+        } else {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed.actor_name === 'string') this.localPrefs.actor_name = parsed.actor_name;
+          if (this.isValidLayoutMode(parsed.layout_mode)) {
+            this.localPrefs.layout_mode = parsed.layout_mode;
+          } else if (parsed.layout_dir === 'TB' || parsed.layout_dir === 'LR') {
+            this.localPrefs.layout_mode = parsed.layout_dir === 'LR' ? 'dagre_lr' : 'dagre_tb';
+          }
+        }
+        const rawPanelWidth = localStorage.getItem('cairn.sidePanelWidth');
+        if (rawPanelWidth !== null) {
+          const savedPanelWidth = Number(rawPanelWidth);
+          if (Number.isFinite(savedPanelWidth)) this.sidePanelWidth = savedPanelWidth;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      if (!this.localPrefs.actor_name.trim()) this.localPrefs.actor_name = 'Human';
+      if (!this.isValidLayoutMode(this.localPrefs.layout_mode)) this.localPrefs.layout_mode = 'dagre_tb';
+      this.layoutMode = this.localPrefs.layout_mode;
+    },
+
+    saveLocalPrefs() {
+      try {
+        localStorage.setItem('cairn.localPrefs', JSON.stringify(this.localPrefs));
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    saveSidePanelWidth() {
+      try {
+        localStorage.setItem('cairn.sidePanelWidth', String(this.sidePanelWidth));
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    actorName() {
+      return this.localPrefs.actor_name.trim() || 'Human';
+    },
+
+    projectStatusBadgeClass(status) {
+      const classes = {
+        active: 'bg-teal-50 text-teal-600',
+        stopped: 'bg-amber-50 text-amber-700',
+        completed: 'bg-slate-100 text-slate-500',
+      };
+      return classes[status] || 'bg-slate-100 text-slate-500';
+    },
+
+    reasonBadgeText(reason, compact = false) {
+      if (!reason) return '';
+      if (compact) return `Reason · ${reason.worker}`;
+      const trigger = reason.trigger ? ` (${reason.trigger})` : '';
+      return `Reasoning · ${reason.worker}${trigger}`;
+    },
+
+    workingIntentBadgeText(count) {
+      return `Exploring · ${count}`;
+    },
+
+    isBootstrapIntent(intent) {
+      return Boolean(
+        intent
+        && intent.description === 'bootstrap'
+        && intent.creator === 'dispatcher.bootstrap'
+        && Array.isArray(intent.from)
+        && intent.from.length === 1
+        && intent.from[0] === 'origin'
+        && intent.to === null,
+      );
+    },
+
+    openIntentNodeType(intent) {
+      if (this.isBootstrapIntent(intent)) return intent.worker ? 'bootstrap_running' : 'bootstrap_pending';
+      return intent.worker ? 'in_progress' : 'unclaimed';
+    },
+
+    openIntentNodeLabel(intent) {
+      return this.isBootstrapIntent(intent) ? 'Bootstrap' : '?';
+    },
+
+    openIntentNodeSize(intent) {
+      if (this.isBootstrapIntent(intent)) return { width: 82, height: 30 };
+      return { width: 22, height: 22 };
+    },
+
+    projectIsActive() {
+      return !this.replay.active && this.project?.project?.status === 'active';
+    },
+
+    countProjectsByStatus(status) {
+      return this.projects.filter(project => project.status === status).length;
+    },
+
+    hasActiveProjects() {
+      return this.projects.some(project => project.status === 'active');
+    },
+
+    projectCanWriteHints() {
+      return !this.replay.active && ['active', 'stopped', 'completed'].includes(this.project?.project?.status);
+    },
+
+    canActOnSelectedFacts() {
+      return this.projectIsActive() && this.selectedFacts.length > 0 && !this.selectedFacts.includes('goal');
+    },
+
+    async loadProjects() {
+      try { this.projects = await this.api('GET', '/projects'); } catch(e) { console.error(e); }
+    },
+
+    rememberProjectListScroll() {
+      const scroller = this.$refs.projectListScroll;
+      if (!scroller) return;
+      this.projectListScrollTop = scroller.scrollTop;
+    },
+
+    restoreProjectListScroll() {
+      if (!this.shouldRestoreProjectListScroll) return;
+      this.$nextTick(() => {
+        const scroller = this.$refs.projectListScroll;
+        if (!scroller) return;
+        const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+        scroller.scrollTop = Math.min(this.projectListScrollTop, maxScrollTop);
+        this.shouldRestoreProjectListScroll = false;
+      });
+    },
+
+    escapeHtml(text) {
+      return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    },
+
+    highlightYamlScalar(value) {
+      const escaped = this.escapeHtml(value);
+      if (!value.trim()) return escaped;
+      if (/^\s*#.*$/.test(value)) return `<span style="color:#64748b">${escaped}</span>`;
+      if (/^\s*['"].*['"]\s*$/.test(value)) return `<span style="color:#15803d">${escaped}</span>`;
+      if (/^\s*\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}:\d{2})\s*$/.test(value)) return `<span style="color:#b45309">${escaped}</span>`;
+      if (/^\s*(true|false|null|~)\s*$/i.test(value)) return `<span style="color:#b91c1c">${escaped}</span>`;
+      if (/^\s*-?\d+(\.\d+)?\s*$/.test(value)) return `<span style="color:#0f766e">${escaped}</span>`;
+      if (/^\s*(origin|goal|f\d+|i\d+)\s*$/i.test(value)) return `<span style="color:#6d28d9">${escaped}</span>`;
+      return `<span style="color:#0f172a">${escaped}</span>`;
+    },
+
+    highlightYamlLine(line) {
+      if (/^\s*$/.test(line)) return '';
+      if (/^\s*#/.test(line)) return `<span style="color:#64748b">${this.escapeHtml(line)}</span>`;
+
+      const listKeyMatch = line.match(/^(\s*-\s+)([^:#\n][^:]*):(.*)$/);
+      if (listKeyMatch) {
+        const [, prefix, key, rest] = listKeyMatch;
+        return `${this.escapeHtml(prefix)}<span style="color:#7dd3fc">${this.escapeHtml(key)}</span>:${this.highlightYamlScalar(rest)}`;
+      }
+
+      const keyMatch = line.match(/^(\s*)([^:#\n][^:]*):(.*)$/);
+      if (keyMatch) {
+        const [, indent, key, rest] = keyMatch;
+        return `${this.escapeHtml(indent)}<span style="color:#7dd3fc">${this.escapeHtml(key)}</span>:${this.highlightYamlScalar(rest)}`;
+      }
+
+      const listValueMatch = line.match(/^(\s*-\s+)(.*)$/);
+      if (listValueMatch) {
+        const [, prefix, rest] = listValueMatch;
+        return `${this.escapeHtml(prefix)}${this.highlightYamlScalar(rest)}`;
+      }
+
+      return this.highlightYamlScalar(line);
+    },
+
+    yamlSectionTint(sectionName) {
+      const tints = {
+        project: { header: '#eff6ff', body: '#fafcff', itemA: '#f3f8ff', itemB: '#edf5ff' },
+        hints: { header: '#fffbeb', body: '#fffef8', itemA: '#fffaf0', itemB: '#fff6e8' },
+        facts: { header: '#eef2ff', body: '#fafaff', itemA: '#f5f7ff', itemB: '#eef3ff' },
+        intents: { header: '#ecfdf5', body: '#f8fdfb', itemA: '#f1fbf5', itemB: '#eaf8ef' },
+      };
+      return tints[sectionName] || { header: '#f8fafc', body: '#ffffff', itemA: '#f8fafc', itemB: '#f1f5f9' };
+    },
+
+    async copyYamlPreview() {
+      if (!this.yamlPreviewText) return;
+      if (!navigator.clipboard?.writeText) {
+        this.showToast('Copy not supported', 'error');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(this.yamlPreviewText);
+        this.showToast('Copied');
+      } catch {
+        this.showToast('Copy failed', 'error');
+      }
+    },
+
+    highlightYaml(text) {
+      const lines = String(text ?? '').split('\n');
+      let currentSection = '';
+      let activeItemIndent = null;
+      let activeItemStripe = 0;
+      let nextItemStripe = 0;
+
+      return lines.map((line) => {
+        const topLevelMatch = line.match(/^([A-Za-z_][A-Za-z0-9_-]*):\s*$/);
+        if (topLevelMatch) {
+          currentSection = topLevelMatch[1];
+          activeItemIndent = null;
+          activeItemStripe = 0;
+          nextItemStripe = 0;
+        }
+
+        const tint = this.yamlSectionTint(currentSection);
+        const indent = (line.match(/^(\s*)/) || ['',''])[1].length;
+        const isBlank = /^\s*$/.test(line);
+        const isListItem = /^(\s*)-\s+/.test(line);
+        const isTopLevelItem = isListItem && indent === 0;
+
+        if (isTopLevelItem) {
+          activeItemIndent = indent;
+          activeItemStripe = nextItemStripe;
+          nextItemStripe = nextItemStripe === 0 ? 1 : 0;
+        } else if (!isBlank && activeItemIndent !== null && indent === 0) {
+          activeItemIndent = null;
+        }
+
+        const isNestedListItem = isListItem && activeItemIndent !== null && indent > activeItemIndent;
+        const isItemContinuation = !isListItem && !isBlank && activeItemIndent !== null && indent > activeItemIndent;
+        const isBlankWithinItem = isBlank && activeItemIndent !== null;
+        const isItemLine = isTopLevelItem || isNestedListItem || isItemContinuation || isBlankWithinItem;
+        const lineHtml = isBlank ? '&nbsp;' : this.highlightYamlLine(line);
+        let background = currentSection ? tint.body : 'transparent';
+        let fontWeight = '400';
+
+        if (topLevelMatch) {
+          background = tint.header;
+          fontWeight = '700';
+        } else if (isItemLine) {
+          background = activeItemStripe === 0 ? tint.itemA : tint.itemB;
+        }
+
+        return `<div style="white-space:pre;padding:0 16px;background:${background};font-weight:${fontWeight};color:#0f172a">${lineHtml}</div>`;
+      }).join('');
+    },
+
+    highlightTimeline(text) {
+      const lines = String(text ?? '').split('\n');
+      const stripes = ['#fffbf5', '#fef5ee'];
+      let blockIndex = -1;
+      return lines.map((line) => {
+        if (/^\[/.test(line)) blockIndex++;
+        const bg = blockIndex < 0 ? stripes[0] : stripes[blockIndex % 2];
+        const isBlank = /^\s*$/.test(line);
+        return `<div style="white-space:pre;padding:0 16px;background:${bg};color:#0f172a">${isBlank ? '&nbsp;' : this.escapeHtml(line)}</div>`;
+      }).join('');
+    },
+
+    projectLabel(projectId, projectTitle) {
+      return projectTitle ? `${projectId} - ${projectTitle}` : projectId;
+    },
+
+    deleteConfirmLabel() {
+      return this.projectLabel(this.deleteConfirm.id, this.deleteConfirm.title);
+    },
+
+    requestDeleteProject(projectId, projectTitle = '') {
+      if (!projectId) return;
+      this.deleteConfirm = { id: projectId, title: projectTitle };
+      this.showDeleteModal = true;
+    },
+
+    closeDeleteModal(force = false) {
+      if (this.isDeletingProject && !force) return;
+      this.showDeleteModal = false;
+      this.deleteConfirm = { id: '', title: '' };
+    },
+
+    async viewProjectYaml(projectId, projectTitle = '') {
+      if (!projectId) return;
+      this.exportProjectId = projectId;
+      this.yamlPreviewTitle = this.projectLabel(projectId, projectTitle);
+      this.exportTab = 'yaml';
+      await this.loadExportTab('yaml');
+      this.showYamlModal = true;
+    },
+
+    async switchExportTab(tab) {
+      if (tab === this.exportTab) return;
+      this.exportTab = tab;
+      await this.loadExportTab(tab);
+    },
+
+    async loadExportTab(tab) {
+      if (!this.exportProjectId) return;
+      try {
+        const text = await this.fetchText(`/projects/${this.exportProjectId}/export?format=${tab}`);
+        this.yamlPreviewText = text;
+        this.yamlPreviewHtml = tab === 'yaml' ? this.highlightYaml(text) : this.highlightTimeline(text);
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    deleteProject() {
+      if (!this.selectedProjectId) return;
+      this.requestDeleteProject(this.selectedProjectId, this.project?.project?.title || '');
+    },
+
+    deleteProjectById(projectId, projectTitle = '') {
+      this.requestDeleteProject(projectId, projectTitle);
+    },
+
+    async confirmDeleteProject() {
+      const projectId = this.deleteConfirm.id;
+      if (!projectId || this.isDeletingProject) return;
+      try {
+        this.isDeletingProject = true;
+        await this.api('DELETE', `/projects/${projectId}`);
+        this.closeDeleteModal(true);
+        if (this.selectedProjectId === projectId && this.view === 'graph') {
+          this.backToList();
+        } else {
+          await this.loadProjects();
+        }
+        this.showToast(`Deleted ${projectId}`);
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      } finally {
+        this.isDeletingProject = false;
+        if (!this.showDeleteModal) this.deleteConfirm = { id: '', title: '' };
+      }
+    },
+
+    async loadSettings() {
+      try {
+        const s = await this.api('GET', '/settings');
+        this.settingsForm.intent_timeout = s.intent_timeout;
+        this.settingsForm.reason_timeout = s.reason_timeout;
+      } catch(e) { console.error(e); }
+    },
+
+    async loadProject(id) {
+      try { this.project = await this.api('GET', `/projects/${id}`); } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async toggleProjectStop() {
+      if (!this.selectedProjectId || !this.project || this.project.project.status === 'completed') return;
+      const nextStatus = this.project.project.status === 'active' ? 'stopped' : 'active';
+      try {
+        await this.setProjectStatus(this.selectedProjectId, nextStatus);
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async toggleProjectStopById(projectId, currentStatus) {
+      if (!projectId || currentStatus === 'completed') return;
+      const nextStatus = currentStatus === 'active' ? 'stopped' : 'active';
+      try {
+        await this.setProjectStatus(projectId, nextStatus);
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async setProjectStatus(projectId, status, options = {}) {
+      const { reload = true, toast = true } = options;
+      const updated = await this.api('PUT', `/projects/${projectId}/status`, { status });
+      const projectSummary = this.projects.find(item => item.id === projectId);
+      if (projectSummary) {
+        projectSummary.status = updated.status;
+        projectSummary.reason = updated.reason;
+      }
+      if (this.selectedProjectId === projectId && this.project) {
+        this.project.project.status = updated.status;
+        this.project.project.reason = updated.reason;
+        if (!this.projectIsActive()) {
+          this.showIntentModal = false;
+          this.showConcludeModal = false;
+          this.showCompleteModal = false;
+        }
+        if (!this.projectCanWriteHints()) {
+          this.showHintModal = false;
+        }
+      }
+      if (reload) await this.loadProjects();
+      if (toast) this.showToast(status === 'stopped' ? 'Project stopped' : 'Project resumed');
+      return updated;
+    },
+
+    async stopAllActiveProjects() {
+      const activeProjects = this.projects.filter(project => project.status === 'active');
+      if (activeProjects.length === 0 || this.isStoppingAllProjects) return;
+      this.isStoppingAllProjects = true;
+      try {
+        const results = await Promise.allSettled(
+          activeProjects.map(project => this.setProjectStatus(project.id, 'stopped', { reload: false, toast: false }))
+        );
+        await this.loadProjects();
+        const successCount = results.filter(result => result.status === 'fulfilled').length;
+        const failureCount = results.length - successCount;
+        if (failureCount === 0) {
+          this.showToast(`Stopped ${successCount} active project${successCount === 1 ? '' : 's'}`);
+        } else {
+          this.showToast(`Stopped ${successCount} projects, ${failureCount} failed`, 'error');
+        }
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      } finally {
+        this.isStoppingAllProjects = false;
+      }
+    },
+
+    openReopenProject(projectId, projectTitle = '') {
+      if (!projectId) return;
+      this.reopenForm = { projectId, projectTitle, description: '' };
+      this.showReopenModal = true;
+    },
+
+    openRenameProject(projectId, projectTitle = '') {
+      if (!projectId) return;
+      this.renameForm = { projectId, originalTitle: projectTitle, title: projectTitle };
+      this.showRenameModal = true;
+      this.$nextTick(() => {
+        this.$refs.renameTitleInput?.focus();
+        this.$refs.renameTitleInput?.select?.();
+      });
+    },
+
+    async renameProject() {
+      const projectId = this.renameForm.projectId || this.selectedProjectId;
+      if (!projectId) return;
+      try {
+        const updated = await this.api('PUT', `/projects/${projectId}/title`, {
+          title: this.renameForm.title,
+        });
+        const projectSummary = this.projects.find(item => item.id === projectId);
+        if (projectSummary) {
+          projectSummary.title = updated.title;
+        }
+        if (this.selectedProjectId === projectId && this.project) {
+          this.project.project.title = updated.title;
+        }
+        this.showRenameModal = false;
+        this.renameForm = { projectId: '', originalTitle: '', title: '' };
+        await this.loadProjects();
+        this.showToast('Project renamed');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    replayProgressLabel() {
+      if (!this.replay.active || this.replay.frames.length === 0) return 'Replay';
+      return `Replay ${Math.min(this.replay.frameIndex + 1, this.replay.frames.length)} / ${this.replay.frames.length}`;
+    },
+
+    stopReplayTimer() {
+      if (!this.replay.timer) return;
+      clearTimeout(this.replay.timer);
+      this.replay.timer = null;
+    },
+
+    updateReplaySpeed() {
+      if (!this.replay.active || !this.replay.playing) return;
+      this.stopReplayTimer();
+      this.scheduleReplayTick();
+    },
+
+    replayEventWeight(event) {
+      const type = event?.type;
+      if (type === 'reason_started') return 1.6;
+      if (type === 'intent_declared') return 1.05;
+      if (type === 'intent_running') return 0.75;
+      if (type === 'intent_concluded' || type === 'project_completed') return 1.6;
+      if (type === 'project_created' || type === 'hint_added') return 0.8;
+      return 1.0;
+    },
+
+    replayEventDurationMs(event) {
+      const base = Number(this.replay.stepMs) || 1100;
+      return Math.round(base * this.replayEventWeight(event));
+    },
+
+    replayTimelineElapsedDurationMs(events, index) {
+      let elapsed = 0;
+      for (let i = 0; i < index; i += 1) {
+        elapsed += this.replayEventDurationMs(events[i]);
+      }
+      return elapsed;
+    },
+
+    scheduleReplayTick() {
+      if (!this.replay.active || !this.replay.playing) return;
+      if (this.replay.frameIndex >= this.replay.frames.length - 1) {
+        this.replay.playing = false;
+        return;
+      }
+      this.stopReplayTimer();
+      const currentFrame = this.replay.frames[this.replay.frameIndex];
+      const delay = this.replayEventDurationMs(currentFrame?.event);
+      this.replay.timer = setTimeout(() => this.advanceProjectReplay(), delay);
+    },
+
+    buildInitialReplayProject(sourceProject) {
+      const origin = sourceProject.facts.find(fact => fact.id === 'origin');
+      const goal = sourceProject.facts.find(fact => fact.id === 'goal');
+      return {
+        project: {
+          ...this.cloneData(sourceProject.project),
+          status: 'active',
+          reason: null,
+        },
+        facts: [origin, goal].filter(Boolean).map(fact => this.cloneData(fact)),
+        intents: [],
+        hints: [],
+      };
+    },
+
+    buildReplayFrames(sourceProject, baseEvents) {
+      const sourceIntents = new Map(sourceProject.intents.map(intent => [intent.id, intent]));
+      const replayEvents = [];
+
+      for (const event of baseEvents) {
+        if (event.type !== 'intent_declared' || !event.intentId) {
+          replayEvents.push(this.cloneData(event));
+          continue;
+        }
+
+        const sourceIntent = sourceIntents.get(event.intentId);
+        replayEvents.push({
+          id: `reason-started-${event.intentId}`,
+          type: 'reason_started',
+          timestamp: sourceIntent?.created_at || event.timestamp,
+          actor: sourceIntent?.creator || event.actor || 'reasoner',
+          title: sourceIntent?.description || event.title,
+          meta: [
+            sourceIntent?.id || event.intentId,
+            `from ${(sourceIntent?.from || event.sourceFactIds || []).join(', ')}`,
+          ],
+          targetType: 'reason',
+          targetId: sourceIntent?.id || event.intentId,
+          order: `${event.order}.reason`,
+          intentId: sourceIntent?.id || event.intentId,
+          producedFactId: null,
+          sourceFactIds: [...(sourceIntent?.from || event.sourceFactIds || [])],
+        });
+        replayEvents.push(this.cloneData(event));
+        if (!sourceIntent?.worker) continue;
+        replayEvents.push({
+          id: `intent-running-${sourceIntent.id}`,
+          type: 'intent_running',
+          timestamp: sourceIntent.last_heartbeat_at || sourceIntent.created_at,
+          actor: sourceIntent.worker,
+          title: sourceIntent.description,
+          meta: [sourceIntent.id, `worker ${sourceIntent.worker}`],
+          targetType: 'intent',
+          targetId: sourceIntent.id,
+          order: `${event.order}.run`,
+          intentId: sourceIntent.id,
+          producedFactId: null,
+          sourceFactIds: [...sourceIntent.from],
+        });
+      }
+
+      const replayProject = this.buildInitialReplayProject(sourceProject);
+      const frames = [];
+      for (const event of replayEvents) {
+        this.applyReplayEvent(replayProject, sourceProject, event);
+        frames.push({
+          event: this.cloneData(event),
+          project: this.cloneData(replayProject),
+        });
+      }
+
+      if (frames.length > 0) {
+        frames[frames.length - 1].project.project.status = sourceProject.project.status;
+        frames[frames.length - 1].project.project.reason = this.cloneData(sourceProject.project.reason);
+      }
+      return frames;
+    },
+
+    applyReplayEvent(replayProject, sourceProject, event) {
+      if (!replayProject || !sourceProject || !event) return;
+      const sourceIntent = event.intentId
+        ? sourceProject.intents.find(intent => intent.id === event.intentId) || null
+        : null;
+
+      if (event.type === 'project_created') {
+        replayProject.project.title = sourceProject.project.title;
+        replayProject.project.status = 'active';
+        return;
+      }
+
+      if (event.type === 'hint_added') {
+        const hint = sourceProject.hints.find(item => item.id === event.targetId);
+        if (hint && !replayProject.hints.some(item => item.id === hint.id)) {
+          replayProject.hints.push(this.cloneData(hint));
+        }
+        return;
+      }
+
+      if (event.type === 'reason_started') {
+        replayProject.project.reason = {
+          worker: event.actor || 'reasoner',
+          trigger: 'new_facts',
+          started_at: event.timestamp,
+          last_heartbeat_at: event.timestamp,
+        };
+        return;
+      }
+
+      if (event.type === 'intent_declared') {
+        if (!sourceIntent) return;
+        replayProject.project.reason = null;
+        if (!replayProject.intents.some(intent => intent.id === sourceIntent.id)) {
+          replayProject.intents.push({
+            id: sourceIntent.id,
+            from: [...sourceIntent.from],
+            to: null,
+            description: sourceIntent.description,
+            creator: sourceIntent.creator,
+            worker: null,
+            last_heartbeat_at: null,
+            created_at: sourceIntent.created_at,
+            concluded_at: null,
+          });
+        }
+        return;
+      }
+
+      if (event.type === 'intent_running') {
+        if (!sourceIntent) return;
+        const replayIntent = replayProject.intents.find(intent => intent.id === sourceIntent.id);
+        if (!replayIntent) return;
+        replayIntent.worker = sourceIntent.worker || sourceIntent.creator;
+        replayIntent.last_heartbeat_at = sourceIntent.last_heartbeat_at || sourceIntent.created_at;
+        return;
+      }
+
+      if (event.type !== 'intent_concluded' && event.type !== 'project_completed') return;
+      if (!sourceIntent) return;
+
+      const replayIntent = replayProject.intents.find(intent => intent.id === sourceIntent.id);
+      if (replayIntent) {
+        replayIntent.to = sourceIntent.to;
+        replayIntent.worker = sourceIntent.worker || sourceIntent.creator;
+        replayIntent.last_heartbeat_at = sourceIntent.last_heartbeat_at;
+        replayIntent.concluded_at = sourceIntent.concluded_at;
+      }
+
+      if (event.type === 'project_completed') {
+        replayProject.project.status = 'completed';
+        return;
+      }
+
+      const producedFact = sourceProject.facts.find(fact => fact.id === sourceIntent.to);
+      if (producedFact && !replayProject.facts.some(fact => fact.id === producedFact.id)) {
+        replayProject.facts.push(this.cloneData(producedFact));
+      }
+    },
+
+    applyReplayFrame(frameIndex, options = {}) {
+      if (!this.replay.active) return;
+      const { reinitialize = false } = options;
+      const frame = this.replay.frames[frameIndex];
+      if (!frame) return;
+
+      this.replay.frameIndex = frameIndex;
+      this.project = this.cloneData(frame.project);
+      this.replay.visibleEvents = this.replay.frames
+        .slice(0, frameIndex + 1)
+        .map(item => this.cloneData(item.event))
+        .filter(entry => entry.type !== 'reason_started')
+        .map((entry, index, list) => ({ ...entry, isLast: index === list.length - 1 }));
+      this._timelineEventsCacheProject = null;
+      this._timelineEventsCache = [];
+
+      if (reinitialize) {
+        this.teardownAutoFit();
+        if (this.cy) {
+          this.cy.destroy();
+          this.cy = null;
+        }
+        this.$nextTick(() => {
+          this.initGraph();
+          this.followReplayTimelineTail();
+        });
+        return;
+      }
+
+      this.updateGraph();
+      this.followReplayTimelineTail();
+    },
+
+    async startProjectReplay() {
+      if (!this.project || this.replay.active || !this.selectedProjectId) return;
+      try {
+        const sourceProject = await this.api('GET', `/projects/${this.selectedProjectId}`);
+        const baseEvents = this.timelineEvents().map(event => ({
+          ...event,
+          meta: [...(event.meta || [])],
+          sourceFactIds: [...(event.sourceFactIds || [])],
+        }));
+        const frames = this.buildReplayFrames(sourceProject, baseEvents);
+        if (frames.length === 0) {
+          this.showToast('No timeline to replay', 'error');
+          return;
+        }
+
+        const stepMs = String(this.replay.stepMs || '1100');
+        this.stopReplayTimer();
+        this.replay = {
+          active: true,
+          playing: true,
+          stepMs,
+          frameIndex: -1,
+          frames,
+          visibleEvents: [],
+          sourceProject,
+          timer: null,
+        };
+        this.polling = false;
+        this.sideTab = 'log';
+        this.selectedNode = null;
+        this.selectedFacts = [];
+        this.selectedTimelineEntryId = null;
+        this.applyReplayFrame(0, { reinitialize: true });
+        this.scheduleReplayTick();
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    advanceProjectReplay() {
+      if (!this.replay.active) return;
+      if (this.replay.frameIndex >= this.replay.frames.length - 1) {
+        this.replay.playing = false;
+        this.stopReplayTimer();
+        return;
+      }
+      this.applyReplayFrame(this.replay.frameIndex + 1);
+      this.scheduleReplayTick();
+    },
+
+    toggleProjectReplayPlayback() {
+      if (!this.replay.active) return;
+      if (this.replay.playing) {
+        this.replay.playing = false;
+        this.stopReplayTimer();
+        return;
+      }
+      if (this.replay.frameIndex >= this.replay.frames.length - 1) {
+        this.restartProjectReplay();
+        return;
+      }
+      this.replay.playing = true;
+      this.scheduleReplayTick();
+    },
+
+    restartProjectReplay() {
+      if (!this.replay.active || this.replay.frames.length === 0) return;
+      this.stopReplayTimer();
+      this.replay.playing = true;
+      this.selectedNode = null;
+      this.selectedFacts = [];
+      this.selectedTimelineEntryId = null;
+      this.applyReplayFrame(0, { reinitialize: true });
+      this.scheduleReplayTick();
+    },
+
+    async exitProjectReplay() {
+      if (!this.replay.active) return;
+      const projectId = this.selectedProjectId;
+      const stepMs = String(this.replay.stepMs || '1100');
+      this.stopReplayTimer();
+      this.replay = {
+        active: false,
+        playing: false,
+        stepMs,
+        frameIndex: -1,
+        frames: [],
+        visibleEvents: [],
+        sourceProject: null,
+        timer: null,
+      };
+      this._timelineEventsCacheProject = null;
+      this._timelineEventsCache = [];
+      this.polling = true;
+      if (!projectId) return;
+      await this.loadProject(projectId);
+      this.$nextTick(() => {
+        this.teardownAutoFit();
+        if (this.cy) {
+          this.cy.destroy();
+          this.cy = null;
+        }
+        this.initGraph();
+      });
+    },
+
+    async reopenProject() {
+      const projectId = this.reopenForm.projectId || this.selectedProjectId;
+      if (!projectId) return;
+      try {
+        const actor = this.actorName();
+        await this.api('POST', `/projects/${projectId}/reopen`, {
+          description: this.reopenForm.description,
+          creator: actor,
+        });
+        this.showReopenModal = false;
+        this.reopenForm = { projectId: '', projectTitle: '', description: '' };
+        await this.loadProjects();
+        if (this.selectedProjectId === projectId && this.view === 'graph') {
+          await this.loadProject(projectId);
+          this.updateGraph();
+        }
+        this.showToast('Project reopened');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async openProject(id) {
+      if (this.replay.active) {
+        this.stopReplayTimer();
+        this.replay.active = false;
+        this.replay.playing = false;
+        this.replay.frames = [];
+        this.replay.visibleEvents = [];
+        this.replay.frameIndex = -1;
+        this.replay.sourceProject = null;
+        this._timelineEventsCacheProject = null;
+        this._timelineEventsCache = [];
+        this.polling = true;
+      }
+      this.rememberProjectListScroll();
+      this.selectedProjectId = id;
+      this.selectedNode = null;
+      this.selectedFacts = [];
+      this.selectedTimelineEntryId = null;
+      await this.loadProject(id);
+      this.view = 'graph';
+      if (location.hash !== `#/projects/${id}`) location.hash = `/projects/${id}`;
+      this.$nextTick(() => {
+        const clampedWidth = this.clampPanelWidth(this.sidePanelWidth);
+        if (clampedWidth !== this.sidePanelWidth) {
+          this.sidePanelWidth = clampedWidth;
+          this.saveSidePanelWidth();
+        }
+        this.teardownAutoFit();
+        if (this.cy) { this.cy.destroy(); this.cy = null; }
+        this.initGraph();
+      });
+    },
+
+    backToList(fromRoute) {
+      if (this.replay.active) {
+        this.stopReplayTimer();
+        this.replay.active = false;
+        this.replay.playing = false;
+        this.replay.frames = [];
+        this.replay.visibleEvents = [];
+        this.replay.frameIndex = -1;
+        this.replay.sourceProject = null;
+        this._timelineEventsCacheProject = null;
+        this._timelineEventsCache = [];
+        this.polling = true;
+      }
+      this.view = 'list';
+      this.shouldRestoreProjectListScroll = true;
+      this.project = null;
+      this.selectedProjectId = '';
+      this.selectedNode = null;
+      this.selectedFacts = [];
+      this.selectedTimelineEntryId = null;
+      this.teardownAutoFit();
+      if (this.cy) { this.cy.destroy(); this.cy = null; }
+      if (!fromRoute) location.hash = '/';
+      this.loadProjects().then(() => this.restoreProjectListScroll());
+    },
+
+    startPolling() {
+      this.pollTimer = setInterval(async () => {
+        if (!this.polling) return;
+        if (this.selectedProjectId && this.view === 'graph') {
+          await this.loadProject(this.selectedProjectId);
+          this.updateGraph();
+        } else {
+          await this.loadProjects();
+        }
+      }, 5000);
+    },
+
+    buildElements() {
+      const nodes = [];
+      const edges = [];
+      for (const f of this.project.facts) {
+        const nodeType = f.id === 'origin' ? 'origin' : f.id === 'goal' ? 'goal' : 'fact';
+        const label = this.summarizeFactLabel(f);
+        const size = this.factNodeSize(label, nodeType);
+        nodes.push({ data: {
+          id: f.id,
+          label,
+          description: f.description,
+          nodeType,
+          width: size.width,
+          height: size.height,
+        }});
+      }
+      for (const intent of this.project.intents) {
+        const lbl = intent.description;
+        if (intent.to) {
+          for (const src of intent.from) {
+            edges.push({ data: { id: `${intent.id}_${src}`, source: src, target: intent.to, intentId: intent.id, label: lbl, status: 'concluded' }});
+          }
+        } else {
+          const phId = `_ph_${intent.id}`;
+          const nodeSize = this.openIntentNodeSize(intent);
+          const nodeType = this.openIntentNodeType(intent);
+          nodes.push({ data: {
+            id: phId,
+            label: this.openIntentNodeLabel(intent),
+            description: intent.description,
+            nodeType,
+            intentId: intent.id,
+            width: nodeSize.width,
+            height: nodeSize.height,
+          }});
+          for (const src of intent.from) {
+            edges.push({ data: { id: `${intent.id}_${src}`, source: src, target: phId, intentId: intent.id, label: lbl, status: nodeType }});
+          }
+          if (this.isBootstrapIntent(intent)) {
+            edges.push({ data: { id: `${intent.id}_goal`, source: phId, target: 'goal', intentId: intent.id, label: '', status: nodeType, edgeType: 'bootstrap_scope' }});
+          }
+        }
+      }
+      return { nodes, edges };
+    },
+
+    initGraph() {
+      const container = document.getElementById('cy');
+      if (!container) return;
+      const { nodes, edges } = this.buildElements();
+      const rawCy = cytoscape({
+        container,
+        elements: [...nodes, ...edges],
+        style: this.graphStyles(),
+        layout: this.layoutOpts(),
+        minZoom: 0.15, maxZoom: 3.5,
+      });
+      this.cy = rawCy;
+      const self = this;
+      rawCy.on('tap', 'node', e => self.onNodeTap(e));
+      rawCy.on('tap', 'edge', e => self.onEdgeTap(e));
+      rawCy.on('tap', e => { if (e.target === rawCy) self.clearSelection(); });
+      this.pulseActive();
+      this.setupAutoFit();
+    },
+
+    graphStyles() {
+      const common = { 'text-valign':'center','text-halign':'center','font-family':'-apple-system,BlinkMacSystemFont,Inter,sans-serif' };
+      return [
+        { selector: 'node[nodeType="origin"]', style: { ...common, shape:'round-rectangle','background-color':'#14b8a6',label:'data(label)',color:'#fff','font-size':'11px','font-weight':'bold','text-wrap':'wrap','text-max-width':'92px','text-overflow-wrap':'anywhere',width:'data(width)',height:'data(height)','border-width':0 }},
+        { selector: 'node[nodeType="goal"]', style: { ...common, shape:'round-rectangle','background-color':'#f43f5e',label:'data(label)',color:'#fff','font-size':'11px','font-weight':'bold','text-wrap':'wrap','text-max-width':'92px','text-overflow-wrap':'anywhere',width:'data(width)',height:'data(height)','border-width':0 }},
+        { selector: 'node[nodeType="fact"]', style: { ...common, shape:'round-rectangle','background-color':'#6366f1',label:'data(label)',color:'#fff','font-size':'10px','font-weight':'bold','text-wrap':'wrap','text-max-width':'116px','text-overflow-wrap':'anywhere',width:'data(width)',height:'data(height)','border-width':0 }},
+        { selector: 'node[nodeType="in_progress"]', style: { ...common, shape:'ellipse','background-color':'#f59e0b','background-opacity':0.8,label:'?',color:'#fff','font-size':'11px','font-weight':'bold',width:22,height:22,'border-width':2,'border-color':'#d97706' }},
+        { selector: 'node[nodeType="unclaimed"]', style: { ...common, shape:'ellipse','background-color':'#cbd5e1','background-opacity':0.5,label:'?',color:'#94a3b8','font-size':'11px','font-weight':'bold',width:20,height:20,'border-width':1.5,'border-color':'#94a3b8','border-style':'dashed' }},
+        { selector: 'node[nodeType="bootstrap_pending"]', style: { ...common, shape:'round-rectangle','background-color':'#fff7ed','background-opacity':0.96,label:'data(label)',color:'#c2410c','font-size':'10px','font-weight':'bold',width:'data(width)',height:'data(height)','border-width':1.5,'border-color':'#fdba74','border-style':'dashed','text-wrap':'wrap','text-max-width':'70px' }},
+        { selector: 'node[nodeType="bootstrap_running"]', style: { ...common, shape:'round-rectangle','background-color':'#fb923c','background-opacity':0.96,label:'data(label)',color:'#fff7ed','font-size':'10px','font-weight':'bold',width:'data(width)',height:'data(height)','border-width':2,'border-color':'#ea580c','text-wrap':'wrap','text-max-width':'70px' }},
+
+        { selector: 'edge[status="concluded"]', style: { width:2,'line-color':'#6ee7b7','target-arrow-color':'#6ee7b7','target-arrow-shape':'triangle','curve-style':'bezier',label:'data(label)','font-size':'7px',color:'#94a3b8','text-rotation':'autorotate','text-margin-y':-9,'text-max-width':'80px','text-wrap':'ellipsis','text-background-color':'#f8fafc','text-background-opacity':0.85,'text-background-padding':'2px','text-events':'yes','arrow-scale':0.9 }},
+        { selector: 'edge[status="in_progress"]', style: { width:2,'line-color':'#fbbf24','line-style':'dashed','line-dash-pattern':[8,4],'line-dash-offset':0,'target-arrow-color':'#fbbf24','target-arrow-shape':'triangle','curve-style':'bezier',label:'data(label)','font-size':'7px',color:'#b45309','text-rotation':'autorotate','text-margin-y':-9,'text-max-width':'80px','text-wrap':'ellipsis','text-background-color':'#fffbeb','text-background-opacity':0.85,'text-background-padding':'2px','text-events':'yes','arrow-scale':0.9 }},
+        { selector: 'edge[status="unclaimed"]', style: { width:1.5,'line-color':'#cbd5e1','line-style':'dashed','line-dash-pattern':[5,5],'target-arrow-color':'#cbd5e1','target-arrow-shape':'triangle','curve-style':'bezier',label:'data(label)','font-size':'7px',color:'#94a3b8','text-rotation':'autorotate','text-margin-y':-9,'text-max-width':'80px','text-wrap':'ellipsis','text-background-color':'#f8fafc','text-background-opacity':0.85,'text-background-padding':'2px','text-events':'yes','arrow-scale':0.7 }},
+        { selector: 'edge[status="bootstrap_pending"]', style: { width:2,'line-color':'#fdba74','line-style':'dashed','line-dash-pattern':[8,4],'line-dash-offset':0,'target-arrow-color':'#fdba74','target-arrow-shape':'triangle','curve-style':'bezier',label:'data(label)','font-size':'7px',color:'#c2410c','text-rotation':'autorotate','text-margin-y':-9,'text-max-width':'88px','text-wrap':'ellipsis','text-background-color':'#fff7ed','text-background-opacity':0.92,'text-background-padding':'2px','text-events':'yes','arrow-scale':0.85 }},
+        { selector: 'edge[status="bootstrap_running"]', style: { width:2.5,'line-color':'#fb923c','line-style':'dashed','line-dash-pattern':[10,4],'line-dash-offset':0,'target-arrow-color':'#fb923c','target-arrow-shape':'triangle','curve-style':'bezier',label:'data(label)','font-size':'7px',color:'#c2410c','text-rotation':'autorotate','text-margin-y':-9,'text-max-width':'88px','text-wrap':'ellipsis','text-background-color':'#fff7ed','text-background-opacity':0.92,'text-background-padding':'2px','text-events':'yes','arrow-scale':0.95 }},
+        { selector: 'edge[edgeType="bootstrap_scope"]', style: { label:'',width:1.8,'curve-style':'bezier','line-style':'dotted','line-dash-pattern':[2,5],'target-arrow-shape':'triangle-backcurve','arrow-scale':0.75,'target-distance-from-node':2 }},
+
+        { selector: '.highlight', style: { 'z-index':999 }},
+        { selector: 'edge.highlight', style: { 'z-index':999 }},
+        { selector: 'node.focus', style: { 'border-width':3,'border-color':'#312e81','border-opacity':0.95,'z-index':1000 }},
+        { selector: 'edge.focus', style: { 'z-index':1000,'overlay-color':'#93c5fd','overlay-opacity':0.22,'overlay-padding':5 }},
+        { selector: 'node.selected-fact', style: { 'border-width':0,'underlay-color':'#93c5fd','underlay-padding':8,'underlay-opacity':0.28,'z-index':1001 }},
+        { selector: '.faded', style: { opacity:0.5 }},
+        { selector: '.fresh', style: { opacity:0 }},
+      ];
+    },
+
+    layoutOpts(animate = true) {
+      const direction = this.layoutDirection();
+      if (this.layoutEngine() === 'elk') {
+        const elkDirection = direction === 'TB' ? 'DOWN' : 'RIGHT';
+        return {
+          name: 'elk',
+          fit: true,
+          padding: 50,
+          animate,
+          animationDuration: 350,
+          animationEasing: 'ease-in-out-cubic',
+          elk: {
+            algorithm: 'layered',
+            'elk.direction': elkDirection,
+            'elk.aspectRatio': '1.5',
+            'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+            'elk.spacing.nodeNode': '50',
+            'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+            'elk.spacing.edgeNode': '25',
+            'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+            'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
+          },
+        };
+      }
+      if (this.layoutEngine() === 'klay') {
+        const isHorizontal = direction === 'LR';
+        return {
+          name: 'klay',
+          fit: true,
+          padding: 50,
+          animate,
+          animationDuration: 400,
+          animationEasing: 'ease-in-out-cubic',
+          klay: {
+            direction: direction === 'TB' ? 'DOWN' : 'RIGHT',
+            edgeRouting: 'POLYLINE',
+            crossingMinimization: 'LAYER_SWEEP',
+            nodeLayering: 'NETWORK_SIMPLEX',
+            nodePlacement: 'BRANDES_KOEPF',
+            separateConnectedComponents: true,
+            spacing: isHorizontal ? 52 : 40,
+            inLayerSpacingFactor: isHorizontal ? 1.15 : 1.0,
+            thoroughness: 8,
+          },
+        };
+      }
+      return {
+        name: 'dagre',
+        rankDir: direction,
+        nodeSep: 60,
+        rankSep: 80,
+        padding: 50,
+        fit: true,
+        animate,
+        animationDuration: 400,
+        animationEasing: 'ease-in-out-cubic',
+      };
+    },
+
+    snapshotNodePositions() {
+      const positions = new Map();
+      if (!this.cy) return positions;
+      this.cy.nodes().forEach(node => {
+        positions.set(node.id(), { x: node.position('x'), y: node.position('y') });
+      });
+      return positions;
+    },
+
+    anchorPositionFromIds(nodeIds, previousPositions, offset = 36) {
+      const anchors = [];
+      for (const nodeId of nodeIds) {
+        const existing = this.cy?.getElementById(nodeId);
+        if (existing?.length) {
+          anchors.push({ x: existing.position('x'), y: existing.position('y') });
+          continue;
+        }
+        const previous = previousPositions.get(nodeId);
+        if (previous) anchors.push(previous);
+      }
+      if (anchors.length === 0) return null;
+      const center = anchors.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 });
+      const avg = { x: center.x / anchors.length, y: center.y / anchors.length };
+      return this.layoutDirection() === 'TB'
+        ? { x: avg.x, y: avg.y + offset }
+        : { x: avg.x + offset, y: avg.y };
+    },
+
+    initialPositionForNode(nodeData, previousPositions) {
+      if (!this.project) return null;
+      if (nodeData.intentId) {
+        const previousPlaceholder = previousPositions.get(nodeData.id);
+        if (previousPlaceholder) return previousPlaceholder;
+        const intent = this.project.intents.find(item => item.id === nodeData.intentId);
+        return intent ? this.anchorPositionFromIds(intent.from, previousPositions, 32) : null;
+      }
+
+      const producingIntent = this.project.intents.find(item => item.to === nodeData.id);
+      if (!producingIntent) return null;
+      const placeholderPosition = previousPositions.get(`_ph_${producingIntent.id}`);
+      if (placeholderPosition) return placeholderPosition;
+      return this.anchorPositionFromIds(producingIntent.from, previousPositions, 44);
+    },
+
+    fadeInFreshElement(element) {
+      if (!element || element.length === 0) return;
+      element.addClass('fresh');
+      setTimeout(() => {
+        if (!element.inside()) return;
+        element.animate(
+          { style: { opacity: 1 } },
+          {
+            duration: 500,
+            complete: () => {
+              if (!element.inside()) return;
+              element.removeStyle('opacity');
+            },
+          },
+        );
+        element.removeClass('fresh');
+      }, 30);
+    },
+
+    updateGraph() {
+      if (!this.cy || !this.project) return;
+      const { nodes, edges } = this.buildElements();
+      const wantNodes = new Set(nodes.map(n => n.data.id));
+      const wantEdges = new Set(edges.map(e => e.data.id));
+      const previousPositions = this.snapshotNodePositions();
+      let changed = false;
+
+      this.cy.nodes().forEach(n => { if (!wantNodes.has(n.id())) { n.remove(); changed = true; } });
+      this.cy.edges().forEach(e => { if (!wantEdges.has(e.id())) { e.remove(); changed = true; } });
+
+      for (const n of nodes) {
+        const ex = this.cy.getElementById(n.data.id);
+        if (ex.length === 0) {
+          const initialPosition = this.initialPositionForNode(n.data, previousPositions);
+          const a = this.cy.add(initialPosition ? { ...n, position: initialPosition } : n);
+          this.fadeInFreshElement(a);
+          changed = true;
+        } else if (
+          ex.data('nodeType') !== n.data.nodeType ||
+          ex.data('label') !== n.data.label ||
+          ex.data('description') !== n.data.description ||
+          ex.data('width') !== n.data.width ||
+          ex.data('height') !== n.data.height
+        ) {
+          ex.data(n.data); changed = true;
+        }
+      }
+      for (const e of edges) {
+        const ex = this.cy.getElementById(e.data.id);
+        if (ex.length === 0) {
+          const a = this.cy.add(e);
+          this.fadeInFreshElement(a);
+          changed = true;
+        } else if (ex.data('status') !== e.data.status) {
+          ex.data(e.data);
+        }
+      }
+      if (changed) this.cy.layout(this.layoutOpts()).run();
+      this.pulseActive();
+      this.refreshGraphDecorations();
+    },
+
+    pulseActive() {
+      if (!this.cy) return;
+      this.cy.nodes('[nodeType="in_progress"], [nodeType="bootstrap_running"]').forEach(node => {
+        if (node.scratch('_pulseActive')) return;
+        node.scratch('_pulseActive', true);
+        const isBootstrap = node.data('nodeType') === 'bootstrap_running';
+        const minOpacity = isBootstrap ? 0.55 : 0.35;
+        const maxOpacity = isBootstrap ? 0.98 : 0.8;
+        const pulseOut = () => {
+          if (!node.inside()) {
+            node.removeScratch('_pulseActive');
+            return;
+          }
+          node.animate({ style:{'background-opacity':minOpacity} }, { duration:900, complete: pulseIn });
+        };
+        const pulseIn = () => {
+          if (!node.inside()) {
+            node.removeScratch('_pulseActive');
+            return;
+          }
+          node.animate({ style:{'background-opacity':maxOpacity} }, { duration:900, complete: pulseOut });
+        };
+        pulseOut();
+      });
+      this.cy.edges('[status="in_progress"], [status="bootstrap_running"]').forEach(edge => {
+        if (edge.scratch('_flowActive')) return;
+        edge.scratch('_flowActive', true);
+        const isBootstrap = edge.data('status') === 'bootstrap_running';
+        const dashOffset = isBootstrap ? -16 : -12;
+        const flow = () => {
+          if (!edge.inside() || !['in_progress', 'bootstrap_running'].includes(edge.data('status'))) {
+            edge.removeScratch('_flowActive');
+            return;
+          }
+          edge.animate({ style:{'line-dash-offset':dashOffset} }, {
+            duration:isBootstrap ? 620 : 700,
+            complete:() => {
+              if (!edge.inside() || !['in_progress', 'bootstrap_running'].includes(edge.data('status'))) {
+                edge.removeScratch('_flowActive');
+                return;
+              }
+              edge.style('line-dash-offset', 0);
+              flow();
+            }
+          });
+        };
+        flow();
+      });
+    },
+
+    fitGraph() { if (this.cy) this.cy.fit(undefined, 50); },
+
+    centerGraphOnElements(eles) {
+      if (!this.cy || !eles || eles.length === 0) return;
+      if (this._centerAnimation) this._centerAnimation.stop();
+      this._centerAnimation = this.cy.animation({ center: { eles }, duration: 220, easing: 'ease-in-out-cubic' });
+      this._centerAnimation.play();
+    },
+
+    centerGraphOnFact(factId) {
+      if (!this.cy || !factId) return;
+      const node = this.cy.getElementById(factId);
+      if (node.length > 0) this.centerGraphOnElements(node);
+    },
+
+    centerGraphOnIntent(intentId) {
+      if (!this.cy || !intentId) return;
+      const edges = this.cy.edges(`[intentId="${intentId}"]`);
+      if (edges.length === 0) return;
+      this.centerGraphOnElements(edges.add(edges.sources()).add(edges.targets()));
+    },
+
+    summarizeFactLabel(fact) {
+      if (fact.id === 'origin') return 'Origin';
+      if (fact.id === 'goal') return 'Goal';
+      const normalized = fact.description.replace(/\s+/g, ' ').trim();
+      const chars = Array.from(normalized);
+      if (chars.length <= 24) return normalized || fact.id;
+      return `${chars.slice(0, 24).join('')}…`;
+    },
+
+    factNodeSize(label, nodeType) {
+      const preset = nodeType === 'fact'
+        ? { fontSize: 10, maxTextWidth: 116, minWidth: 52, minHeight: 34, paddingX: 10, paddingY: 10 }
+        : { fontSize: 11, maxTextWidth: 92, minWidth: 58, minHeight: 38, paddingX: 10, paddingY: 10 };
+
+      const measured = this.measureWrappedText(label, preset.maxTextWidth, preset.fontSize);
+      return {
+        width: Math.max(preset.minWidth, Math.ceil(measured.width + preset.paddingX * 2)),
+        height: Math.max(preset.minHeight, Math.ceil(measured.height + preset.paddingY * 2)),
+      };
+    },
+
+    measureWrappedText(text, maxWidth, fontSize) {
+      const content = (text || '').trim() || ' ';
+      const lines = [];
+      let currentWidth = 0;
+      let currentChars = 0;
+      let maxLineWidth = 0;
+
+      const pushLine = () => {
+        if (currentChars === 0 && lines.length > 0) lines.push(0);
+        else if (currentChars > 0) lines.push(currentWidth);
+        maxLineWidth = Math.max(maxLineWidth, currentWidth);
+        currentWidth = 0;
+        currentChars = 0;
+      };
+
+      for (const char of Array.from(content)) {
+        if (char === '\n') {
+          pushLine();
+          continue;
+        }
+        const charWidth = this.estimateLabelCharWidth(char, fontSize);
+        if (currentChars > 0 && currentWidth + charWidth > maxWidth) pushLine();
+        currentWidth += charWidth;
+        currentChars += 1;
+      }
+
+      pushLine();
+
+      const lineCount = Math.max(1, lines.length);
+      const lineHeight = fontSize * 1.35;
+      return {
+        width: Math.min(maxWidth, Math.max(fontSize * 1.6, maxLineWidth)),
+        height: lineCount * lineHeight,
+      };
+    },
+
+    estimateLabelCharWidth(char, fontSize) {
+      if (/\s/.test(char)) return fontSize * 0.35;
+      if (/[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]/.test(char)) {
+        return fontSize * 1.0;
+      }
+      return fontSize * 0.58;
+    },
+
+    setupAutoFit() {
+      this.teardownAutoFit();
+      const container = document.getElementById('cy');
+      if (!container || !this.cy) return;
+      let fitTimer = null;
+      this._resizeObserver = new ResizeObserver(() => {
+        clearTimeout(fitTimer);
+        fitTimer = setTimeout(() => {
+          if (this.cy) {
+            const clampedWidth = this.clampPanelWidth(this.sidePanelWidth);
+            if (clampedWidth !== this.sidePanelWidth) {
+              this.sidePanelWidth = clampedWidth;
+              this.saveSidePanelWidth();
+            }
+            this.cy.resize();
+            this.cy.fit(undefined, 50);
+          }
+        }, 200);
+      });
+      this._resizeObserver.observe(container);
+    },
+
+    teardownAutoFit() {
+      if (this._resizeObserver) {
+        this._resizeObserver.disconnect();
+        this._resizeObserver = null;
+      }
+    },
+    applySelectedLayout() {
+      this.layoutMode = this.isValidLayoutMode(this.layoutMode) ? this.layoutMode : 'dagre_tb';
+      this.localPrefs.layout_mode = this.layoutMode;
+      this.saveLocalPrefs();
+      if (this.cy) this.cy.layout(this.layoutOpts()).run();
+    },
+
+    clampPanelWidth(width) {
+      const containerWidth = document.getElementById('graphLayout')?.getBoundingClientRect().width || window.innerWidth;
+      const min = 260;
+      const max = Math.max(min, containerWidth - 260);
+      return Math.min(max, Math.max(min, width));
+    },
+
+    startPanelResize(e) {
+      e.currentTarget?.setPointerCapture?.(e.pointerId);
+      this.isResizingPanel = true;
+      this.onPanelResize(e);
+    },
+
+    onPanelResize(e) {
+      if (!this.isResizingPanel) return;
+      const rect = document.getElementById('graphLayout')?.getBoundingClientRect();
+      if (!rect) return;
+      this.sidePanelWidth = this.clampPanelWidth(rect.right - e.clientX);
+    },
+
+    stopPanelResize() {
+      if (!this.isResizingPanel) return;
+      this.isResizingPanel = false;
+      this.saveSidePanelWidth();
+    },
+
+    clearGraphSelection(preserveTimeline = false) {
+      this.selectedNode = null;
+      this.selectedFacts = [];
+      if (!preserveTimeline) this.selectedTimelineEntryId = null;
+      if (this.cy) this.cy.elements().removeClass('highlight focus faded selected-fact');
+    },
+
+    clearSelection() {
+      this.clearGraphSelection(false);
+    },
+
+    toggleFactSelection(fid) {
+      this.selectedTimelineEntryId = null;
+      const idx = this.selectedFacts.indexOf(fid);
+      if (idx >= 0) {
+        this.selectedFacts.splice(idx, 1);
+        if (this.selectedFacts.length === 0) {
+          this.clearSelection();
+          return;
+        }
+        if (this.selectedNode?.type === 'fact' && this.selectedNode.id === fid) {
+          this.selectedNode = { type:'fact', id: this.selectedFacts[this.selectedFacts.length - 1] };
+        }
+      } else {
+        this.selectedFacts.push(fid);
+        this.selectedNode = { type:'fact', id: fid };
+      }
+      this.refreshGraphDecorations();
+    },
+
+    removeFactSelection(fid) {
+      this.selectedTimelineEntryId = null;
+      const idx = this.selectedFacts.indexOf(fid);
+      if (idx < 0) return;
+      this.selectedFacts.splice(idx, 1);
+      if (this.selectedFacts.length === 0) {
+        this.clearSelection();
+        return;
+      }
+      if (this.selectedNode?.type === 'fact' && this.selectedNode.id === fid) {
+        this.selectedNode = { type:'fact', id: this.selectedFacts[this.selectedFacts.length - 1] };
+      }
+      this.refreshGraphDecorations();
+    },
+
+    onNodeTap(e) {
+      const node = e.target;
+      const id = node.data('id');
+      const nt = node.data('nodeType');
+      const keepLogFocus = this.sideTab === 'log';
+
+      if (['in_progress', 'unclaimed', 'bootstrap_pending', 'bootstrap_running'].includes(nt)) {
+        this.selectIntent(node.data('intentId'));
+        if (keepLogFocus) this.scrollTimelineToSelection();
+        else this.sideTab = 'detail';
+        return;
+      }
+      if (e.originalEvent.shiftKey) {
+        this.toggleFactSelection(id);
+        if (keepLogFocus) this.scrollTimelineToSelection();
+        else this.sideTab = 'detail';
+        return;
+      } else {
+        this.selectedFacts = [id];
+        this.selectFact(id);
+      }
+      if (keepLogFocus) this.scrollTimelineToSelection();
+      else this.sideTab = 'detail';
+    },
+
+    onEdgeTap(e) {
+      this.selectIntent(e.target.data('intentId'));
+      if (this.sideTab === 'log') this.scrollTimelineToSelection();
+      else this.sideTab = 'detail';
+    },
+
+    selectIntent(intent) {
+      const intentId = typeof intent === 'string' ? intent : intent?.id;
+      if (!intentId) return;
+      this.selectedFacts = [];
+      this.selectedTimelineEntryId = null;
+      this.selectedNode = { type:'intent', id: intentId };
+      this.applyLineageHighlightForIntent(intentId);
+    },
+
+    selectFact(fact) {
+      const factId = typeof fact === 'string' ? fact : fact?.id;
+      if (!factId) return;
+      if (!this.selectedFacts.includes(factId)) this.selectedFacts = [factId];
+      this.selectedTimelineEntryId = null;
+      this.selectedNode = { type:'fact', id: factId };
+      if (this.selectedFacts.length > 1) {
+        this.applyMultiFactSelectionHighlight();
+        return;
+      }
+      this.applyLineageHighlightForFact(factId);
+    },
+
+    refreshGraphDecorations() {
+      if (!this.selectedNode) {
+        this.syncFactSelections();
+        return;
+      }
+      if (this.selectedNode.type === 'intent') this.applyLineageHighlightForIntent(this.selectedNode.id);
+      if (this.selectedNode.type === 'fact') {
+        if (this.selectedFacts.length > 1 && this.selectedFacts.includes(this.selectedNode.id)) {
+          this.applyMultiFactSelectionHighlight();
+          return;
+        }
+        this.applyLineageHighlightForFact(this.selectedNode.id);
+      }
+    },
+
+    syncFactSelections() {
+      if (!this.cy) return;
+      this.cy.nodes().removeClass('selected-fact');
+      for (const fid of this.selectedFacts) {
+        const node = this.cy.getElementById(fid);
+        if (node.length > 0) node.addClass('selected-fact');
+      }
+    },
+
+    collectFactLineage(fid) {
+      const upstreamFacts = new Set();
+      const upstreamIntents = new Set();
+
+      const walkFactUpstream = (factId) => {
+        if (upstreamFacts.has(factId) || !this.project) return;
+        upstreamFacts.add(factId);
+        for (const intent of this.project.intents) {
+          if (intent.to === factId) walkIntentUpstream(intent.id);
+        }
+      };
+
+      const walkIntentUpstream = (iid) => {
+        if (upstreamIntents.has(iid) || !this.project) return;
+        upstreamIntents.add(iid);
+        const intent = this.project.intents.find(i => i.id === iid);
+        if (!intent) return;
+        for (const sourceId of intent.from) walkFactUpstream(sourceId);
+      };
+
+      walkFactUpstream(fid);
+      return { upstreamFacts, upstreamIntents };
+    },
+
+    collectIntentElements(intent, nodeIds, edgeIds) {
+      if (intent.to) nodeIds.add(intent.to);
+      else nodeIds.add(`_ph_${intent.id}`);
+      for (const sourceId of intent.from) {
+        nodeIds.add(sourceId);
+        edgeIds.add(`${intent.id}_${sourceId}`);
+      }
+      if (this.isBootstrapIntent(intent)) {
+        nodeIds.add('goal');
+        edgeIds.add(`${intent.id}_goal`);
+      }
+    },
+
+    applyLineageHighlightForIntent(intentId) {
+      if (!this.cy || !this.project) return;
+      const intent = this.project.intents.find(i => i.id === intentId);
+      if (!intent) return;
+      this.cy.elements().removeClass('highlight focus faded');
+
+      const nodeIds = new Set();
+      const edgeIds = new Set();
+      this.collectIntentElements(intent, nodeIds, edgeIds);
+      const highlightNodes = this.cy.nodes().filter(n => nodeIds.has(n.id()));
+      const focusEdges = this.cy.edges().filter(e => edgeIds.has(e.id()));
+
+      highlightNodes.addClass('highlight');
+      focusEdges.addClass('focus');
+
+      const visible = highlightNodes.add(focusEdges);
+      this.cy.elements().not(visible).addClass('faded');
+      this.syncFactSelections();
+    },
+
+    applyLineageHighlightForFact(factId) {
+      if (!this.cy || !this.project) return;
+      const { upstreamFacts, upstreamIntents } = this.collectFactLineage(factId);
+      const nodeIds = new Set(upstreamFacts);
+      const edgeIds = new Set();
+
+      for (const iid of upstreamIntents) {
+        const intent = this.project.intents.find(i => i.id === iid);
+        if (intent) this.collectIntentElements(intent, nodeIds, edgeIds);
+      }
+
+      this.cy.elements().removeClass('highlight focus faded');
+      const highlightNodes = this.cy.nodes().filter(n => nodeIds.has(n.id()));
+      const highlightEdges = this.cy.edges().filter(e => edgeIds.has(e.id()));
+      const focusNode = this.cy.getElementById(factId);
+
+      highlightNodes.addClass('highlight');
+      highlightEdges.addClass('highlight');
+      focusNode.addClass('focus');
+
+      const visible = highlightNodes.add(highlightEdges).add(focusNode);
+      this.cy.elements().not(visible).addClass('faded');
+      this.syncFactSelections();
+    },
+
+    applyMultiFactSelectionHighlight() {
+      if (!this.cy) return;
+      this.cy.elements().removeClass('highlight focus faded selected-fact');
+      this.syncFactSelections();
+    },
+
+    getProducingIntent(fid) {
+      return this.project ? this.project.intents.find(i => i.to === fid) || null : null;
+    },
+
+    selectedFactId() {
+      return this.selectedNode?.type === 'fact' ? this.selectedNode.id : null;
+    },
+
+    selectedFactRecord() {
+      const factId = this.selectedFactId();
+      if (!this.project || !factId) return null;
+      return this.project.facts.find(f => f.id === factId) || null;
+    },
+
+    selectedFactProducingIntent() {
+      const factId = this.selectedFactId();
+      return factId ? this.getProducingIntent(factId) : null;
+    },
+
+    selectedFactRecords() {
+      if (!this.project || this.selectedFacts.length === 0) return [];
+      const factsById = new Map(this.project.facts.map(f => [f.id, f]));
+      return this.selectedFacts.map(fid => factsById.get(fid)).filter(Boolean);
+    },
+
+    selectedIntentId() {
+      return this.selectedNode?.type === 'intent' ? this.selectedNode.id : null;
+    },
+
+    selectedIntentRecord() {
+      const intentId = this.selectedIntentId();
+      if (!this.project || !intentId) return null;
+      return this.project.intents.find(i => i.id === intentId) || null;
+    },
+
+    selectedOpenIntentRecord() {
+      const intent = this.selectedIntentRecord();
+      if (!intent || intent.to || !this.projectIsActive()) return null;
+      return intent;
+    },
+
+    selectedActionableOpenIntentRecord() {
+      const intent = this.selectedOpenIntentRecord();
+      if (!intent) return null;
+      const actor = this.actorName();
+      return !intent.worker || intent.worker === actor ? intent : null;
+    },
+
+    selectedReleasableOpenIntentRecord() {
+      const intent = this.selectedOpenIntentRecord();
+      if (!intent?.worker) return null;
+      return intent.worker === this.actorName() ? intent : null;
+    },
+
+    selectedIntentPrimaryActionLabel() {
+      const intent = this.selectedOpenIntentRecord();
+      if (!intent) return 'Claim';
+      if (!intent.worker) return 'Claim';
+      return intent.worker === this.actorName() ? 'Heartbeat' : 'Claimed';
+    },
+
+    getFactRecord(fid) {
+      return this.project ? this.project.facts.find(f => f.id === fid) || null : null;
+    },
+
+    intentDotClass(i) {
+      if (i.to) return 'bg-teal-400';
+      if (this.isBootstrapIntent(i)) return i.worker ? 'bg-orange-400' : 'bg-orange-200';
+      return i.worker ? 'bg-amber-400' : 'bg-slate-300';
+    },
+    intentStatusClass(i) {
+      if (i.to) return 'text-teal-600';
+      if (this.isBootstrapIntent(i)) return i.worker ? 'text-orange-600' : 'text-orange-400';
+      return i.worker ? 'text-amber-600' : 'text-slate-400';
+    },
+    intentStatusLabel(i) {
+      if (i.to) return 'Concluded';
+      if (this.isBootstrapIntent(i)) return i.worker ? 'Bootstrap Running' : 'Bootstrap Pending';
+      return i.worker ? 'In Progress' : 'Unclaimed';
+    },
+
+    timelineEvents() {
+      if (this.replay.active) return this.replay.visibleEvents;
+      if (!this.project) return [];
+      if (this._timelineEventsCacheProject === this.project) return this._timelineEventsCache;
+
+      const events = [];
+      let order = 0;
+      const origin = this.getFactRecord('origin');
+      const goal = this.getFactRecord('goal');
+
+      events.push({
+        id: `project-created-${this.project.project.id}`,
+        type: 'project_created',
+        timestamp: this.project.project.created_at,
+        actor: 'system',
+        title: this.project.project.title,
+        meta: [origin ? origin.description : null, goal ? `goal: ${goal.description}` : null].filter(Boolean),
+        targetType: 'fact',
+        targetId: 'origin',
+        order: order++,
+        intentId: null,
+        producedFactId: null,
+        sourceFactIds: [],
+      });
+
+      for (const hint of this.project.hints) {
+        events.push({
+          id: `hint-${hint.id}`,
+          type: 'hint_added',
+          timestamp: hint.created_at,
+          actor: hint.creator,
+          title: hint.content,
+          meta: [],
+          targetType: 'hints',
+          targetId: hint.id,
+          order: order++,
+          intentId: null,
+          producedFactId: null,
+          sourceFactIds: [],
+        });
+      }
+
+      for (const intent of this.project.intents) {
+        events.push({
+          id: `intent-declared-${intent.id}`,
+          type: 'intent_declared',
+          timestamp: intent.created_at,
+          actor: intent.creator,
+          title: intent.description,
+          meta: [intent.id, `from ${intent.from.join(', ')}`],
+          targetType: 'intent',
+          targetId: intent.id,
+          order: order++,
+          intentId: intent.id,
+          producedFactId: null,
+          sourceFactIds: [...intent.from],
+        });
+
+        if (!intent.concluded_at || !intent.to) continue;
+
+        if (intent.to === 'goal') {
+          events.push({
+            id: `project-completed-${intent.id}`,
+            type: 'project_completed',
+            timestamp: intent.concluded_at,
+            actor: intent.worker || intent.creator,
+            title: intent.description,
+            meta: [intent.id, `from ${intent.from.join(', ')}`],
+            targetType: 'fact',
+            targetId: 'goal',
+            order: order++,
+            intentId: intent.id,
+            producedFactId: 'goal',
+            sourceFactIds: [...intent.from],
+          });
+          continue;
+        }
+
+        const fact = this.getFactRecord(intent.to);
+        events.push({
+          id: `intent-concluded-${intent.id}`,
+          type: 'intent_concluded',
+          timestamp: intent.concluded_at,
+          actor: intent.worker || intent.creator,
+          title: fact ? fact.description : intent.description,
+          meta: [intent.id, `produced ${intent.to}`, `from ${intent.from.join(', ')}`],
+          targetType: 'fact',
+          targetId: intent.to,
+          order: order++,
+          intentId: intent.id,
+          producedFactId: intent.to,
+          sourceFactIds: [...intent.from],
+        });
+      }
+
+      const chronological = [...events].sort((a, b) =>
+        a.timestamp.localeCompare(b.timestamp) || a.order - b.order
+      );
+
+      const resolved = [];
+      for (let i = 0; i < chronological.length;) {
+        const bucket = [chronological[i]];
+        let j = i + 1;
+        while (j < chronological.length && chronological[j].timestamp === chronological[i].timestamp) {
+          bucket.push(chronological[j]);
+          j += 1;
+        }
+        resolved.push(...this.resolveTimelineBucket(bucket));
+        i = j;
+      }
+
+      const cached = resolved.map((entry, index) => ({ ...entry, isLast: index === resolved.length - 1 }));
+      this._timelineEventsCacheProject = this.project;
+      this._timelineEventsCache = cached;
+      return cached;
+    },
+
+    resolveTimelineBucket(bucket) {
+      if (bucket.length <= 1) return bucket;
+
+      const eventById = new Map(bucket.map(event => [event.id, event]));
+      const declareEventIdByIntent = new Map();
+      const produceEventIdByFact = new Map();
+      const outgoing = new Map(bucket.map(event => [event.id, new Set()]));
+      const incomingCount = new Map(bucket.map(event => [event.id, 0]));
+
+      const addDependency = (beforeId, afterId) => {
+        if (!beforeId || !afterId || beforeId === afterId) return;
+        const deps = outgoing.get(beforeId);
+        if (!deps || deps.has(afterId)) return;
+        deps.add(afterId);
+        incomingCount.set(afterId, (incomingCount.get(afterId) || 0) + 1);
+      };
+
+      for (const event of bucket) {
+        if (event.type === 'intent_declared') declareEventIdByIntent.set(event.intentId, event.id);
+        if (event.producedFactId) produceEventIdByFact.set(event.producedFactId, event.id);
+      }
+
+      for (const event of bucket) {
+        if ((event.type === 'intent_concluded' || event.type === 'project_completed') && event.intentId) {
+          addDependency(declareEventIdByIntent.get(event.intentId), event.id);
+        }
+
+        if (!event.sourceFactIds?.length) continue;
+        for (const factId of event.sourceFactIds) {
+          addDependency(produceEventIdByFact.get(factId), event.id);
+        }
+      }
+
+      const ready = bucket
+        .filter(event => incomingCount.get(event.id) === 0)
+        .sort((a, b) => a.order - b.order);
+      const ordered = [];
+
+      while (ready.length > 0) {
+        const event = ready.shift();
+        ordered.push(event);
+        for (const nextId of outgoing.get(event.id) || []) {
+          incomingCount.set(nextId, incomingCount.get(nextId) - 1);
+          if (incomingCount.get(nextId) === 0) {
+            ready.push(eventById.get(nextId));
+            ready.sort((a, b) => a.order - b.order);
+          }
+        }
+      }
+
+      if (ordered.length === bucket.length) return ordered;
+
+      const remainingIds = bucket
+        .filter(event => !ordered.some(placed => placed.id === event.id))
+        .sort((a, b) => a.order - b.order);
+      return [...ordered, ...remainingIds];
+    },
+
+    timelineEventBadge(entry) {
+      const labels = {
+        project_created: 'Project',
+        hint_added: 'Hint',
+        reason_started: 'Reason',
+        intent_declared: 'Intent',
+        intent_running: 'Execute',
+        intent_concluded: 'Conclude',
+        project_completed: 'Complete',
+      };
+      return labels[entry.type] || 'Event';
+    },
+
+    timelineEventBadgeClass(entry) {
+      const classes = {
+        project_created: 'bg-slate-100 text-slate-600',
+        hint_added: 'bg-amber-50 text-amber-700',
+        reason_started: 'bg-sky-50 text-sky-700',
+        intent_declared: 'bg-violet-50 text-violet-700',
+        intent_running: 'bg-amber-50 text-amber-700',
+        intent_concluded: 'bg-teal-50 text-teal-700',
+        project_completed: 'bg-rose-50 text-rose-700',
+      };
+      return classes[entry.type] || 'bg-slate-100 text-slate-600';
+    },
+
+    timelineEventIsInteractive(entry) {
+      return entry?.targetType === 'fact' || entry?.targetType === 'intent' || entry?.targetType === 'hints' || entry?.targetType === 'reason';
+    },
+
+    timelineEventTriggersGraphFocus(entry) {
+      return entry?.targetType === 'fact' || entry?.targetType === 'intent';
+    },
+
+    timelineEventDotClass(entry) {
+      const classes = {
+        project_created: 'bg-slate-400',
+        hint_added: 'bg-amber-400',
+        reason_started: 'bg-sky-400',
+        intent_declared: 'bg-violet-400',
+        intent_running: 'bg-amber-400',
+        intent_concluded: 'bg-teal-400',
+        project_completed: 'bg-rose-400',
+      };
+      return classes[entry.type] || 'bg-slate-300';
+    },
+
+    timelineEntryButtonClass(entry) {
+      const base = this.timelineEventIsInteractive(entry) ? 'cursor-pointer hover:bg-slate-50/70' : 'cursor-default';
+      return this.timelineEntryIsSelected(entry)
+        ? `${base} bg-brand-50/80 ring-1 ring-brand-200`
+        : base;
+    },
+
+    timelineEntryDomId(entryId) {
+      return `timeline-entry-${entryId}`;
+    },
+
+    timelineEntryElement(entryId) {
+      return document.getElementById(this.timelineEntryDomId(entryId));
+    },
+
+    timelineTargetEntryIdForGraphSelection(allowMultiFact = false) {
+      const events = this.timelineEvents();
+      if (this.selectedNode?.type === 'intent') {
+        const selectedIntentId = this.selectedNode.id;
+        return events.find(entry => entry.type === 'intent_declared' && entry.intentId === selectedIntentId)?.id
+          || events.find(entry => entry.intentId === selectedIntentId)?.id
+          || null;
+      }
+
+      if (this.selectedNode?.type === 'fact') {
+        if (!allowMultiFact && this.selectedFacts.length > 1) return null;
+        const selectedFactId = this.selectedNode.id;
+        return events.find(entry => entry.targetType === 'fact' && entry.targetId === selectedFactId)?.id || null;
+      }
+
+      return null;
+    },
+
+    activeTimelineEntryId(allowMultiFact = false) {
+      return this.selectedTimelineEntryId || this.timelineTargetEntryIdForGraphSelection(allowMultiFact);
+    },
+
+    latestTimelineEntryId() {
+      const events = this.timelineEvents();
+      return events.length > 0 ? events[events.length - 1].id : null;
+    },
+
+    timelineEntryIsSelected(entry) {
+      return !!entry && this.activeTimelineEntryId(false) === entry.id;
+    },
+
+    selectedTimelineSummary() {
+      const targetEntryId = this.activeTimelineEntryId(false);
+      if (!targetEntryId) return null;
+
+      const events = this.timelineEvents();
+      const index = events.findIndex(entry => entry.id === targetEntryId);
+      if (index < 0) return null;
+
+      const entry = events[index];
+      const total = events.length;
+      const sequencePercent = total <= 1 ? 100 : Math.round((index / (total - 1)) * 100);
+      const replayMode = this.replay.active;
+      const totalDuration = replayMode
+        ? this.replayTimelineElapsedDurationMs(events, Math.max(0, total - 1))
+        : Math.max(0, Date.parse(events[total - 1].timestamp) - Date.parse(events[0].timestamp));
+      const elapsedDuration = replayMode
+        ? this.replayTimelineElapsedDurationMs(events, index)
+        : Math.max(0, Date.parse(entry.timestamp) - Date.parse(events[0].timestamp));
+      const timePercent = totalDuration === 0 ? 100 : Math.round((elapsedDuration / totalDuration) * 100);
+
+      return {
+        sequencePercent,
+        sequenceLabel: `${index + 1} / ${total} · ${sequencePercent}%`,
+        timePercent,
+        timeLabel: `${this.formatDurationMs(elapsedDuration)} / ${this.formatDurationMs(totalDuration)} · ${timePercent}%`,
+      };
+    },
+
+    scrollTimelineToEntry(entryId, options = {}) {
+      const { flash = true } = options;
+      if (!entryId) return;
+      this.$nextTick(() => {
+        requestAnimationFrame(() => {
+          const entry = this.timelineEntryElement(entryId);
+          if (!entry) return;
+          const panel = entry.closest('.overflow-y-auto');
+          if (!panel) return;
+          const top = entry.offsetTop - panel.clientHeight / 2 + entry.clientHeight / 2;
+          const targetTop = Math.max(0, top);
+          panel.scrollTo({ top: targetTop, behavior: 'smooth' });
+          if (!flash) return;
+          const travel = Math.abs(panel.scrollTop - targetTop);
+          const flashDelay = Math.min(450, Math.max(140, travel * 0.18));
+          setTimeout(() => {
+            entry.classList.remove('timeline-flash');
+            void entry.offsetWidth;
+            entry.classList.add('timeline-flash');
+            setTimeout(() => entry.classList.remove('timeline-flash'), 1000);
+          }, flashDelay);
+        });
+      });
+    },
+
+    followReplayTimelineTail() {
+      if (!this.replay.active || this.sideTab !== 'log') return;
+      this.scrollTimelineToEntry(this.latestTimelineEntryId(), { flash: false });
+    },
+
+    scrollTimelineToSelection() {
+      if (this.sideTab !== 'log') return;
+      this.scrollTimelineToEntry(this.activeTimelineEntryId(true));
+    },
+
+    openHintTimelineEntry(hintId) {
+      if (!hintId) return;
+      const entry = this.timelineEvents().find(event => event.type === 'hint_added' && event.targetId === hintId);
+      if (!entry) return;
+      this.sideTab = 'log';
+      this.openTimelineEntry(entry);
+      this.scrollTimelineToEntry(entry.id);
+    },
+
+    openTimelineEntry(entry, options = {}) {
+      const { centerGraph = true } = options;
+      if (!entry || !this.timelineEventIsInteractive(entry)) return;
+      if (!this.timelineEventTriggersGraphFocus(entry)) {
+        this.selectedTimelineEntryId = entry.id;
+        this.clearGraphSelection(true);
+        return;
+      }
+      if (entry.targetType === 'intent' && entry.targetId) {
+        this.selectIntent(entry.targetId);
+        this.selectedTimelineEntryId = entry.id;
+        if (centerGraph) this.centerGraphOnIntent(entry.targetId);
+        return;
+      }
+      if (entry.targetType === 'fact' && entry.targetId) {
+        this.selectedFacts = [entry.targetId];
+        this.selectFact(entry.targetId);
+        this.selectedTimelineEntryId = entry.id;
+        if (centerGraph) this.centerGraphOnFact(entry.targetId);
+      }
+    },
+
+    formatTime(ts) { if (!ts) return ''; return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); },
+    formatDate(ts) { if (!ts) return ''; const d = new Date(ts); return d.toLocaleDateString([],{year:'numeric',month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); },
+    formatTimelineDate(ts) { if (!ts) return ''; return new Date(ts).toLocaleDateString([],{year:'numeric',month:'short',day:'numeric'}); },
+    formatDurationMs(ms) {
+      const totalSeconds = Math.max(0, Math.round(ms / 1000));
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      if (hours > 0) return `${hours}h ${minutes}m`;
+      if (minutes > 0) return `${minutes}m ${seconds}s`;
+      return `${seconds}s`;
+    },
+
+    async createProject() {
+      try {
+        const actor = this.actorName();
+        const hintContents = this.newProject.hints.filter(h => h.content?.trim());
+        const body = { title: this.newProject.title, origin: this.newProject.origin, goal: this.newProject.goal };
+        const hints = hintContents.map(h => ({ content: h.content.trim(), creator: actor }));
+        if (hints.length > 0) body.hints = hints;
+        const data = await this.api('POST', '/projects', body);
+        this.showNewProject = false;
+        this.newProject = { title:'', origin:'', goal:'', hints: [{ content:'' }] };
+        await this.loadProjects();
+        await this.openProject(data.project.id);
+        this.showToast('Project created');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    openCreateIntent() {
+      if (!this.canActOnSelectedFacts()) return;
+      this.intentForm = { description:'' };
+      this.showIntentModal = true;
+    },
+
+    async createIntent(claim = false) {
+      try {
+        const actor = this.actorName();
+        await this.api('POST', `/projects/${this.selectedProjectId}/intents`, {
+          from: this.selectedFacts,
+          description: this.intentForm.description,
+          creator: actor,
+          worker: claim ? actor : null,
+        });
+        this.showIntentModal = false;
+        await this.loadProject(this.selectedProjectId);
+        this.updateGraph();
+        this.showToast(claim ? 'Intent declared and claimed' : 'Intent declared');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async sendHeartbeatForSelectedIntent() {
+      const intent = this.selectedActionableOpenIntentRecord();
+      if (!intent) return;
+      try {
+        const actor = this.actorName();
+        const claiming = !intent.worker;
+        await this.api('POST', `/projects/${this.selectedProjectId}/intents/${intent.id}/heartbeat`, { worker: actor });
+        await this.loadProject(this.selectedProjectId);
+        this.updateGraph();
+        this.showToast(claiming ? 'Intent claimed' : 'Heartbeat sent');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async releaseSelectedIntent() {
+      const intent = this.selectedReleasableOpenIntentRecord();
+      if (!intent) return;
+      try {
+        const actor = this.actorName();
+        await this.api('POST', `/projects/${this.selectedProjectId}/intents/${intent.id}/release`, { worker: actor });
+        await this.loadProject(this.selectedProjectId);
+        this.updateGraph();
+        this.showToast('Intent released');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    openConclude(intent) { this.concludeForm = { description:'', intentId: intent.id }; this.showConcludeModal = true; },
+
+    async concludeIntent() {
+      try {
+        const actor = this.actorName();
+        await this.api('POST', `/projects/${this.selectedProjectId}/intents/${this.concludeForm.intentId}/conclude`, { worker: actor, description: this.concludeForm.description });
+        this.showConcludeModal = false;
+        this.selectedNode = null;
+        await this.loadProject(this.selectedProjectId);
+        this.updateGraph();
+        this.showToast('Intent concluded');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    openCompleteProject() {
+      if (!this.canActOnSelectedFacts()) return;
+      this.completeForm = { description:'' };
+      this.showCompleteModal = true;
+    },
+
+    openHintModal() {
+      if (!this.projectCanWriteHints()) return;
+      this.hintForm = { content:'' };
+      this.showHintModal = true;
+    },
+
+    async completeProject() {
+      try {
+        const actor = this.actorName();
+        await this.api('POST', `/projects/${this.selectedProjectId}/complete`, { from: this.selectedFacts, description: this.completeForm.description, worker: actor });
+        this.showCompleteModal = false;
+        await this.loadProjects();
+        await this.loadProject(this.selectedProjectId);
+        this.updateGraph();
+        this.showToast('Project completed');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async addHint() {
+      if (!this.projectCanWriteHints()) return;
+      try {
+        const actor = this.actorName();
+        await this.api('POST', `/projects/${this.selectedProjectId}/hints`, { content: this.hintForm.content, creator: actor });
+        this.showHintModal = false;
+        this.hintForm = { content:'' };
+        await this.loadProjects();
+        await this.loadProject(this.selectedProjectId);
+        this.sideTab = 'hints';
+        this.showToast('Hint added');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    saveLocalSettings() {
+      try {
+        this.localPrefs.actor_name = this.actorName();
+        this.localPrefs.layout_mode = this.isValidLayoutMode(this.localPrefs.layout_mode) ? this.localPrefs.layout_mode : 'dagre_tb';
+        this.layoutMode = this.localPrefs.layout_mode;
+        this.saveLocalPrefs();
+        if (this.cy) this.cy.layout(this.layoutOpts()).run();
+        this.showLocalPrefs = false;
+        this.showToast('Local preferences saved');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async saveServerSettings() {
+      try {
+        await this.api('PUT', '/settings', this.settingsForm);
+        this.showSettings = false;
+        this.showToast('Server settings saved');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+  };
+}
+</script>
+</body>
+</html>

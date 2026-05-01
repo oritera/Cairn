@@ -1,2 +1,4 @@
 .vscode/
 .DS_Store
+__pycache__/
+.playwright-cli/

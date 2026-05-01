@@ -1,0 +1,59 @@
+server: "http://127.0.0.1:8000"
+
+runtime:
+  interval: 3
+  max_workers: 4
+  max_running_projects: 2
+  max_project_workers: 4
+  healthcheck_timeout: 2
+  prompt_group: "mock"
+
+tasks:
+  bootstrap:
+    timeout: 9
+    conclude_timeout: 5
+  reason:
+    timeout: 5
+    max_intents: 3
+  explore:
+    timeout: 9
+    conclude_timeout: 5
+
+container:
+  image: "ghcr.io/oritera/cairn-worker-container:latest"
+  network_mode: "host"
+  completed_action: "stop"
+  cap_add:
+    - "NET_RAW"
+    - "NET_ADMIN"
+
+common_env:
+  TSEC_BASE_URL: "http://<SERVER_HOST>/api"
+  TSEC_AGENT_TOKEN: "common-agent-token"
+
+workers:
+  - name: "mock-observer-1"
+    type: "mock"
+    task_types: [reason, explore, bootstrap]
+    max_running: 1
+    priority: 0
+    env:
+      MOCK_HEALTHCHECK: '{"delay":[0,2],"outcomes":{"ok":0.9,"fail":0.1}}'
+      MOCK_BOOTSTRAP: '{"delay":[5,10],"outcomes":{"complete":0.0,"fact":0.6,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'
+      MOCK_BOOTSTRAP_CONCLUDE: '{"delay":[2,6],"outcomes":{"fact":0.6,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'
+      MOCK_REASON: '{"delay":[2,6],"outcomes":{"complete":0.1,"intent":0.4,"noop":0.1,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'
+      MOCK_EXPLORE_EXECUTE: '{"delay":[5,10],"outcomes":{"fact":0.6,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'
+      MOCK_EXPLORE_CONCLUDE: '{"delay":[2,6],"outcomes":{"fact":0.6,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'
+
+  - name: "mock-observer-2"
+    type: "mock"
+    task_types: [reason, explore, bootstrap]
+    max_running: 1
+    priority: 0
+    env:
+      MOCK_HEALTHCHECK: '{"delay":[0,2],"outcomes":{"ok":0.9,"fail":0.1}}'
+      MOCK_BOOTSTRAP: '{"delay":[5,10],"outcomes":{"complete":0.0,"fact":0.6,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'
+      MOCK_BOOTSTRAP_CONCLUDE: '{"delay":[2,6],"outcomes":{"fact":0.6,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'
+      MOCK_REASON: '{"delay":[2,6],"outcomes":{"complete":0.1,"intent":0.4,"noop":0.1,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'
+      MOCK_EXPLORE_EXECUTE: '{"delay":[5,10],"outcomes":{"fact":0.6,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'
+      MOCK_EXPLORE_CONCLUDE: '{"delay":[2,6],"outcomes":{"fact":0.6,"rejected":0.1,"invalid_json":0.1,"invalid_payload":0.1,"command_fail":0.1}}'

@@ -1,0 +1,31 @@
+[project]
+name = "cairn"
+version = "0.1.0"
+description = "Fact-graph based collaborative exploration protocol"
+authors = [
+    { name = "leixiao", email = "1729888211@qq.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "click>=8.1",
+    "pyyaml>=6.0",
+    "docker>=7.1.0",
+    "requests>=2.32.3",
+]
+
+[project.scripts]
+cairn = "cairn.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8.9,<0.9.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+]
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
