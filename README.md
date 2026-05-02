@@ -13,10 +13,10 @@
 Cairn is a general-purpose problem-solving engine. <br/>It defines no roles, no workflows. Given an origin and a goal, it searches for a path through an unknown state space. <br/>AI Penetration Testing is one such problem — and a proven one.
 
 <p>
-  <a href="https://discord.gg/nDSy4NZVP">
+  <a href="https://discord.gg/nDSy4NZVP" target="_blank" rel="noopener noreferrer">
     <img src="https://img.shields.io/badge/Discord-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" />
   </a>
-  <a href="https://x.com/le1xia0">
+  <a href="https://x.com/le1xia0" target="_blank" rel="noopener noreferrer">
     <img src="https://img.shields.io/badge/X-000000?style=flat-square&logo=x&logoColor=white" alt="X" />
   </a>
 </p>
@@ -24,7 +24,7 @@ Cairn is a general-purpose problem-solving engine. <br/>It defines no roles, no 
 </div>
 
 <p align="center">
-  <a href="https://www.bilibili.com/video/BV1a8R5BhEVi/">
+  <a href="https://www.bilibili.com/video/BV1a8R5BhEVi/" target="_blank" rel="noopener noreferrer">
     <img src="./README/cairn.png" alt="Cairn runtime screenshot" width="900" />
   </a>
 </p>
