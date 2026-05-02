@@ -14,6 +14,12 @@ Cairn is a general-purpose problem-solving engine. <br/>It defines no roles, no 
 
 </div>
 
+<p align="center">
+  <a href="https://www.bilibili.com/video/BV1a8R5BhEVi/">
+    <img src="./README/cairn.png" alt="Cairn runtime screenshot" width="900" />
+  </a>
+</p>
+
 ## What is Cairn?
 
 Penetration testing is fundamentally a **directed search through a near-infinite state space**:
