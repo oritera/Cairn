@@ -46,6 +46,11 @@ Agent Workers run an OODA loop — Observe the full graph, Orient to the current
 
 Agents coordinate exclusively through the shared board (Stigmergy). No direct communication. No information silos.
 
+## Cairn in Action
+
+https://github.com/user-attachments/assets/e557b1ac-dda4-41cb-87dd-9d56dbf05133
+
+
 ## How It Works
 
 Three task types, all executed by the same Worker:
