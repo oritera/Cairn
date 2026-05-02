@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="cairn/src/cairn/server/static/favicon.svg" alt="Cairn Logo" width="220" />
+<img src="./README/banner.png" alt="Cairn Banner"/>
 
 # Cairn
 ### More Than Just AI Penetration Testing — Towards General State-Space Search
