@@ -49,7 +49,7 @@ class PiDriver(WorkerDriver):
         argv.extend(["-p", prompt])
         return DriverResult(argv=self._wrap_with_models(worker, argv), session=session)
 
-    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> list[str]:
+    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> DriverResult:
         env = worker.env
         argv = [
             "--provider",
@@ -65,7 +65,7 @@ class PiDriver(WorkerDriver):
             "-p",
             prompt,
         ]
-        return self._wrap_with_models(worker, argv)
+        return DriverResult(argv=self._wrap_with_models(worker, argv), session=session)
 
     def extract_session(self, session: str | None, stdout: str, stderr: str) -> str | None:
         if session:

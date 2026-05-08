@@ -115,6 +115,7 @@ def run_bootstrap_task(
             timeout_seconds=config.tasks.bootstrap.timeout,
             lease=lease,
             cancellation=cancellation,
+            stdin=execute.stdin,
         )
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
         session = driver.extract_session(session, first.stdout, first.stderr)
@@ -298,18 +299,19 @@ def _try_conclude_fallback(
         load_prompt(config.runtime.prompt_group, "bootstrap_conclude.md"),
         _bootstrap_prompt_replacements(project),
     )
-    conclude_argv = driver.build_conclude(worker, prompt, session)
+    conclude = driver.build_conclude(worker, prompt, session)
     LOG.info("starting bootstrap conclude fallback project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
     conclude_started = time.perf_counter()
     result = run_worker_process(
         container_manager,
         container_name,
         worker,
-        conclude_argv,
+        conclude.argv,
         phase="bootstrap_conclude",
         timeout_seconds=config.tasks.bootstrap.conclude_timeout,
         lease=lease,
         cancellation=cancellation,
+        stdin=conclude.stdin,
     )
     conclude_ms = int((time.perf_counter() - conclude_started) * 1000)
     cancelled = cancel_reason(result, cancellation)

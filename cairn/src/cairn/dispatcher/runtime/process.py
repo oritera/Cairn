@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
 import logging
+import socket
 import threading
 import time
 from typing import Any
@@ -24,9 +26,10 @@ class ProcessResult:
 
 
 class ManagedProcess:
-    def __init__(self, container: Container, command: list[str], env: dict[str, str]):
+    def __init__(self, container: Container, command: list[str], env: dict[str, str], *, stdin: str | None = None):
         self.command = command
         self.env = env
+        self.stdin = stdin
         self._container = container
         self._api = container.client.api
         self._exec_id: str | None = None
@@ -45,12 +48,13 @@ class ManagedProcess:
             self.command,
             stdout=True,
             stderr=True,
-            stdin=False,
+            stdin=self.stdin is not None,
             tty=False,
             environment=self.env,
         )
         self._exec_id = exec_info["Id"]
-        self._reader = threading.Thread(target=self._read_stream, daemon=True)
+        target = self._read_stream if self.stdin is None else self._read_socket_stream
+        self._reader = threading.Thread(target=target, daemon=True)
         self._reader.start()
 
     def communicate(self, timeout: float | None) -> ProcessResult:
@@ -118,6 +122,77 @@ class ManagedProcess:
         finally:
             self._returncode = self._resolve_exit_code()
             self._done.set()
+
+    def _read_socket_stream(self) -> None:
+        assert self._exec_id is not None
+        sock: Any | None = None
+        try:
+            sock = self._api.exec_start(
+                self._exec_id,
+                detach=False,
+                tty=False,
+                socket=True,
+            )
+            self._set_socket_timeout(sock, None)
+            self._send_stdin(sock)
+            self._read_multiplexed_socket(sock)
+        except DockerException as exc:
+            self._read_error = str(exc)
+        except OSError as exc:
+            self._read_error = str(exc)
+        finally:
+            if sock is not None:
+                self._close_socket_response(sock)
+                with suppress(OSError, ValueError):
+                    sock.close()
+            self._returncode = self._resolve_exit_code()
+            self._done.set()
+
+    def _send_stdin(self, sock: Any) -> None:
+        data = (self.stdin or "").encode("utf-8")
+        if data:
+            self._raw_socket(sock).sendall(data)
+        try:
+            self._raw_socket(sock).shutdown(socket.SHUT_WR)
+        except OSError:
+            pass
+
+    def _read_multiplexed_socket(self, sock: Any) -> None:
+        buffer = b""
+        while True:
+            raw_sock = self._raw_socket(sock)
+            chunk = raw_sock.recv(4096)
+            if not chunk:
+                return
+            buffer += chunk
+            while len(buffer) >= 8:
+                stream_type = buffer[0]
+                frame_size = int.from_bytes(buffer[4:8], byteorder="big")
+                if len(buffer) < 8 + frame_size:
+                    break
+                payload = buffer[8 : 8 + frame_size]
+                buffer = buffer[8 + frame_size :]
+                if stream_type == 1:
+                    self._stdout.append(self._decode(payload))
+                elif stream_type == 2:
+                    self._stderr.append(self._decode(payload))
+
+    @staticmethod
+    def _raw_socket(sock: Any) -> Any:
+        return getattr(sock, "_sock", sock)
+
+    @staticmethod
+    def _set_socket_timeout(sock: Any, timeout: float | None) -> None:
+        raw_sock = ManagedProcess._raw_socket(sock)
+        if hasattr(raw_sock, "settimeout"):
+            raw_sock.settimeout(timeout)
+
+    @staticmethod
+    def _close_socket_response(sock: Any) -> None:
+        response = getattr(sock, "_response", None)
+        if response is not None:
+            with suppress(Exception):
+                response.close()
 
     def _resolve_exit_code(self) -> int:
         assert self._exec_id is not None

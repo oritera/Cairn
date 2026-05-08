@@ -95,6 +95,7 @@ def run_worker_process(
     timeout_seconds: int,
     lease: HeartbeatLease | None = None,
     cancellation: TaskCancellation | None = None,
+    stdin: str | None = None,
 ) -> ProcessResult:
     LOG.info(
         "starting container exec container=%s worker=%s phase=%s timeout=%ss",
@@ -108,6 +109,7 @@ def run_worker_process(
         dict(worker.env),
         argv,
         timeout_seconds=timeout_seconds,
+        stdin=stdin,
     )
     process.start()
     if lease is not None:

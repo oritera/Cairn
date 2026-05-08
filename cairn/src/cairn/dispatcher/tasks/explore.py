@@ -115,6 +115,7 @@ def run_explore_task(
             timeout=config.tasks.explore.timeout,
             lease=lease,
             cancellation=cancellation,
+            stdin=execute.stdin,
         )
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
         session = driver.extract_session(session, first.stdout, first.stderr)
@@ -299,18 +300,19 @@ def _try_conclude_fallback(
             "intent_description": intent.description,
         },
     )
-    conclude_argv = driver.build_conclude(worker, prompt, session)
+    conclude = driver.build_conclude(worker, prompt, session)
     LOG.info("starting conclude fallback project=%s intent=%s worker=%s", project_id, intent.id, worker.name)
     conclude_started = time.perf_counter()
     result = _run_process(
         container_manager,
         container_name,
         worker,
-        conclude_argv,
+        conclude.argv,
         phase="explore_conclude",
         timeout=config.tasks.explore.conclude_timeout,
         lease=lease,
         cancellation=cancellation,
+        stdin=conclude.stdin,
     )
     conclude_ms = int((time.perf_counter() - conclude_started) * 1000)
     cancelled = cancel_reason(result, cancellation)
@@ -391,6 +393,7 @@ def _run_process(
     timeout: int,
     lease: HeartbeatLease,
     cancellation: TaskCancellation,
+    stdin: str | None = None,
 ):
     return run_worker_process(
         container_manager,
@@ -401,4 +404,5 @@ def _run_process(
         timeout_seconds=timeout,
         lease=lease,
         cancellation=cancellation,
+        stdin=stdin,
     )

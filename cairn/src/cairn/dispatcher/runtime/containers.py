@@ -185,6 +185,7 @@ class ContainerManager:
         command: list[str],
         timeout_seconds: int | None = None,
         kill_after_seconds: int = 5,
+        stdin: str | None = None,
     ) -> ManagedProcess:
         container = self._require_container(container_name)
         argv: list[str] = []
@@ -198,7 +199,7 @@ class ContainerManager:
                 ]
             )
         argv.extend(command)
-        return ManagedProcess(container, argv, env)
+        return ManagedProcess(container, argv, env, stdin=stdin)
 
     def remove_container(self, name: str, *, force: bool = True) -> None:
         container = self._get_container(name)

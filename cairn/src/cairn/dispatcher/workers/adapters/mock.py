@@ -134,5 +134,5 @@ class MockDriver(SeedSessionDriver):
     def build_execute(self, worker: WorkerConfig, prompt: str, session: str | None) -> DriverResult:
         return DriverResult(argv=self._argv(worker, prompt), session=session)
 
-    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> list[str]:
-        return self._argv(worker, prompt)
+    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> DriverResult:
+        return DriverResult(argv=self._argv(worker, prompt), session=session)

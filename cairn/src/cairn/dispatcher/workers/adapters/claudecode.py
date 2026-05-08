@@ -81,19 +81,20 @@ class ClaudeCodeDriver(SeedSessionDriver):
                 session,
                 "--dangerously-skip-permissions",
                 "-p",
-                "--",
-                prompt,
             ],
             session=session,
+            stdin=prompt,
         )
 
-    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> list[str]:
-        return [
-            "claude",
-            "-r",
-            session,
-            "--dangerously-skip-permissions",
-            "-p",
-            "--",
-            prompt,
-        ]
+    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> DriverResult:
+        return DriverResult(
+            argv=[
+                "claude",
+                "-r",
+                session,
+                "--dangerously-skip-permissions",
+                "-p",
+            ],
+            session=session,
+            stdin=prompt,
+        )

@@ -62,35 +62,40 @@ class CodexDriver(RegexSessionDriver):
                 "-c",
                 'model_providers.cairn.env_key="OPENAI_API_KEY"',
                 "--",
-                prompt,
-            ]
+                "-",
+            ],
+            stdin=prompt,
         )
 
-    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> list[str]:
+    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> DriverResult:
         env = worker.env
-        return [
-            "codex",
-            "exec",
-            "resume",
-            session,
-            "--dangerously-bypass-approvals-and-sandbox",
-            "--model",
-            env["CODEX_MODEL"],
-            "-c",
-            'model_provider="cairn"',
-            "-c",
-            'model_providers.cairn.name="cairn"',
-            "-c",
-            'model_providers.cairn.wire_api="responses"',
-            "-c",
-            'model_reasoning_effort="high"',
-            "-c",
-            f'model_providers.cairn.base_url="{env["CODEX_BASE_URL"]}"',
-            "-c",
-            'model_providers.cairn.env_key="OPENAI_API_KEY"',
-            "--",
-            prompt,
-        ]
+        return DriverResult(
+            argv=[
+                "codex",
+                "exec",
+                "resume",
+                session,
+                "--dangerously-bypass-approvals-and-sandbox",
+                "--model",
+                env["CODEX_MODEL"],
+                "-c",
+                'model_provider="cairn"',
+                "-c",
+                'model_providers.cairn.name="cairn"',
+                "-c",
+                'model_providers.cairn.wire_api="responses"',
+                "-c",
+                'model_reasoning_effort="high"',
+                "-c",
+                f'model_providers.cairn.base_url="{env["CODEX_BASE_URL"]}"',
+                "-c",
+                'model_providers.cairn.env_key="OPENAI_API_KEY"',
+                "--",
+                "-",
+            ],
+            session=session,
+            stdin=prompt,
+        )
 
     @staticmethod
     def _healthcheck_url(worker: WorkerConfig) -> str:

@@ -129,6 +129,7 @@ def run_reason_task(
             timeout_seconds=config.tasks.reason.timeout,
             lease=lease,
             cancellation=cancellation,
+            stdin=command.stdin,
         )
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
         total_ms = int((time.perf_counter() - task_started) * 1000)
