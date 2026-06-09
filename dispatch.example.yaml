@@ -74,6 +74,7 @@ workers:
       CODEX_MODEL: "qwen3.6-plus"
       CODEX_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
       OPENAI_API_KEY: "sk-xxx"
+      CODEX_WIRE_API: "responses"
 
   - name: "pi_qwen3.6-plus"
     type: "pi"

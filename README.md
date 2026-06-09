@@ -159,14 +159,17 @@ docker compose up --build
 ```
  
 This starts `cairn-server` on port `8000` and `cairn-dispatcher` once the server passes its health check. The dispatcher mounts `dispatch.yaml` from the project root and connects to Docker via the host socket. Data is persisted to `./datas/cairn/`.
+The Compose file also exposes `dispatch.yaml` to `cairn-server` via `CAIRN_DISPATCH_CONFIG`, which enables editing worker API profiles from the web UI.
  
 ### Manual
  
 ```bash
 # Start the server
+CAIRN_DISPATCH_CONFIG=dispatch.yaml \
 uv run --project cairn cairn serve
- 
+
 # Run the dispatcher
+CAIRN_DISPATCH_CONFIG=dispatch.yaml \
 uv run --project cairn cairn dispatch --config dispatch.yaml
  
 # Run startup health checks only

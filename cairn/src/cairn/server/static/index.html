@@ -277,6 +277,9 @@
       <button @click="loadSettings(); showSettings = true" class="h-7 w-7 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition inline-flex items-center justify-center shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7 7 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a7 7 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a7 7 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a7 7 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path d="M15 12a3 3 0 1 1-6 0-3 3 0 0 1 6 0Z"/></svg>
       </button>
+      <button @click="loadSettings(); loadDispatcherConfig(); showWorkerConfig = true" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center justify-center shrink-0">
+        API
+      </button>
     </div>
   </header>
 
@@ -478,6 +481,9 @@
       </button>
       <button @click="loadSettings(); showSettings = true" class="h-7 w-7 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition inline-flex items-center justify-center shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7 7 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a7 7 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a7 7 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a7 7 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path d="M15 12a3 3 0 1 1-6 0-3 3 0 0 1 6 0Z"/></svg>
+      </button>
+      <button @click="loadSettings(); loadDispatcherConfig(); showWorkerConfig = true" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center justify-center shrink-0">
+        API
       </button>
     </div>
   </header>
@@ -987,7 +993,7 @@
 
 <!-- Settings -->
 <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showSettings = false">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-slate-200/60" @click.stop>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 border border-slate-200/60" @click.stop>
     <h3 class="text-base font-semibold text-slate-700 mb-4">Server Settings</h3>
     <div>
       <label class="text-[11px] text-slate-400 mb-1 block font-medium">Intent timeout (seconds)</label>
@@ -1001,6 +1007,65 @@
     <div class="flex justify-end gap-2 mt-5">
       <button @click="showSettings = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
       <button @click="saveServerSettings()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200">Save Server</button>
+    </div>
+  </div>
+</div>
+
+<!-- Worker API Settings -->
+<div x-show="showWorkerConfig" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showWorkerConfig = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 border border-slate-200/60 max-h-[85vh] overflow-y-auto" @click.stop>
+    <div class="flex items-start justify-between gap-4 mb-4">
+      <div class="min-w-0">
+        <h3 class="text-base font-semibold text-slate-700">Worker API Profiles</h3>
+        <p class="text-[11px] text-slate-400 break-all mt-1" x-text="dispatcherConfigPath || 'No dispatcher config file found'"></p>
+      </div>
+      <button @click="loadDispatcherConfig()" type="button" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 transition shrink-0">Reload</button>
+    </div>
+    <template x-if="dispatcherConfigForm.workers.length === 0">
+      <div class="px-4 py-5 border border-dashed border-slate-200 rounded-xl text-sm text-slate-400">
+        No editable worker config found.
+      </div>
+    </template>
+    <div class="space-y-3">
+      <template x-for="worker in dispatcherConfigForm.workers" :key="worker.name">
+        <div class="border border-slate-200 rounded-xl p-4 space-y-3">
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-slate-700 truncate" x-text="worker.name"></div>
+            <div class="text-[11px] text-slate-400 uppercase tracking-[0.12em]" x-text="worker.type"></div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] text-slate-400 mb-1 block font-medium">Model</label>
+              <input x-model="worker.model" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+            </div>
+            <div x-show="worker.api_mode_options && worker.api_mode_options.length > 0">
+              <label class="text-[11px] text-slate-400 mb-1 block font-medium">API mode</label>
+              <input x-model="worker.api_mode" :placeholder="workerApiModePlaceholder(worker)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+              <div class="flex flex-wrap gap-2 mt-2">
+                <template x-for="mode in worker.api_mode_options" :key="`${worker.name}-${mode}`">
+                  <button type="button" @click="worker.api_mode = mode" class="px-2 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition" x-text="formatWorkerApiMode(mode)"></button>
+                </template>
+              </div>
+              <p x-show="workerApiModeHelp(worker)" class="text-[11px] text-slate-400 mt-2" x-text="workerApiModeHelp(worker)"></p>
+            </div>
+            <div class="md:col-span-2">
+              <label class="text-[11px] text-slate-400 mb-1 block font-medium">API base URL</label>
+              <input x-model="worker.base_url" :placeholder="workerBaseUrlPlaceholder(worker)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+            </div>
+            <div class="md:col-span-2">
+              <label class="text-[11px] text-slate-400 mb-1 block font-medium">API key</label>
+              <input type="password" x-model="worker.api_key" :placeholder="workerApiKeyPlaceholder(worker)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+              <p x-show="worker.api_mode === 'qizhi_openai' || worker.api_mode === 'iq_openai'" class="text-[11px] text-slate-400 mt-2">
+                Use the company token format <span class="font-mono">service_name|prompt_id|prompt_token</span>; requests are sent as a Bearer token.
+              </p>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="showWorkerConfig = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
+      <button @click="saveServerSettings()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200">Save</button>
     </div>
   </div>
 </div>
@@ -1096,6 +1161,7 @@ function cairnApp() {
     showRenameModal: false,
     showLocalPrefs: false,
     showSettings: false,
+    showWorkerConfig: false,
     showYamlModal: false,
     exportTab: 'yaml',
     exportProjectId: '',
@@ -1110,6 +1176,8 @@ function cairnApp() {
     renameForm: { projectId: '', originalTitle: '', title: '' },
     localPrefs: { actor_name: 'Human', layout_mode: 'dagre_tb' },
     settingsForm: { intent_timeout: 5, reason_timeout: 5 },
+    dispatcherConfigPath: '',
+    dispatcherConfigForm: { workers: [] },
     deleteConfirm: { id: '', title: '' },
     isDeletingProject: false,
     yamlPreviewTitle: '',
@@ -1141,6 +1209,7 @@ function cairnApp() {
       this.loadLocalPrefs();
       await this.loadProjects();
       await this.loadSettings();
+      await this.loadDispatcherConfig();
       this.startPolling();
       window.addEventListener('hashchange', () => this.handleRoute());
       this.handleRoute();
@@ -1582,6 +1651,67 @@ function cairnApp() {
         this.settingsForm.intent_timeout = s.intent_timeout;
         this.settingsForm.reason_timeout = s.reason_timeout;
       } catch(e) { console.error(e); }
+    },
+
+    async loadDispatcherConfig() {
+      try {
+        const config = await this.api('GET', '/dispatcher-config');
+        this.dispatcherConfigPath = config.config_path || '';
+        this.dispatcherConfigForm.workers = Array.isArray(config.workers) ? config.workers : [];
+      } catch (e) {
+        this.dispatcherConfigPath = '';
+        this.dispatcherConfigForm.workers = [];
+        console.error(e);
+      }
+    },
+
+    formatWorkerApiMode(mode) {
+      const labels = {
+        responses: 'OpenAI Responses',
+        chat_completions: 'OpenAI Chat Completions',
+        qizhi_openai: '奇智 OpenAI 兼容',
+        iq_openai: 'IQIYI OpenAI 兼容',
+        openai_compatible: 'OpenAI Compatible',
+        dashscope_compatible: 'DashScope Compatible',
+        'openai-completions': 'OpenAI Completions',
+        'openai-chat-completions': 'OpenAI Chat Completions',
+      };
+      return labels[mode] || mode;
+    },
+
+    workerApiModePlaceholder(worker) {
+      if (worker?.type === 'codex') return 'responses / chat_completions / qizhi_openai';
+      if (worker?.type === 'pi') return 'openai-completions';
+      return 'custom mode';
+    },
+
+    workerApiModeHelp(worker) {
+      const mode = String(worker?.api_mode || '').trim();
+      if (mode === 'qizhi_openai' || mode === 'iq_openai') {
+        return 'Uses the company OpenAI-compatible gateway. Base URL usually ends with /v1 and requests go to /v1/chat/completions.';
+      }
+      if (mode === 'chat_completions' || mode === 'openai-chat-completions' || mode === 'openai_compatible' || mode === 'dashscope_compatible') {
+        return 'Compatible with OpenAI Chat Completions style APIs.';
+      }
+      if (mode === 'responses') {
+        return 'Uses the OpenAI Responses API.';
+      }
+      if (mode === 'openai-completions') {
+        return 'Uses the provider/completions style API expected by the pi worker.';
+      }
+      return mode ? 'Custom API mode. Make sure the worker adapter understands this value.' : '';
+    },
+
+    workerBaseUrlPlaceholder(worker) {
+      const mode = String(worker?.api_mode || '').trim();
+      if (mode === 'qizhi_openai' || mode === 'iq_openai') return 'http://ibrain.qiyi.domain/v1';
+      return 'https://example.com/v1';
+    },
+
+    workerApiKeyPlaceholder(worker) {
+      const mode = String(worker?.api_mode || '').trim();
+      if (mode === 'qizhi_openai' || mode === 'iq_openai') return 'service_name|prompt_id|prompt_token';
+      return 'sk-...';
     },
 
     async loadProject(id) {
@@ -3395,7 +3525,20 @@ function cairnApp() {
     async saveServerSettings() {
       try {
         await this.api('PUT', '/settings', this.settingsForm);
+        if (this.showWorkerConfig || this.dispatcherConfigForm.workers.length > 0) {
+          await this.api('PUT', '/dispatcher-config', {
+            workers: this.dispatcherConfigForm.workers.map(worker => ({
+              name: worker.name,
+              model: worker.model,
+              base_url: worker.base_url,
+              api_key: worker.api_key,
+              api_mode: worker.api_mode,
+            })),
+          });
+          await this.loadDispatcherConfig();
+        }
         this.showSettings = false;
+        this.showWorkerConfig = false;
         this.showToast('Server settings saved');
       } catch(e) { this.showToast(e.message, 'error'); }
     },

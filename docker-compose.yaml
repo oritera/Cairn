@@ -7,8 +7,11 @@ services:
     container_name: cairn-server
     ports:
       - "8000:8000"
+    environment:
+      CAIRN_DISPATCH_CONFIG: /cairn/dispatch.yaml
     volumes:
       - ./datas/cairn/:/root/.local/share/cairn/
+      - ./dispatch.yaml:/cairn/dispatch.yaml
     healthcheck:
       test:
         - "CMD"
@@ -30,6 +33,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dispatch.yaml:/cairn/dispatch.yaml
+    environment:
+      CAIRN_DISPATCH_CONFIG: /cairn/dispatch.yaml
     depends_on:
       cairn-server:
         condition: service_healthy

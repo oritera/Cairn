@@ -242,3 +242,30 @@ class ReopenResponse(BaseModel):
     project: ProjectMeta
     fact: Fact
     intent: Intent
+
+
+class DispatcherWorkerConfig(BaseModel):
+    name: str
+    type: str
+    model: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+    api_mode: str | None = None
+    api_mode_options: list[str] = Field(default_factory=list)
+
+
+class DispatcherConfigResponse(BaseModel):
+    config_path: str
+    workers: list[DispatcherWorkerConfig]
+
+
+class UpdateDispatcherWorkerConfigRequest(BaseModel):
+    name: str
+    model: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+    api_mode: str | None = None
+
+
+class UpdateDispatcherConfigRequest(BaseModel):
+    workers: list[UpdateDispatcherWorkerConfigRequest]
