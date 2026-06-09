@@ -54,7 +54,7 @@ class CodexDriver(RegexSessionDriver):
                 "-c",
                 'model_providers.cairn.name="cairn"',
                 "-c",
-                'model_providers.cairn.wire_api="responses"',
+                f'model_providers.cairn.wire_api="{self._wire_api(worker)}"',
                 "-c",
                 'model_reasoning_effort="high"',
                 "-c",
@@ -81,7 +81,7 @@ class CodexDriver(RegexSessionDriver):
             "-c",
             'model_providers.cairn.name="cairn"',
             "-c",
-            'model_providers.cairn.wire_api="responses"',
+            f'model_providers.cairn.wire_api="{self._wire_api(worker)}"',
             "-c",
             'model_reasoning_effort="high"',
             "-c",
@@ -94,7 +94,10 @@ class CodexDriver(RegexSessionDriver):
 
     @staticmethod
     def _healthcheck_url(worker: WorkerConfig) -> str:
-        return f"{worker.env['CODEX_BASE_URL']}/responses"
+        base = worker.env["CODEX_BASE_URL"].rstrip("/")
+        if CodexDriver._wire_api(worker) == "chat_completions":
+            return f"{base}/chat/completions"
+        return f"{base}/responses"
 
     @staticmethod
     def _healthcheck_headers(worker: WorkerConfig) -> list[str]:
@@ -107,9 +110,39 @@ class CodexDriver(RegexSessionDriver):
 
     @staticmethod
     def _healthcheck_payload(worker: WorkerConfig) -> str:
+        if CodexDriver._wire_api(worker) == "chat_completions":
+            return (
+                '{"messages":[{"role":"user","content":"ping"}],'
+                '"model":"'
+                + worker.env["CODEX_MODEL"]
+                + '","stream":false}'
+            )
         return (
             '{"input":[{"content":"ping","role":"user"}],'
             '"model":"'
             + worker.env["CODEX_MODEL"]
             + '","stream":false}'
         )
+
+    @staticmethod
+    def _wire_api(worker: WorkerConfig) -> str:
+        wire_api = str(worker.env.get("CODEX_WIRE_API", "responses")).strip().lower()
+        if wire_api in {
+            "chat_completions",
+            "chat-completions",
+            "chat.completions",
+            "qizhi_openai",
+            "qizhi-openai",
+            "qizhi.openai",
+            "iq_openai",
+            "iq-openai",
+            "iq.openai",
+            "openai_compatible",
+            "openai-compatible",
+            "openai.compatible",
+            "dashscope_compatible",
+            "dashscope-compatible",
+            "dashscope.compatible",
+        }:
+            return "chat_completions"
+        return "responses"

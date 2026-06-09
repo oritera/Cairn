@@ -40,6 +40,7 @@ class DispatcherLoop:
     def __init__(self, config_path: Path):
         self.config_path = config_path
         self.config = DispatchConfig.load(config_path)
+        self._config_mtime_ns = self._read_config_mtime_ns()
         self.client = CairnClient(self.config.server)
         self.container_manager = ContainerManager(self.config.container)
         self.executor = ThreadPoolExecutor(max_workers=self.config.runtime.max_workers)
@@ -74,6 +75,7 @@ class DispatcherLoop:
             self.run_startup_healthchecks()
             while True:
                 try:
+                    self._maybe_reload_config()
                     if not self._settings_checked:
                         self._validate_server_settings()
                         self._settings_checked = True
@@ -862,3 +864,39 @@ class DispatcherLoop:
         if any(result.ok for result in results):
             return
         raise RuntimeError(format_failure_summary(results))
+
+    def _read_config_mtime_ns(self) -> int | None:
+        try:
+            return self.config_path.stat().st_mtime_ns
+        except OSError:
+            return None
+
+    def _maybe_reload_config(self) -> None:
+        current_mtime = self._read_config_mtime_ns()
+        if current_mtime is None or current_mtime == self._config_mtime_ns:
+            return
+        previous = self.config
+        try:
+            reloaded = DispatchConfig.load(self.config_path)
+        except Exception as exc:
+            LOG.warning("dispatcher config reload failed path=%s error=%s", self.config_path, exc)
+            return
+        self.config = reloaded
+        self._config_mtime_ns = current_mtime
+        if (
+            reloaded.runtime.max_workers != previous.runtime.max_workers
+            or reloaded.runtime.max_running_projects != previous.runtime.max_running_projects
+            or reloaded.runtime.max_project_workers != previous.runtime.max_project_workers
+        ):
+            LOG.warning(
+                "dispatcher config reloaded but concurrency executor settings changed; restart dispatcher to fully apply "
+                "max_workers=%s->%s max_running_projects=%s->%s max_project_workers=%s->%s",
+                previous.runtime.max_workers,
+                reloaded.runtime.max_workers,
+                previous.runtime.max_running_projects,
+                reloaded.runtime.max_running_projects,
+                previous.runtime.max_project_workers,
+                reloaded.runtime.max_project_workers,
+            )
+        else:
+            LOG.info("dispatcher config reloaded path=%s", self.config_path)
