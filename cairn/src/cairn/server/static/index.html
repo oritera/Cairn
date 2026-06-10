@@ -783,6 +783,13 @@
                 <p class="text-[11px] text-slate-400 mt-1 break-words" x-text="[entry.actor, ...entry.meta].filter(Boolean).join(' · ')"></p>
               </template>
             </button>
+            <button type="button"
+              @click.stop="copyTimelineEntry(entry)"
+              class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 shadow-sm shadow-slate-200/30 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400"
+              title="Copy log"
+              :aria-label="`Copy ${timelineEventBadge(entry)} log`">
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg>
+            </button>
           </div>
         </template>
       </div>
@@ -1413,6 +1420,25 @@ function cairnApp() {
       } catch {
         this.showToast('Copy failed', 'error');
       }
+    },
+
+    async copyTimelineEntry(entry) {
+      if (!entry) return;
+      try {
+        await this.copyText(this.timelineEntryCopyText(entry));
+        this.showToast('Log copied');
+      } catch {
+        this.showToast('Copy failed', 'error');
+      }
+    },
+
+    timelineEntryCopyText(entry) {
+      const details = [entry.actor, ...(entry.meta || [])].filter(Boolean).join(' · ');
+      return [
+        `[${this.formatTimelineDate(entry.timestamp)} ${this.formatTime(entry.timestamp)}] ${this.timelineEventBadge(entry)}`,
+        details,
+        entry.title,
+      ].filter(Boolean).join('\n');
     },
 
     async copyText(text) {

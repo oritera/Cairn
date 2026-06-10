@@ -112,12 +112,20 @@ class HeartbeatLease:
     def _fail(self, status_code: int | None, text: str) -> None:
         self._failure = HeartbeatFailure(status_code, text)
         LOG.warning(
-            "heartbeat failed scope=%s worker=%s status=%s",
+            "heartbeat failed scope=%s worker=%s status=%s preview=%s",
             self._scope,
             self._worker_name,
             status_code,
+            _preview(text),
         )
         with self._lock:
             process = self._process
         if process is not None:
             process.kill()
+
+
+def _preview(text: str, limit: int = 160) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[:limit]}..."

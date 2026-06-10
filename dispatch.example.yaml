@@ -46,6 +46,12 @@ container:
   network_mode: "host"
   # "stop" keeps finished containers for inspection; "remove" is cleaner but loses post-run state.
   completed_action: "stop"
+  # Optional host-to-worker-container bind mounts. Use these when native CLI
+  # subscription auth should be shared with dynamically-created worker containers.
+  # volumes:
+  #   - "/Users/you/.codex:/home/kali/.codex:rw"
+  #   - "/Users/you/.claude:/home/kali/.claude:rw"
+  #   - "/Users/you/.claude.json:/home/kali/.claude.json:rw"
   # Add Linux capabilities only when a task truly needs them, such as packet crafting or network admin actions.
   # cap_add:
   #   - "NET_RAW"
@@ -65,6 +71,18 @@ workers:
       ANTHROPIC_BASE_URL: "https://api.deepseek.com/anthropic"
       ANTHROPIC_AUTH_TOKEN: "sk-xxx"
 
+  # Native Claude Code subscription mode. Requires either a mounted Claude Code
+  # login cache or CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`.
+  # - name: "claudecode_native"
+  #   type: "claudecode"
+  #   task_types: [bootstrap, reason, explore]
+  #   max_running: 2
+  #   priority: 0
+  #   env:
+  #     CLAUDE_AUTH_MODE: "subscription"
+  #     ANTHROPIC_MODEL: "sonnet"
+  #     CLAUDE_CODE_OAUTH_TOKEN: "${CLAUDE_CODE_OAUTH_TOKEN}"
+
   - name: "codex_qwen3.6-plus"
     type: "codex"
     task_types: [bootstrap,reason,explore]
@@ -74,6 +92,18 @@ workers:
       CODEX_MODEL: "qwen3.6-plus"
       CODEX_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
       OPENAI_API_KEY: "sk-xxx"
+
+  # Native Codex ChatGPT subscription mode. Requires a mounted Codex login cache
+  # from `codex login` / `codex login --device-auth`, or CODEX_ACCESS_TOKEN.
+  # - name: "codex_native"
+  #   type: "codex"
+  #   task_types: [bootstrap, reason, explore]
+  #   max_running: 2
+  #   priority: 0
+  #   env:
+  #     CODEX_AUTH_MODE: "chatgpt"
+  #     CODEX_MODEL: "gpt-5.4"
+  #     # CODEX_ACCESS_TOKEN: "${CODEX_ACCESS_TOKEN}"
 
   - name: "pi_qwen3.6-plus"
     type: "pi"

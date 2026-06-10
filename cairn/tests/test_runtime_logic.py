@@ -82,6 +82,23 @@ def test_container_manager_build_exec_process_wraps_command_with_timeout() -> No
     assert process.env == {"A": "B"}
 
 
+def test_container_manager_parses_configured_volume_bindings() -> None:
+    manager = _manager()
+    manager._config = manager._config.model_copy(
+        update={
+            "volumes": [
+                "/Users/me/.codex:/home/kali/.codex:ro",
+                "/Users/me/.claude:/home/kali/.claude",
+            ]
+        }
+    )
+
+    assert manager._volume_bindings() == {
+        "/Users/me/.codex": {"bind": "/home/kali/.codex", "mode": "ro"},
+        "/Users/me/.claude": {"bind": "/home/kali/.claude", "mode": "rw"},
+    }
+
+
 def test_completed_container_stop_action_only_stops_running_container() -> None:
     manager = _manager()
     container = FakeContainer()

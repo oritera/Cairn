@@ -57,6 +57,7 @@ class ContainerManager:
                 name=name,
                 network_mode=self._config.network_mode,
                 cap_add=self._config.cap_add or None,
+                volumes=self._volume_bindings(),
             )
             LOG.info("created container project=%s container=%s", project_id, name)
             return name
@@ -92,6 +93,7 @@ class ContainerManager:
                 name=name,
                 network_mode=self._config.network_mode,
                 cap_add=self._config.cap_add or None,
+                volumes=self._volume_bindings(),
             )
         except DockerException as exc:
             raise RuntimeError(f"failed to create startup container {name}: {exc}") from exc
@@ -189,6 +191,30 @@ class ContainerManager:
 
     def needs_stopped_cleanup(self, project_id: str) -> bool:
         return self.inspect_state(self.container_name(project_id)) == "running"
+
+    def _volume_bindings(self) -> dict[str, dict[str, str]] | None:
+        if not self._config.volumes:
+            return None
+        return {
+            host: {"bind": container, "mode": mode}
+            for host, container, mode in map(self._parse_volume, self._config.volumes)
+        }
+
+    @staticmethod
+    def _parse_volume(volume: str) -> tuple[str, str, str]:
+        parts = volume.split(":")
+        if len(parts) not in {2, 3}:
+            raise ValueError(f"invalid container volume {volume!r}; expected host_path:container_path[:ro|rw]")
+        host_path = parts[0]
+        container_path = parts[1]
+        mode = parts[2] if len(parts) == 3 else "rw"
+        if not host_path:
+            raise ValueError(f"invalid container volume {volume!r}; host path is required")
+        if not container_path.startswith("/"):
+            raise ValueError(f"invalid container volume {volume!r}; container path must be absolute")
+        if mode not in {"ro", "rw"}:
+            raise ValueError(f"invalid container volume {volume!r}; mode must be ro or rw")
+        return host_path, container_path, mode
 
     def build_exec_process(
         self,

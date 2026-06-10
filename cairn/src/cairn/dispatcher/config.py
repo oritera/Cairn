@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 import json
+import os
 from importlib import resources
 from pathlib import Path
 from typing import Any, Literal
@@ -16,16 +17,8 @@ CompletedAction = Literal["remove", "stop"]
 WorkerHealthcheckMode = Literal["startup_and_task", "startup_only", "disabled"]
 
 WORKER_ENV_KEYS: dict[WorkerType, tuple[str, ...]] = {
-    "claudecode": (
-        "ANTHROPIC_MODEL",
-        "ANTHROPIC_BASE_URL",
-        "ANTHROPIC_AUTH_TOKEN",
-    ),
-    "codex": (
-        "CODEX_MODEL",
-        "CODEX_BASE_URL",
-        "OPENAI_API_KEY",
-    ),
+    "claudecode": ("ANTHROPIC_MODEL",),
+    "codex": ("CODEX_MODEL",),
     "pi": (
         "PI_MODEL",
         "PI_BASE_URL",
@@ -153,6 +146,7 @@ class ContainerConfig(BaseModel):
     network_mode: str
     completed_action: CompletedAction
     cap_add: list[str] = Field(default_factory=list)
+    volumes: list[str] = Field(default_factory=list)
 
 
 class RuntimeConfig(BaseModel):
@@ -190,6 +184,10 @@ class WorkerConfig(BaseModel):
         missing = [key for key in required if not self.env.get(key)]
         if missing:
             raise ValueError(f"worker {self.name} missing env keys: {', '.join(missing)}")
+        if self.type == "claudecode":
+            _validate_claudecode_env(self.name, self.env)
+        if self.type == "codex":
+            _validate_codex_env(self.name, self.env)
         if self.type == "pi":
             _validate_optional_positive_int_env(self.name, self.env, "PI_MODEL_CONTEXT_WINDOW")
         if self.type == "mock":
@@ -232,7 +230,7 @@ class DispatchConfig(BaseModel):
                 merged_workers.append(worker)
                 continue
             worker_copy = dict(worker)
-            worker_copy["env"] = {**common_env, **worker_env}
+            worker_copy["env"] = _expand_env_references({**common_env, **worker_env})
             merged_workers.append(worker_copy)
         merged["workers"] = merged_workers
         return merged
@@ -266,6 +264,42 @@ def _validate_optional_positive_int_env(worker_name: str, env: dict[str, str], k
         raise ValueError(f"worker {worker_name} env {key} must be an integer") from exc
     if parsed <= 0:
         raise ValueError(f"worker {worker_name} env {key} must be greater than 0")
+
+
+def _expand_env_references(env: dict[str, Any]) -> dict[str, Any]:
+    return {key: _expand_env_reference(value) for key, value in env.items()}
+
+
+def _expand_env_reference(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    if value.startswith("${") and value.endswith("}") and len(value) > 3:
+        return os.environ.get(value[2:-1], "")
+    if value.startswith("$") and len(value) > 1 and value[1:].replace("_", "").isalnum():
+        return os.environ.get(value[1:], "")
+    return value
+
+
+def _validate_claudecode_env(worker_name: str, env: dict[str, str]) -> None:
+    mode = env.get("CLAUDE_AUTH_MODE", "api_key")
+    if mode not in {"api_key", "subscription"}:
+        raise ValueError(f"worker {worker_name} CLAUDE_AUTH_MODE must be api_key or subscription")
+    if mode == "api_key":
+        _require_env(worker_name, env, ("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN"))
+
+
+def _validate_codex_env(worker_name: str, env: dict[str, str]) -> None:
+    mode = env.get("CODEX_AUTH_MODE", "provider_api_key")
+    if mode not in {"provider_api_key", "chatgpt"}:
+        raise ValueError(f"worker {worker_name} CODEX_AUTH_MODE must be provider_api_key or chatgpt")
+    if mode == "provider_api_key":
+        _require_env(worker_name, env, ("CODEX_BASE_URL", "OPENAI_API_KEY"))
+
+
+def _require_env(worker_name: str, env: dict[str, str], keys: tuple[str, ...]) -> None:
+    missing = [key for key in keys if not env.get(key)]
+    if missing:
+        raise ValueError(f"worker {worker_name} missing env keys: {', '.join(missing)}")
 
 
 def validate_prompt_resources(prompt_group: str) -> None:

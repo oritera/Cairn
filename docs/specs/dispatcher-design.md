@@ -681,8 +681,11 @@ Dispatcher 只需要看退出码，不需要理解响应体。
 依赖环境变量：
 
 - `ANTHROPIC_MODEL`
-- `ANTHROPIC_BASE_URL`
-- `ANTHROPIC_AUTH_TOKEN`
+- `CLAUDE_AUTH_MODE` 可选；默认 `api_key`，可设为 `subscription`
+- 当 `CLAUDE_AUTH_MODE=api_key` 时，还需要：
+  - `ANTHROPIC_BASE_URL`
+  - `ANTHROPIC_AUTH_TOKEN`
+- 当 `CLAUDE_AUTH_MODE=subscription` 时，使用 Claude Code 原生登录态；可通过挂载 `~/.claude`、`~/.claude.json` 或提供 `CLAUDE_CODE_OAUTH_TOKEN` 供容器内 CLI 使用。macOS Keychain 内的 Claude Pro token 不能被 Linux worker 容器直接读取，推荐使用 `claude setup-token` 后通过 `${CLAUDE_CODE_OAUTH_TOKEN}` 注入
 
 健康检查可在 driver 内部按等价方式实现：
 
@@ -692,6 +695,12 @@ curl -sS --fail -o /dev/null \
   -H "Authorization: Bearer $ANTHROPIC_AUTH_TOKEN" \
   -H "content-type: application/json" \
   -d "{\"model\":\"$ANTHROPIC_MODEL\",\"max_tokens\":10,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}"
+```
+
+当 `CLAUDE_AUTH_MODE=subscription` 时，健康检查使用：
+
+```bash
+claude auth status --text
 ```
 
 已知行为：
@@ -707,6 +716,8 @@ curl -sS --fail -o /dev/null \
 claude --session-id "{session}" --dangerously-skip-permissions -p -- "{prompt}"
 ```
 
+当 `CLAUDE_AUTH_MODE=subscription` 时，driver 会额外传入 `--model "{env.ANTHROPIC_MODEL}"`。
+
 二阶段收尾：
 
 ```bash
@@ -718,8 +729,11 @@ claude -r "{session}" --dangerously-skip-permissions -p -- "{prompt}"
 依赖环境变量：
 
 - `CODEX_MODEL`
-- `CODEX_BASE_URL`
-- `OPENAI_API_KEY`
+- `CODEX_AUTH_MODE` 可选；默认 `provider_api_key`，可设为 `chatgpt`
+- 当 `CODEX_AUTH_MODE=provider_api_key` 时，还需要：
+  - `CODEX_BASE_URL`
+  - `OPENAI_API_KEY`
+- 当 `CODEX_AUTH_MODE=chatgpt` 时，使用 Codex 原生 ChatGPT 登录态；可通过挂载 `~/.codex` 或提供 `CODEX_ACCESS_TOKEN` 供容器内 CLI 使用
 
 健康检查可在 driver 内部按等价方式实现：
 
@@ -729,6 +743,12 @@ curl -sS --fail -o /dev/null \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H "content-type: application/json" \
   -d "{\"model\":\"$CODEX_MODEL\",\"max_tokens\":10,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}"
+```
+
+当 `CODEX_AUTH_MODE=chatgpt` 时，健康检查使用：
+
+```bash
+codex login status
 ```
 
 已知行为：
@@ -749,6 +769,8 @@ codex exec --dangerously-bypass-approvals-and-sandbox --model "{env.CODEX_MODEL}
   -c 'model_providers.cairn.env_key="OPENAI_API_KEY"' \
   -- "{prompt}"
 ```
+
+当 `CODEX_AUTH_MODE=chatgpt` 时，driver 不设置 `model_provider="cairn"`，直接使用 Codex CLI 的原生认证和 provider。
 
 二阶段收尾：
 
@@ -883,6 +905,8 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 | `container.image` | 是 | 项目容器镜像 |
 | `container.network_mode` | 是 | 项目容器网络模式 |
 | `container.completed_action` | 是 | 项目 completed 后对容器的处理方式 |
+| `container.cap_add` | 否 | 创建项目容器和 startup healthcheck 容器时附加的 Linux capabilities |
+| `container.volumes` | 否 | 创建项目容器和 startup healthcheck 容器时附加的 Docker bind mounts，格式为 `host_path:container_path[:ro|rw]` |
 
 `container.completed_action` 可选值：
 
@@ -893,6 +917,7 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 
 - completed project 的容器 cleanup 可以异步并行进行，不要求阻塞主调度循环
 - 如果项目已从 Server 删除，Dispatcher 会把找不到对应项目的 `cairn-dispatch-*` 容器视为 orphan，并执行 stop 清理
+- `container.volumes` 用于把 CLI 登录态等宿主机文件或目录挂载到动态创建的 worker 容器，例如 `~/.codex`、`~/.claude` 和 `~/.claude.json`
 
 ### `tasks.*`
 
@@ -920,6 +945,7 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 - Worker 选择顺序是：先过滤任务类型、`max_running` 和处于本地 `retry_after` 窗口内的 Worker，再按 `priority`，同优先级优先选当前运行数更少的，最后随机；`bootstrap` 和 `explore` 都会先 claim，再启动任务；当 `runtime.worker_healthcheck=startup_and_task` 时，真正启动前会做一次健康检查，失败的 Worker 会进入短暂不可选窗口；进入 `bootstrap_conclude` / `explore_conclude` fallback 时不再重复健康检查
 - 健康检查、执行命令、session 提取、二阶段 `conclude` 都由对应 driver 代码负责
 - prompt 内容从代码工程里的 markdown 资源加载
+- `env` 的值如果完整写成 `${NAME}` 或 `$NAME`，会在 Dispatcher 进程内从同名环境变量展开；这用于注入 `CLAUDE_CODE_OAUTH_TOKEN` 等不适合写进 `dispatch.yaml` 的 secret
 
 ---
 

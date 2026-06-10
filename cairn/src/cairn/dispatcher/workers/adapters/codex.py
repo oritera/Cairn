@@ -9,6 +9,8 @@ class CodexDriver(RegexSessionDriver):
     type_name = "codex"
 
     def build_healthcheck(self, worker: WorkerConfig) -> list[str]:
+        if self._auth_mode(worker) == "chatgpt":
+            return ["codex", "login", "status"]
         return [
             "curl",
             "-sS",
@@ -22,6 +24,8 @@ class CodexDriver(RegexSessionDriver):
         ]
 
     def build_startup_healthcheck(self, worker: WorkerConfig) -> list[str]:
+        if self._auth_mode(worker) == "chatgpt":
+            return self.build_healthcheck(worker)
         return build_verbose_curl_healthcheck(
             self._healthcheck_url(worker),
             headers=self._healthcheck_headers(worker),
@@ -29,6 +33,8 @@ class CodexDriver(RegexSessionDriver):
         )
 
     def describe_startup_healthcheck(self, worker: WorkerConfig) -> str:
+        if self._auth_mode(worker) == "chatgpt":
+            return "codex login status"
         return render_curl_command(
             self._healthcheck_url(worker),
             headers=[
@@ -49,18 +55,7 @@ class CodexDriver(RegexSessionDriver):
                 "--dangerously-bypass-approvals-and-sandbox",
                 "--model",
                 env["CODEX_MODEL"],
-                "-c",
-                'model_provider="cairn"',
-                "-c",
-                'model_providers.cairn.name="cairn"',
-                "-c",
-                'model_providers.cairn.wire_api="responses"',
-                "-c",
-                'model_reasoning_effort="high"',
-                "-c",
-                f'model_providers.cairn.base_url="{env["CODEX_BASE_URL"]}"',
-                "-c",
-                'model_providers.cairn.env_key="OPENAI_API_KEY"',
+                *self._config_args(worker),
                 "--",
                 prompt,
             ]
@@ -76,21 +71,34 @@ class CodexDriver(RegexSessionDriver):
             "--dangerously-bypass-approvals-and-sandbox",
             "--model",
             env["CODEX_MODEL"],
-            "-c",
-            'model_provider="cairn"',
-            "-c",
-            'model_providers.cairn.name="cairn"',
-            "-c",
-            'model_providers.cairn.wire_api="responses"',
-            "-c",
-            'model_reasoning_effort="high"',
-            "-c",
-            f'model_providers.cairn.base_url="{env["CODEX_BASE_URL"]}"',
-            "-c",
-            'model_providers.cairn.env_key="OPENAI_API_KEY"',
+            *self._config_args(worker),
             "--",
             prompt,
         ]
+
+    @staticmethod
+    def _auth_mode(worker: WorkerConfig) -> str:
+        return worker.env.get("CODEX_AUTH_MODE", "provider_api_key")
+
+    def _config_args(self, worker: WorkerConfig) -> list[str]:
+        args = ["-c", 'model_reasoning_effort="high"']
+        if self._auth_mode(worker) == "provider_api_key":
+            env = worker.env
+            args.extend(
+                [
+                    "-c",
+                    'model_provider="cairn"',
+                    "-c",
+                    'model_providers.cairn.name="cairn"',
+                    "-c",
+                    'model_providers.cairn.wire_api="responses"',
+                    "-c",
+                    f'model_providers.cairn.base_url="{env["CODEX_BASE_URL"]}"',
+                    "-c",
+                    'model_providers.cairn.env_key="OPENAI_API_KEY"',
+                ]
+            )
+        return args
 
     @staticmethod
     def _healthcheck_url(worker: WorkerConfig) -> str:

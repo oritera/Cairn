@@ -1,6 +1,8 @@
 .vscode/
 .DS_Store
+.env
 __pycache__/
 .playwright-cli/
 datas/
 dispatch.yaml
+note.txt

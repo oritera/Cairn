@@ -12,6 +12,8 @@ class ClaudeCodeDriver(SeedSessionDriver):
     type_name = "claudecode"
 
     def build_healthcheck(self, worker: WorkerConfig) -> list[str]:
+        if self._auth_mode(worker) == "subscription":
+            return ["claude", "auth", "status", "--text"]
         env = worker.env
         return [
             "curl",
@@ -35,6 +37,8 @@ class ClaudeCodeDriver(SeedSessionDriver):
         ]
 
     def build_startup_healthcheck(self, worker: WorkerConfig) -> list[str]:
+        if self._auth_mode(worker) == "subscription":
+            return self.build_healthcheck(worker)
         env = worker.env
         return build_verbose_curl_healthcheck(
             f"{env['ANTHROPIC_BASE_URL']}/v1/messages",
@@ -54,6 +58,8 @@ class ClaudeCodeDriver(SeedSessionDriver):
         )
 
     def describe_startup_healthcheck(self, worker: WorkerConfig) -> str:
+        if self._auth_mode(worker) == "subscription":
+            return "claude auth status --text"
         env = worker.env
         return render_curl_command(
             f"{env['ANTHROPIC_BASE_URL']}/v1/messages",
@@ -74,26 +80,29 @@ class ClaudeCodeDriver(SeedSessionDriver):
 
     def build_execute(self, worker: WorkerConfig, prompt: str, session: str | None) -> DriverResult:
         assert session is not None
-        return DriverResult(
-            argv=[
-                "claude",
-                "--session-id",
-                session,
-                "--dangerously-skip-permissions",
-                "-p",
-                "--",
-                prompt,
-            ],
-            session=session,
-        )
+        argv = [
+            "claude",
+            "--session-id",
+            session,
+            "--dangerously-skip-permissions",
+        ]
+        if self._auth_mode(worker) == "subscription":
+            argv.extend(["--model", worker.env["ANTHROPIC_MODEL"]])
+        argv.extend(["-p", "--", prompt])
+        return DriverResult(argv=argv, session=session)
 
     def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> list[str]:
-        return [
+        argv = [
             "claude",
             "-r",
             session,
             "--dangerously-skip-permissions",
-            "-p",
-            "--",
-            prompt,
         ]
+        if self._auth_mode(worker) == "subscription":
+            argv.extend(["--model", worker.env["ANTHROPIC_MODEL"]])
+        argv.extend(["-p", "--", prompt])
+        return argv
+
+    @staticmethod
+    def _auth_mode(worker: WorkerConfig) -> str:
+        return worker.env.get("CLAUDE_AUTH_MODE", "api_key")

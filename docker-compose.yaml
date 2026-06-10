@@ -27,6 +27,9 @@ services:
       dockerfile: Dockerfile
     image: cairn-app
     container_name: cairn-dispatcher
+    environment:
+      CLAUDE_CODE_OAUTH_TOKEN: "${CLAUDE_CODE_OAUTH_TOKEN:-}"
+      CODEX_ACCESS_TOKEN: "${CODEX_ACCESS_TOKEN:-}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dispatch.yaml:/cairn/dispatch.yaml
