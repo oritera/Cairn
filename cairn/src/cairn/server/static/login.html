@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cairn Login</title>
+  <script src="/static/vendor/tailwindcss.js"></script>
+  <style>
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <main class="min-h-screen flex items-center justify-center px-4">
+    <section class="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60">
+      <div class="mb-6">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Cairn</p>
+        <h1 class="mt-2 text-2xl font-semibold">Sign in</h1>
+      </div>
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-500" for="username">Username</label>
+          <input id="username" name="username" autocomplete="username" required
+            class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-500" for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required
+            class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <p id="message" hidden class="text-sm text-rose-600"></p>
+        <button id="submit" type="submit"
+          class="w-full rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white shadow-sm shadow-sky-200 transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50">
+          Sign in
+        </button>
+      </form>
+    </section>
+  </main>
+  <script>
+    const form = document.getElementById('login-form');
+    const message = document.getElementById('message');
+    const submit = document.getElementById('submit');
+    const username = document.getElementById('username');
+    const password = document.getElementById('password');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      message.hidden = true;
+      submit.disabled = true;
+      try {
+        const response = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            username: username.value,
+            password: password.value,
+          }),
+        });
+        if (!response.ok) throw new Error('Invalid username or password');
+        window.location.href = '/';
+      } catch (error) {
+        message.textContent = error.message || 'Sign in failed';
+        message.hidden = false;
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

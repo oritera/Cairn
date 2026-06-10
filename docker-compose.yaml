@@ -9,6 +9,9 @@ services:
       - "8000:8000"
     environment:
       CAIRN_DISPATCH_CONFIG: /cairn/dispatch.yaml
+      CAIRN_AUTH_USERNAME: ${CAIRN_AUTH_USERNAME:-gumingyao_sx}
+      CAIRN_AUTH_PASSWORD: ${CAIRN_AUTH_PASSWORD:-}
+      CAIRN_AUTH_SECRET: ${CAIRN_AUTH_SECRET:-}
     volumes:
       - ./datas/cairn/:/root/.local/share/cairn/
       - ./dispatch.yaml:/cairn/dispatch.yaml
@@ -17,7 +20,7 @@ services:
         - "CMD"
         - "python"
         - "-c"
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/projects', timeout=5)"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)"
       interval: 10s
       timeout: 5s
       retries: 12

@@ -135,6 +135,29 @@ def test_pi_driver_models_json_and_execute_argv_include_context_window_and_tools
     assert result.argv[-2:] == ["-p", "prompt"]
 
 
+def test_pi_driver_maps_qizhi_mode_to_openai_chat_completions() -> None:
+    worker = WorkerConfig.model_validate(
+        {
+            "name": "pi-worker",
+            "type": "pi",
+            "task_types": ["explore"],
+            "max_running": 1,
+            "priority": 0,
+            "env": {
+                "PI_MODEL": "model",
+                "PI_BASE_URL": "http://ibrain.qiyi.domain/v1",
+                "PI_API_KEY": "model|123|token",
+                "PI_PROVIDER_API": "qizhi_openai",
+            },
+        }
+    )
+
+    result = PiDriver().build_execute(worker, "prompt", None)
+    models = json.loads(result.argv[5])
+
+    assert models["providers"]["cairn"]["api"] == "openai-chat-completions"
+
+
 def test_codex_driver_execute_argv_passes_model_endpoint_and_prompt() -> None:
     worker = WorkerConfig.model_validate(
         {

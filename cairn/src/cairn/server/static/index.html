@@ -440,9 +440,9 @@
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.708"/><path d="M3 3v6h6"/></svg>
           </button>
           <select x-model="replay.stepMs" @change="updateReplaySpeed()" class="h-6 rounded-md border border-violet-200 bg-white/80 px-1.5 text-[11px] text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-100">
-            <option value="700" x-text="t('speed.fast')"></option>
-            <option value="1100" x-text="t('speed.normal')"></option>
-            <option value="1600" x-text="t('speed.slow')"></option>
+            <option value="900" x-text="t('speed.fast')"></option>
+            <option value="1300" x-text="t('speed.normal')"></option>
+            <option value="1800" x-text="t('speed.slow')"></option>
           </select>
           <button @click="exitProjectReplay()" class="inline-flex h-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 px-2 hover:bg-white transition">
             <span x-text="t('action.exit')"></span>
@@ -1088,7 +1088,7 @@
           </div>
           <div x-show="workerApiModeOptions(selectedWorker()).length > 0">
             <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('api.mode')"></label>
-            <select x-model="selectedWorker().api_mode"
+            <select x-model="selectedWorker().api_mode" @change="onWorkerApiModeChange(selectedWorker())"
               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
               <template x-for="mode in workerApiModeOptions(selectedWorker())" :key="mode">
                 <option :value="mode" x-text="formatWorkerApiMode(mode)"></option>
@@ -1102,8 +1102,8 @@
           </div>
           <div class="md:col-span-2">
             <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('api.key')"></label>
-            <input type="password" x-model="selectedWorker().api_key" :placeholder="workerApiKeyPlaceholder(selectedWorker())" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
-            <p x-show="selectedWorker()?.api_mode === 'qizhi_openai' || selectedWorker()?.api_mode === 'iq_openai'" class="text-[11px] text-slate-400 mt-2" x-text="t('api.companyTokenHelp')"></p>
+            <input type="password" x-model="selectedWorker().api_key" @blur="inferQizhiModel(selectedWorker())" :placeholder="workerApiKeyPlaceholder(selectedWorker())" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+            <p x-show="selectedWorker()?.api_mode === 'qizhi_openai'" class="text-[11px] text-slate-400 mt-2" x-text="t('api.companyTokenHelp')"></p>
           </div>
         </div>
 
@@ -1552,7 +1552,7 @@ function cairnApp() {
     replay: {
       active: false,
       playing: false,
-      stepMs: '1600',
+      stepMs: '1300',
       frameIndex: -1,
       frames: [],
       visibleEvents: [],
@@ -2175,14 +2175,30 @@ function cairnApp() {
       worker.api_mode_options = this.workerApiModeOptionsForType(worker.type);
       worker.api_mode = this.defaultApiMode(worker.type);
       worker._test = null;
+      this.onWorkerApiModeChange(worker);
+    },
+
+    onWorkerApiModeChange(worker) {
+      if (!worker) return;
+      if (worker.api_mode === 'qizhi_openai' && !worker.base_url) {
+        worker.base_url = 'http://ibrain.qiyi.domain/v1';
+      }
+      this.inferQizhiModel(worker);
+      worker._test = null;
+    },
+
+    inferQizhiModel(worker) {
+      if (!worker || worker.api_mode !== 'qizhi_openai' || worker.model) return;
+      const parts = String(worker.api_key || '').split('|').map(part => part.trim());
+      if (parts.length === 3 && parts[0]) worker.model = parts[0];
     },
 
     workerApiModeOptionsForType(type) {
       if (type === 'codex') {
-        return ['responses', 'chat_completions', 'qizhi_openai', 'iq_openai', 'openai_compatible', 'dashscope_compatible'];
+        return ['responses', 'chat_completions', 'qizhi_openai', 'openai_compatible', 'dashscope_compatible'];
       }
       if (type === 'pi') {
-        return ['openai-completions', 'openai-chat-completions', 'qizhi_openai', 'iq_openai', 'dashscope_compatible'];
+        return ['openai-completions', 'openai-chat-completions', 'qizhi_openai', 'dashscope_compatible'];
       }
       return [];
     },
@@ -2201,6 +2217,7 @@ function cairnApp() {
     async testSelectedWorkerApi() {
       const worker = this.selectedWorker();
       if (!worker || this.isTestingWorker) return;
+      this.onWorkerApiModeChange(worker);
       worker._test = { ok: false, detail: this.t('api.testing'), response_preview: '' };
       this.isTestingWorker = true;
       try {
@@ -2224,13 +2241,10 @@ function cairnApp() {
     },
 
     formatWorkerApiMode(mode) {
-      if (mode === 'qizhi_openai') return 'Qizhi OpenAI Compatible';
-      if (mode === 'iq_openai') return 'IQIYI OpenAI Compatible';
       const labels = {
         responses: 'OpenAI Responses',
         chat_completions: 'OpenAI Chat Completions',
         qizhi_openai: '奇智 OpenAI 兼容',
-        iq_openai: 'IQIYI OpenAI 兼容',
         openai_compatible: 'OpenAI Compatible',
         dashscope_compatible: 'DashScope Compatible',
         'openai-completions': 'OpenAI Completions',
@@ -2247,10 +2261,10 @@ function cairnApp() {
 
     workerApiModeHelp(worker) {
       const mode = String(worker?.api_mode || '').trim();
-      if (mode === 'qizhi_openai' || mode === 'iq_openai') {
+      if (mode === 'qizhi_openai') {
         return this.language === 'zh'
-          ? '使用公司 OpenAI 兼容网关。Base URL 通常以 /v1 结尾，请求会发送到 /v1/chat/completions。'
-          : 'Uses the company OpenAI-compatible gateway. Base URL usually ends with /v1 and requests go to /v1/chat/completions.';
+          ? '使用奇智 OpenAI 兼容网关。只填三段式 API Key 时会自动补全默认 Base URL 和模型名。'
+          : 'Uses the Qizhi OpenAI-compatible gateway. The three-part API key can auto-fill the default Base URL and model.';
       }
       if (mode === 'chat_completions' || mode === 'openai-chat-completions' || mode === 'openai_compatible' || mode === 'dashscope_compatible') {
         return this.language === 'zh'
@@ -2272,13 +2286,13 @@ function cairnApp() {
 
     workerBaseUrlPlaceholder(worker) {
       const mode = String(worker?.api_mode || '').trim();
-      if (mode === 'qizhi_openai' || mode === 'iq_openai') return 'http://ibrain.qiyi.domain/v1';
+      if (mode === 'qizhi_openai') return 'http://ibrain.qiyi.domain/v1';
       return 'https://example.com/v1';
     },
 
     workerApiKeyPlaceholder(worker) {
       const mode = String(worker?.api_mode || '').trim();
-      if (mode === 'qizhi_openai' || mode === 'iq_openai') return 'service_name|prompt_id|prompt_token';
+      if (mode === 'qizhi_openai') return 'service_name|prompt_id|prompt_token';
       return 'sk-...';
     },
 
@@ -2421,7 +2435,7 @@ function cairnApp() {
     },
 
     replayEventDurationMs(event) {
-      const base = Number(this.replay.stepMs) || 1100;
+      const base = Number(this.replay.stepMs) || 1300;
       return Math.round(base * this.replayEventWeight(event));
     },
 
@@ -2616,6 +2630,8 @@ function cairnApp() {
         .map(item => this.cloneData(item.event))
         .filter(entry => entry.type !== 'reason_started')
         .map((entry, index, list) => ({ ...entry, isLast: index === list.length - 1 }));
+      const activeEntry = this.replay.visibleEvents[this.replay.visibleEvents.length - 1] || null;
+      this.selectedTimelineEntryId = activeEntry?.id || null;
       this._timelineEventsCacheProject = null;
       this._timelineEventsCache = [];
 
@@ -2627,13 +2643,41 @@ function cairnApp() {
         }
         this.$nextTick(() => {
           this.initGraph();
-          this.followReplayTimelineTail();
+          this.focusReplayFrame(frame);
         });
         return;
       }
 
       this.updateGraph();
+      this.$nextTick(() => this.focusReplayFrame(frame));
+    },
+
+    focusReplayFrame(frame) {
+      if (!this.replay.active || !frame) return;
+      const entry = this.replay.visibleEvents[this.replay.visibleEvents.length - 1] || frame.event;
       this.followReplayTimelineTail();
+      if (!this.cy || !entry || !this.timelineEventTriggersGraphFocus(entry)) {
+        return;
+      }
+      requestAnimationFrame(() => {
+        const elements = this.replayFocusElements(entry);
+        if (!elements || elements.length === 0) return;
+        this.centerGraphOnElements(elements, { duration: 680, padding: 96 });
+      });
+    },
+
+    replayFocusElements(entry) {
+      if (!this.cy || !entry) return null;
+      if (entry.targetType === 'fact' && entry.targetId) {
+        const node = this.cy.getElementById(entry.targetId);
+        return node.length > 0 ? node : null;
+      }
+      if (entry.targetType === 'intent' && entry.targetId) {
+        const edges = this.cy.edges(`[intentId="${entry.targetId}"]`);
+        if (edges.length === 0) return null;
+        return edges.add(edges.sources()).add(edges.targets());
+      }
+      return null;
     },
 
     async startProjectReplay() {
@@ -2651,7 +2695,7 @@ function cairnApp() {
           return;
         }
 
-        const stepMs = String(this.replay.stepMs || '1100');
+        const stepMs = String(this.replay.stepMs || '1300');
         this.stopReplayTimer();
         this.replay = {
           active: true,
@@ -2715,7 +2759,7 @@ function cairnApp() {
     async exitProjectReplay() {
       if (!this.replay.active) return;
       const projectId = this.selectedProjectId;
-      const stepMs = String(this.replay.stepMs || '1100');
+      const stepMs = String(this.replay.stepMs || '1300');
       this.stopReplayTimer();
       this.replay = {
         active: false,
@@ -2931,14 +2975,18 @@ function cairnApp() {
 
     layoutOpts(animate = true) {
       const direction = this.layoutDirection();
+      const replayMode = this.replay?.active === true;
+      const fit = !replayMode;
+      const padding = replayMode ? 70 : 50;
+      const duration = replayMode ? 650 : 400;
       if (this.layoutEngine() === 'elk') {
         const elkDirection = direction === 'TB' ? 'DOWN' : 'RIGHT';
         return {
           name: 'elk',
-          fit: true,
-          padding: 50,
+          fit,
+          padding,
           animate,
-          animationDuration: 350,
+          animationDuration: replayMode ? duration : 350,
           animationEasing: 'ease-in-out-cubic',
           elk: {
             algorithm: 'layered',
@@ -2957,10 +3005,10 @@ function cairnApp() {
         const isHorizontal = direction === 'LR';
         return {
           name: 'klay',
-          fit: true,
-          padding: 50,
+          fit,
+          padding,
           animate,
-          animationDuration: 400,
+          animationDuration: duration,
           animationEasing: 'ease-in-out-cubic',
           klay: {
             direction: direction === 'TB' ? 'DOWN' : 'RIGHT',
@@ -2980,10 +3028,10 @@ function cairnApp() {
         rankDir: direction,
         nodeSep: 60,
         rankSep: 80,
-        padding: 50,
-        fit: true,
+        padding,
+        fit,
         animate,
-        animationDuration: 400,
+        animationDuration: duration,
         animationEasing: 'ease-in-out-cubic',
       };
     },
@@ -3146,10 +3194,12 @@ function cairnApp() {
 
     fitGraph() { if (this.cy) this.cy.fit(undefined, 50); },
 
-    centerGraphOnElements(eles) {
+    centerGraphOnElements(eles, options = {}) {
       if (!this.cy || !eles || eles.length === 0) return;
+      const { duration = 260, padding = null } = options;
+      const viewport = padding ? { fit: { eles, padding } } : { center: { eles } };
       if (this._centerAnimation) this._centerAnimation.stop();
-      this._centerAnimation = this.cy.animation({ center: { eles }, duration: 220, easing: 'ease-in-out-cubic' });
+      this._centerAnimation = this.cy.animation({ ...viewport, duration, easing: 'ease-in-out-cubic' });
       this._centerAnimation.play();
     },
 
@@ -4094,6 +4144,7 @@ function cairnApp() {
       try {
         await this.api('PUT', '/settings', this.settingsForm);
         if (this.showWorkerConfig || this.dispatcherConfigForm.workers.length > 0) {
+          this.dispatcherConfigForm.workers.forEach(worker => this.onWorkerApiModeChange(worker));
           await this.api('PUT', '/dispatcher-config', {
             workers: this.dispatcherConfigForm.workers.map(worker => ({
               name: worker.name,

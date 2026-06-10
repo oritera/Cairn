@@ -42,7 +42,6 @@ API_MODE_OPTIONS: dict[str, list[str]] = {
         "responses",
         "chat_completions",
         "qizhi_openai",
-        "iq_openai",
         "openai_compatible",
         "dashscope_compatible",
     ],
@@ -50,7 +49,6 @@ API_MODE_OPTIONS: dict[str, list[str]] = {
         "openai-completions",
         "openai-chat-completions",
         "qizhi_openai",
-        "iq_openai",
         "dashscope_compatible",
     ],
 }
@@ -59,6 +57,7 @@ DEFAULT_EDITABLE_TASK_TYPES = ["bootstrap", "reason", "explore"]
 DEFAULT_EDITABLE_MAX_RUNNING = 2
 DEFAULT_EDITABLE_PRIORITY = 0
 CONNECTION_TEST_PREVIEW_LIMIT = 200
+QIZHI_DEFAULT_BASE_URL = "http://ibrain.qiyi.domain/v1"
 
 
 def resolve_dispatch_config_path() -> Path:
@@ -157,6 +156,7 @@ def update_dispatcher_config(workers: list[UpdateDispatcherWorkerConfigRequest])
         _write_env_value(env, field_map.get("base_url"), incoming.base_url)
         _write_env_value(env, field_map.get("api_key"), incoming.api_key)
         _write_env_value(env, field_map.get("api_mode"), incoming.api_mode)
+        _normalize_company_gateway_env(worker_type, env)
         next_workers.append(worker)
 
     for worker in worker_list:
@@ -234,6 +234,7 @@ def _build_test_worker(body: DispatcherConnectionTestRequest, worker_type: str) 
     _write_env_value(worker["env"], field_map.get("base_url"), body.base_url)
     _write_env_value(worker["env"], field_map.get("api_key"), body.api_key)
     _write_env_value(worker["env"], field_map.get("api_mode"), body.api_mode)
+    _normalize_company_gateway_env(worker_type, worker["env"])
     try:
         return WorkerConfig.model_validate(worker)
     except Exception as exc:
@@ -290,6 +291,42 @@ def _connection_test_request(worker: WorkerConfig) -> tuple[str, dict[str, str],
 
 def _bearer_headers(api_key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {api_key}", "content-type": "application/json"}
+
+
+def _normalize_company_gateway_env(worker_type: str, env: dict[str, Any]) -> None:
+    if worker_type == "codex":
+        api_mode_key = "CODEX_WIRE_API"
+        base_url_key = "CODEX_BASE_URL"
+        api_key_key = "OPENAI_API_KEY"
+        model_key = "CODEX_MODEL"
+    elif worker_type == "pi":
+        api_mode_key = "PI_PROVIDER_API"
+        base_url_key = "PI_BASE_URL"
+        api_key_key = "PI_API_KEY"
+        model_key = "PI_MODEL"
+    else:
+        return
+
+    if not _is_qizhi_mode(env.get(api_mode_key)):
+        return
+    if not str(env.get(base_url_key, "") or "").strip():
+        env[base_url_key] = QIZHI_DEFAULT_BASE_URL
+    if not str(env.get(model_key, "") or "").strip():
+        inferred_model = _qizhi_token_model(env.get(api_key_key))
+        if inferred_model:
+            env[model_key] = inferred_model
+
+
+def _is_qizhi_mode(value: Any) -> bool:
+    mode = str(value or "").strip().lower()
+    return mode in {"qizhi_openai", "qizhi-openai", "qizhi.openai"}
+
+
+def _qizhi_token_model(value: Any) -> str | None:
+    parts = [part.strip() for part in str(value or "").split("|")]
+    if len(parts) != 3:
+        return None
+    return parts[0] or None
 
 
 def _codex_wire_api(value: str | None) -> str:

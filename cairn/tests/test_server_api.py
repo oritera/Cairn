@@ -5,11 +5,13 @@ import pytest
 import yaml
 
 from cairn.server import db
+from cairn.server import dispatcher_config as dispatcher_config_service
 from cairn.server.app import app
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch) -> TestClient:
+    monkeypatch.setenv("CAIRN_AUTH_DISABLED", "1")
     monkeypatch.setattr(db, "_db_path", None)
     db.configure(tmp_path / "cairn.db")
     with TestClient(app) as test_client:
@@ -288,6 +290,38 @@ def test_dispatcher_config_update_can_add_and_enable_single_api_profile(
     assert saved["runtime"]["prompt_group"] == "zh"
     assert saved["workers"][0]["enabled"] is False
     assert saved["workers"][1]["env"]["CODEX_MODEL"] == "gpt-test"
+    assert "iq_openai" not in payload["workers"][1]["api_mode_options"]
+
+
+def test_qizhi_connection_test_uses_documented_bearer_token_and_defaults(client: TestClient, monkeypatch) -> None:
+    captured = {}
+
+    class FakeResponse:
+        status_code = 200
+        text = '{"ok":true}'
+
+    def fake_post(url, *, headers, json, timeout):
+        captured.update({"url": url, "headers": headers, "json": json, "timeout": timeout})
+        return FakeResponse()
+
+    monkeypatch.setattr(dispatcher_config_service.requests, "post", fake_post)
+
+    response = client.post(
+        "/dispatcher-config/test",
+        json={
+            "name": "qizhi",
+            "type": "codex",
+            "enabled": True,
+            "api_key": "test-service|123456|test-token",
+            "api_mode": "qizhi_openai",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert captured["url"] == "http://ibrain.qiyi.domain/v1/chat/completions"
+    assert captured["headers"]["Authorization"] == "Bearer test-service|123456|test-token"
+    assert captured["json"]["model"] == "test-service"
 
 
 def test_dispatcher_config_test_rejects_incomplete_profile(client: TestClient) -> None:
@@ -298,3 +332,22 @@ def test_dispatcher_config_test_rejects_incomplete_profile(client: TestClient) -
 
     assert response.status_code == 400
     assert "missing env keys" in response.json()["detail"]
+
+
+def test_auth_requires_login_when_password_is_configured(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("CAIRN_AUTH_DISABLED", raising=False)
+    monkeypatch.setenv("CAIRN_AUTH_USERNAME", "tester")
+    monkeypatch.setenv("CAIRN_AUTH_PASSWORD", "secret-password")
+    monkeypatch.setattr(db, "_db_path", None)
+    db.configure(tmp_path / "auth.db")
+
+    with TestClient(app) as auth_client:
+        assert auth_client.get("/healthz").status_code == 200
+        assert auth_client.get("/projects").status_code == 401
+
+        bad_login = auth_client.post("/auth/login", json={"username": "tester", "password": "wrong"})
+        assert bad_login.status_code == 401
+
+        good_login = auth_client.post("/auth/login", json={"username": "tester", "password": "secret-password"})
+        assert good_login.status_code == 200
+        assert auth_client.get("/projects").status_code == 200

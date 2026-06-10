@@ -175,9 +175,26 @@ class PiDriver(WorkerDriver):
 
         provider: dict[str, Any] = {
             "baseUrl": env["PI_BASE_URL"],
-            "api": env["PI_PROVIDER_API"],
+            "api": PiDriver._provider_api(env["PI_PROVIDER_API"]),
             "apiKey": env["PI_API_KEY"],
             "models": [model],
         }
         payload = {"providers": {"cairn": provider}}
         return json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
+
+    @staticmethod
+    def _provider_api(value: str) -> str:
+        provider_api = str(value or "openai-completions").strip().lower()
+        if provider_api in {
+            "qizhi_openai",
+            "qizhi-openai",
+            "qizhi.openai",
+            "iq_openai",
+            "iq-openai",
+            "iq.openai",
+            "dashscope_compatible",
+            "dashscope-compatible",
+            "dashscope.compatible",
+        }:
+            return "openai-chat-completions"
+        return provider_api
