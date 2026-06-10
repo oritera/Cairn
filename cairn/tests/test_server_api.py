@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 import pytest
+import yaml
 
 from cairn.server import db
 from cairn.server.app import app
@@ -207,3 +208,93 @@ def test_project_creation_rejects_invalid_bootstrap_enabled(client: TestClient) 
     )
 
     assert response.status_code == 422
+
+
+def test_dispatcher_config_update_can_add_and_enable_single_api_profile(
+    client: TestClient,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    config_path = tmp_path / "dispatch.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "server": "http://127.0.0.1:8000",
+                "runtime": {
+                    "interval": 60,
+                    "max_workers": 2,
+                    "max_running_projects": 1,
+                    "max_project_workers": 2,
+                    "healthcheck_timeout": 5,
+                    "prompt_group": "zh",
+                },
+                "tasks": {
+                    "bootstrap": {"timeout": 10, "conclude_timeout": 5},
+                    "reason": {"timeout": 10, "max_intents": 2},
+                    "explore": {"timeout": 10, "conclude_timeout": 5},
+                },
+                "container": {
+                    "image": "test-image",
+                    "network_mode": "host",
+                    "completed_action": "stop",
+                },
+                "workers": [
+                    {
+                        "name": "codex_old",
+                        "type": "codex",
+                        "task_types": ["bootstrap", "reason", "explore"],
+                        "max_running": 1,
+                        "priority": 0,
+                        "env": {
+                            "CODEX_MODEL": "old",
+                            "CODEX_BASE_URL": "http://old.example/v1",
+                            "OPENAI_API_KEY": "old-key",
+                        },
+                    }
+                ],
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CAIRN_DISPATCH_CONFIG", str(config_path))
+
+    response = client.put(
+        "/dispatcher-config",
+        json={
+            "workers": [
+                {"name": "codex_old", "type": "codex", "enabled": False},
+                {
+                    "name": "codex_new",
+                    "type": "codex",
+                    "enabled": True,
+                    "model": "gpt-test",
+                    "base_url": "http://api.example/v1",
+                    "api_key": "sk-test",
+                    "api_mode": "responses",
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [worker["name"] for worker in payload["workers"]] == ["codex_old", "codex_new"]
+    assert payload["workers"][0]["enabled"] is False
+    assert payload["workers"][1]["enabled"] is True
+
+    saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert saved["runtime"]["prompt_group"] == "zh"
+    assert saved["workers"][0]["enabled"] is False
+    assert saved["workers"][1]["env"]["CODEX_MODEL"] == "gpt-test"
+
+
+def test_dispatcher_config_test_rejects_incomplete_profile(client: TestClient) -> None:
+    response = client.post(
+        "/dispatcher-config/test",
+        json={"name": "bad", "type": "codex", "enabled": True},
+    )
+
+    assert response.status_code == 400
+    assert "missing env keys" in response.json()["detail"]

@@ -170,6 +170,7 @@ class WorkerConfig(BaseModel):
 
     name: str
     type: WorkerType
+    enabled: bool = True
     task_types: list[TaskType]
     max_running: int = Field(gt=0)
     priority: int = Field(ge=0)
@@ -186,6 +187,8 @@ class WorkerConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_env(self) -> "WorkerConfig":
+        if not self.enabled:
+            return self
         required = WORKER_ENV_KEYS[self.type]
         missing = [key for key in required if not self.env.get(key)]
         if missing:
@@ -244,9 +247,15 @@ class DispatchConfig(BaseModel):
             raise ValueError("worker names must be unique")
         if not self.workers:
             raise ValueError("workers must not be empty")
+        if not self.enabled_workers:
+            raise ValueError("at least one worker must be enabled")
         if self.runtime.max_project_workers > self.runtime.max_workers:
             raise ValueError("max_project_workers cannot exceed max_workers")
         return self
+
+    @property
+    def enabled_workers(self) -> list[WorkerConfig]:
+        return [worker for worker in self.workers if worker.enabled]
 
     @classmethod
     def load(cls, path: Path) -> "DispatchConfig":

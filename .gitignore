@@ -4,3 +4,5 @@ __pycache__/
 .playwright-cli/
 datas/
 dispatch.yaml
+.codex/
+verification.md

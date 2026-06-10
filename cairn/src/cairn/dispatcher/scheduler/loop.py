@@ -483,7 +483,7 @@ class DispatcherLoop:
         blocked_rejected: list[str] = []
         blocked_task_type: list[str] = []
         running_counts = self._worker_counts()
-        for worker in self.config.workers:
+        for worker in self.config.enabled_workers:
             if task_type not in worker.task_types:
                 blocked_task_type.append(worker.name)
                 continue
@@ -605,7 +605,7 @@ class DispatcherLoop:
             return False
         if self._get_bootstrap_intent(project) is not None:
             return True
-        return any("bootstrap" in worker.task_types for worker in self.config.workers)
+        return any("bootstrap" in worker.task_types for worker in self.config.enabled_workers)
 
     def _create_bootstrap_intent(self, project_id: str) -> Intent | None:
         response = self.client.create_intent(

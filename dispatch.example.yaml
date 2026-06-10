@@ -21,6 +21,7 @@ runtime:
   # "startup_only" checks only at startup. "disabled" skips automatic worker checks.
   worker_healthcheck: "startup_only"
   # Prompt set loaded from cairn/src/cairn/dispatcher/prompts/.
+  # Use "zh" for Chinese system prompts.
   prompt_group: "default"
 
 tasks:
