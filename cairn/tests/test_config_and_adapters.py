@@ -46,6 +46,29 @@ def test_dispatch_config_rejects_duplicate_workers_and_excess_project_parallelis
         DispatchConfig.model_validate(payload)
 
 
+def test_dispatch_config_skips_disabled_workers_and_requires_one_enabled_worker() -> None:
+    payload = make_config().model_dump()
+    payload["workers"].append(
+        {
+            "name": "disabled-codex",
+            "type": "codex",
+            "enabled": False,
+            "task_types": ["reason"],
+            "max_running": 1,
+            "priority": 0,
+            "env": {},
+        }
+    )
+
+    config = DispatchConfig.model_validate(payload)
+
+    assert [worker.name for worker in config.enabled_workers] == ["test-worker"]
+
+    payload["workers"][0]["enabled"] = False
+    with pytest.raises(ValidationError, match="at least one worker must be enabled"):
+        DispatchConfig.model_validate(payload)
+
+
 def test_pi_worker_rejects_invalid_context_window() -> None:
     with pytest.raises(ValidationError, match="PI_MODEL_CONTEXT_WINDOW must be greater than 0"):
         WorkerConfig.model_validate(
@@ -83,6 +106,7 @@ def test_mock_worker_rejects_unknown_phase_configuration() -> None:
 def test_bundled_prompt_groups_have_required_placeholders() -> None:
     validate_prompt_resources("default")
     validate_prompt_resources("mock")
+    validate_prompt_resources("zh")
 
 
 def test_pi_driver_models_json_and_execute_argv_include_context_window_and_tools() -> None:

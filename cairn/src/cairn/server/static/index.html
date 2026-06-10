@@ -239,19 +239,19 @@
     </div>
     <div class="flex-1"></div>
     <div class="flex items-center gap-3 text-[11px] text-slate-400">
-      <span class="inline-flex items-center gap-1.5 shrink-0" title="All projects">
-        <span class="font-medium uppercase tracking-[0.12em] text-slate-400">All</span>
+      <span class="inline-flex items-center gap-1.5 shrink-0" :title="t('header.all')">
+        <span class="font-medium uppercase tracking-[0.12em] text-slate-400" x-text="t('header.all')"></span>
         <span class="font-semibold text-slate-600 tabular-nums" x-text="projects.length"></span>
       </span>
-      <span class="inline-flex items-center gap-1.5 shrink-0" title="Active projects">
+      <span class="inline-flex items-center gap-1.5 shrink-0" :title="t('header.active')">
         <span class="h-1.5 w-1.5 rounded-full bg-teal-500"></span>
         <span class="font-semibold text-teal-700 tabular-nums" x-text="countProjectsByStatus('active')"></span>
       </span>
-      <span class="inline-flex items-center gap-1.5 shrink-0" title="Stopped projects">
+      <span class="inline-flex items-center gap-1.5 shrink-0" :title="t('header.stopped')">
         <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
         <span class="font-semibold text-amber-700 tabular-nums" x-text="countProjectsByStatus('stopped')"></span>
       </span>
-      <span class="inline-flex items-center gap-1.5 shrink-0" title="Completed projects">
+      <span class="inline-flex items-center gap-1.5 shrink-0" :title="t('header.completed')">
         <span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
         <span class="font-semibold text-slate-600 tabular-nums" x-text="countProjectsByStatus('completed')"></span>
       </span>
@@ -259,15 +259,15 @@
         @click="stopAllActiveProjects()"
         :disabled="!hasActiveProjects() || isStoppingAllProjects"
         class="h-7 px-2.5 rounded-lg border border-amber-200 text-xs text-amber-700 hover:bg-amber-50 transition inline-flex items-center gap-1.5 shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
-        title="Stop all active projects">
+        :title="t('action.stopActive')">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-        <span x-text="isStoppingAllProjects ? 'Stopping...' : 'Stop Active'"></span>
+        <span x-text="isStoppingAllProjects ? t('action.stopping') : t('action.stopActive')"></span>
       </button>
     </div>
     <div class="flex items-center gap-1.5">
       <button @click="showNewProject = true" class="h-7 px-2.5 rounded-lg border border-brand-200 text-xs text-brand-600 hover:bg-brand-50 transition inline-flex items-center gap-1.5">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-        New Project
+        <span x-text="t('modal.newProject')"></span>
       </button>
     </div>
     <div class="flex items-center gap-1.5 ml-1">
@@ -278,8 +278,9 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7 7 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a7 7 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a7 7 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a7 7 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path d="M15 12a3 3 0 1 1-6 0-3 3 0 0 1 6 0Z"/></svg>
       </button>
       <button @click="loadSettings(); loadDispatcherConfig(); showWorkerConfig = true" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center justify-center shrink-0">
-        API
+        <span x-text="t('api.title')"></span>
       </button>
+      <button @click="toggleLanguage()" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center justify-center shrink-0" :title="t('language.current')" x-text="languageSwitchLabel()"></button>
     </div>
   </header>
 
@@ -287,8 +288,8 @@
     <template x-if="projects.length === 0">
       <div class="flex flex-col items-center justify-center h-full text-slate-400">
         <img src="/static/favicon.svg" alt="" class="w-20 h-20 mb-5 opacity-30">
-        <p class="text-lg font-medium text-slate-500">No projects yet</p>
-        <p class="text-sm mt-1">Create a project to start exploring</p>
+        <p class="text-lg font-medium text-slate-500" x-text="t('view.noProjects')"></p>
+        <p class="text-sm mt-1" x-text="t('view.createFirst')"></p>
       </div>
     </template>
 
@@ -300,7 +301,7 @@
             <span class="text-[11px] font-mono text-slate-400 tracking-wide" x-text="p.id"></span>
             <span class="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-[0.12em]"
               :class="projectStatusBadgeClass(p.status)"
-              x-text="p.status"></span>
+              x-text="projectStatusLabel(p.status)"></span>
           </div>
           <div class="mb-3 flex-1">
             <div class="title-action-trigger flex items-start gap-2">
@@ -308,7 +309,7 @@
               <button type="button"
                 @click.stop="openRenameProject(p.id, p.title)"
                 class="title-action-button mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400"
-                title="Rename project"
+                :title="t('action.rename')"
                 :aria-label="`Rename ${p.title}`">
                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m16.862 4.487 1.65-1.65a1.875 1.875 0 1 1 2.652 2.652l-9.193 9.193a4.5 4.5 0 0 1-1.897 1.13L6 17l1.188-4.074a4.5 4.5 0 0 1 1.13-1.897l8.544-8.542Z"/><path d="M19.5 7.125 16.875 4.5"/><path d="M5.25 18.75h13.5"/></svg>
               </button>
@@ -363,7 +364,7 @@
               <button type="button" @click.stop="viewProjectYaml(p.id, p.title)"
                 class="px-2 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition flex items-center gap-1">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M14.25 3H7.5A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V8.25L14.25 3Z"/><path d="M14.25 3v5.25h4.5"/><path d="M8.25 12h7.5M8.25 15h5.25"/></svg>
-                Snapshot
+                <span x-text="t('action.snapshot')"></span>
               </button>
               <template x-if="p.status !== 'completed'">
                 <button type="button" @click.stop="toggleProjectStopById(p.id, p.status)"
@@ -373,20 +374,20 @@
                     : 'border-teal-200 text-teal-600 hover:bg-teal-50'">
                   <svg x-show="p.status === 'active'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
                   <svg x-show="p.status === 'stopped'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg>
-                  <span x-text="p.status === 'active' ? 'Stop' : 'Resume'"></span>
+                  <span x-text="p.status === 'active' ? t('action.stop') : t('action.resume')"></span>
                 </button>
               </template>
               <template x-if="p.status === 'completed'">
                 <button type="button" @click.stop="openReopenProject(p.id, p.title)"
                   class="px-2 py-1 rounded-lg border border-sky-200 text-[11px] text-sky-600 hover:bg-sky-50 transition flex items-center gap-1">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.708"/><path d="M3 3v6h6"/></svg>
-                  Reopen
+                  <span x-text="t('action.reopen')"></span>
                 </button>
               </template>
               <button type="button" @click.stop="deleteProjectById(p.id, p.title)"
                 class="px-2 py-1 rounded-lg border border-rose-200 text-[11px] text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition flex items-center gap-1">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6"/><path d="M19 6l-.63 11.338A2 2 0 0 1 16.37 19.5H7.63a2 2 0 0 1-1.997-2.162L5 6"/><path d="M10 10.5v5"/><path d="M14 10.5v5"/></svg>
-                Delete
+                <span x-text="t('action.delete')"></span>
               </button>
             </div>
           </div>
@@ -414,43 +415,43 @@
       </button>
       <span class="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-[0.12em] shrink-0"
         :class="projectStatusBadgeClass(project.project.status)"
-        x-text="project.project.status"></span>
+        x-text="projectStatusLabel(project.project.status)"></span>
     </div>
     <div class="flex-1"></div>
     <div class="flex items-center gap-4 text-xs text-slate-400">
-      <span x-text="`${project.facts.length} facts`"></span>
-      <span x-text="`${project.intents.length} intents`"></span>
+      <span x-text="t('header.facts', { count: project.facts.length })"></span>
+      <span x-text="t('header.intents', { count: project.intents.length })"></span>
     </div>
     <div class="flex items-center gap-1.5">
       <template x-if="!replay.active">
         <button @click="startProjectReplay()" class="px-2.5 py-1 rounded-lg border border-violet-200 text-xs text-violet-600 hover:bg-violet-50 transition flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/><path d="M4 5v14"/></svg>
-          Replay
+          <span x-text="t('action.replay')"></span>
         </button>
       </template>
       <template x-if="replay.active">
         <div class="flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50/80 px-2 py-1 text-xs text-violet-700">
           <span class="font-medium whitespace-nowrap" x-text="replayProgressLabel()"></span>
-          <button @click="toggleProjectReplayPlayback()" class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 hover:bg-white transition" :title="replay.playing ? 'Pause replay' : 'Resume replay'">
+          <button @click="toggleProjectReplayPlayback()" class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 hover:bg-white transition" :title="replay.playing ? t('action.pauseReplay') : t('action.resumeReplay')">
             <svg x-show="replay.playing" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 6h3v12H8zM13 6h3v12h-3z"/></svg>
             <svg x-show="!replay.playing" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg>
           </button>
-          <button @click="restartProjectReplay()" class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 hover:bg-white transition" title="Restart replay">
+          <button @click="restartProjectReplay()" class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 hover:bg-white transition" :title="t('action.restartReplay')">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.708"/><path d="M3 3v6h6"/></svg>
           </button>
           <select x-model="replay.stepMs" @change="updateReplaySpeed()" class="h-6 rounded-md border border-violet-200 bg-white/80 px-1.5 text-[11px] text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-100">
-            <option value="700">Fast</option>
-            <option value="1100">Normal</option>
-            <option value="1600">Slow</option>
+            <option value="700" x-text="t('speed.fast')"></option>
+            <option value="1100" x-text="t('speed.normal')"></option>
+            <option value="1600" x-text="t('speed.slow')"></option>
           </select>
           <button @click="exitProjectReplay()" class="inline-flex h-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 px-2 hover:bg-white transition">
-            Exit
+            <span x-text="t('action.exit')"></span>
           </button>
         </div>
       </template>
       <button @click="viewProjectYaml(selectedProjectId, project.project.title)" class="px-2.5 py-1 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition flex items-center gap-1.5">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M14.25 3H7.5A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V8.25L14.25 3Z"/><path d="M14.25 3v5.25h4.5"/><path d="M8.25 12h7.5M8.25 15h5.25"/></svg>
-        Snapshot
+        <span x-text="t('action.snapshot')"></span>
       </button>
       <template x-if="!replay.active && project.project.status !== 'completed'">
         <button @click="toggleProjectStop()"
@@ -460,19 +461,19 @@
             : 'border-teal-200 text-teal-600 hover:bg-teal-50'">
           <svg x-show="project.project.status === 'active'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
           <svg x-show="project.project.status === 'stopped'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg>
-          <span x-text="project.project.status === 'active' ? 'Stop' : 'Resume'"></span>
+          <span x-text="project.project.status === 'active' ? t('action.stop') : t('action.resume')"></span>
         </button>
       </template>
       <template x-if="!replay.active && project.project.status === 'completed'">
         <button @click="openReopenProject(project.project.id, project.project.title)"
           class="px-2.5 py-1 rounded-lg border border-sky-200 text-xs text-sky-600 hover:bg-sky-50 transition flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.708"/><path d="M3 3v6h6"/></svg>
-          Reopen
+          <span x-text="t('action.reopen')"></span>
         </button>
       </template>
       <button x-show="!replay.active" @click="deleteProject()" class="px-2.5 py-1 rounded-lg border border-rose-200 text-xs text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition flex items-center gap-1.5">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6"/><path d="M19 6l-.63 11.338A2 2 0 0 1 16.37 19.5H7.63a2 2 0 0 1-1.997-2.162L5 6"/><path d="M10 10.5v5"/><path d="M14 10.5v5"/></svg>
-        Delete
+        <span x-text="t('action.delete')"></span>
       </button>
     </div>
     <div class="flex items-center gap-1.5 ml-1">
@@ -483,8 +484,9 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7 7 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a7 7 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a7 7 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a7 7 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path d="M15 12a3 3 0 1 1-6 0-3 3 0 0 1 6 0Z"/></svg>
       </button>
       <button @click="loadSettings(); loadDispatcherConfig(); showWorkerConfig = true" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center justify-center shrink-0">
-        API
+        <span x-text="t('api.title')"></span>
       </button>
+      <button @click="toggleLanguage()" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center justify-center shrink-0" :title="t('language.current')" x-text="languageSwitchLabel()"></button>
     </div>
   </header>
 
@@ -538,19 +540,19 @@
           <button @click="openCreateIntent()" :disabled="!canActOnSelectedFacts()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-brand-200 text-brand-600 rounded-lg shadow-sm text-xs font-medium hover:bg-brand-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-            Intent
+            <span x-text="t('common.intent')"></span>
           </button>
           <button @click="openCompleteProject()" :disabled="!canActOnSelectedFacts()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-teal-200 text-teal-600 rounded-lg shadow-sm text-xs font-medium hover:bg-teal-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-            Complete
+            <span x-text="t('action.complete')"></span>
           </button>
         </div>
         <div class="flex gap-1.5" x-show="projectCanWriteHints()">
           <button @click="openHintModal()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-amber-200 text-amber-600 rounded-lg shadow-sm text-xs font-medium hover:bg-amber-50 transition flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z"/></svg>
-            Hint
+            <span x-text="t('common.hint')"></span>
           </button>
         </div>
         <div class="flex gap-1.5" x-show="projectIsActive()">
@@ -562,12 +564,12 @@
           <button @click="releaseSelectedIntent()" :disabled="!selectedReleasableOpenIntentRecord()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-amber-200 text-amber-700 rounded-lg shadow-sm text-xs font-medium hover:bg-amber-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 10V7.75A3.75 3.75 0 1 1 16.5 7"/><path d="M7.5 10.5h9A1.5 1.5 0 0 1 18 12v6A1.5 1.5 0 0 1 16.5 19.5h-9A1.5 1.5 0 0 1 6 18v-6A1.5 1.5 0 0 1 7.5 10.5Z"/><path d="M12 14.25v1.5"/></svg>
-            Release
+            <span x-text="t('action.release')"></span>
           </button>
           <button @click="selectedActionableOpenIntentRecord() && openConclude(selectedActionableOpenIntentRecord())" :disabled="!selectedActionableOpenIntentRecord()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-teal-200 text-teal-600 rounded-lg shadow-sm text-xs font-medium hover:bg-teal-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.25 3H7.5A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V8.25L14.25 3Z"/><path d="M14.25 3v5.25h4.5"/><path d="M9 13.5 10.875 15.375 15 11.25"/></svg>
-            Conclude
+            <span x-text="t('action.conclude')"></span>
           </button>
         </div>
       </div>
@@ -583,21 +585,21 @@
     <div class="border-l border-slate-200/60 bg-white flex flex-col overflow-hidden shrink-0 relative z-20" :style="{ width: sidePanelWidth + 'px', minWidth: sidePanelWidth + 'px', flexBasis: sidePanelWidth + 'px' }">
       <div class="flex border-b border-slate-100 shrink-0">
         <button @click="sideTab = 'detail'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
-          :class="sideTab === 'detail' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Detail</button>
+          :class="sideTab === 'detail' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'" x-text="t('common.detail')"></button>
         <button @click="sideTab = 'hints'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
           :class="sideTab === 'hints' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">
-          Hints <span class="ml-0.5 text-[10px] opacity-60" x-text="project.hints.length"></span>
+          <span x-text="t('common.hints')"></span> <span class="ml-0.5 text-[10px] opacity-60" x-text="project.hints.length"></span>
         </button>
         <button @click="sideTab = 'log'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
-          :class="sideTab === 'log' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Log</button>
+          :class="sideTab === 'log' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'" x-text="t('common.log')"></button>
       </div>
 
       <!-- Detail -->
       <div x-show="sideTab === 'detail'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/40">
         <template x-if="!selectedNode">
           <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-5 py-10 text-center shadow-sm">
-            <p class="text-sm text-slate-400">Click a node or edge</p>
-            <p class="text-xs text-slate-300 mt-1">Shift+click for multi-select</p>
+            <p class="text-sm text-slate-400" x-text="t('view.selectNode')"></p>
+            <p class="text-xs text-slate-300 mt-1" x-text="t('view.shiftMulti')"></p>
           </div>
         </template>
         <template x-if="selectedNode && selectedNode.type === 'fact' && selectedFacts.length > 1">
@@ -716,7 +718,7 @@
       <div x-show="sideTab === 'hints'" class="flex-1 overflow-y-auto p-4 space-y-3 bg-amber-50/25">
         <template x-if="project.hints.length === 0">
           <div class="rounded-2xl border border-dashed border-amber-200 bg-white/80 px-5 py-10 text-center shadow-sm">
-            <p class="text-sm text-slate-300">No hints yet</p>
+            <p class="text-sm text-slate-300" x-text="t('view.noHints')"></p>
           </div>
         </template>
         <template x-for="h in project.hints" :key="h.id">
@@ -745,7 +747,7 @@
             <div class="space-y-2.5">
               <div class="space-y-1">
                 <div class="flex items-center justify-between gap-3 text-[11px]">
-                  <span class="text-slate-400">Sequence</span>
+                  <span class="text-slate-400" x-text="t('common.sequence')"></span>
                   <span class="font-mono text-slate-600" x-text="selectedTimelineSummary().sequenceLabel"></span>
                 </div>
                 <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
@@ -754,7 +756,7 @@
               </div>
               <div class="space-y-1">
                 <div class="flex items-center justify-between gap-3 text-[11px]">
-                  <span class="text-slate-400">Time Span</span>
+                  <span class="text-slate-400" x-text="t('common.timeSpan')"></span>
                   <span class="font-mono text-slate-600 text-right" x-text="selectedTimelineSummary().timeLabel"></span>
                 </div>
                 <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
@@ -765,7 +767,7 @@
           </section>
         </template>
         <template x-if="timelineEvents().length === 0">
-          <p class="text-sm text-slate-300 text-center mt-12">No activity yet</p>
+          <p class="text-sm text-slate-300 text-center mt-12" x-text="t('view.noActivity')"></p>
         </template>
         <template x-for="entry in timelineEvents()" :key="entry.id">
           <div class="flex items-stretch gap-3" :id="timelineEntryDomId(entry.id)">
@@ -786,7 +788,7 @@
                 <p class="text-sm text-slate-700 leading-relaxed break-words mt-1" x-text="entry.title"></p>
               </template>
               <template x-if="entry.actor || entry.meta.length > 0">
-                <p class="text-[11px] text-slate-400 mt-1 break-words" x-text="[entry.actor, ...entry.meta].filter(Boolean).join(' · ')"></p>
+                <p class="text-[11px] text-slate-400 mt-1 break-words" x-text="[entry.actor, ...entry.meta].filter(Boolean).join(' - ')"></p>
               </template>
             </button>
           </div>
@@ -802,24 +804,24 @@
 <!-- New Project -->
 <div x-show="showNewProject" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showNewProject = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-4">New Project</h3>
+    <h3 class="text-base font-semibold text-slate-700 mb-4" x-text="t('modal.newProject')"></h3>
     <div class="space-y-3">
-      <input x-model="newProject.title" placeholder="Project title" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
+      <input x-model="newProject.title" :placeholder="t('placeholder.projectTitle')" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
       <textarea x-model="newProject.origin" placeholder="Origin — starting point" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
       <textarea x-model="newProject.goal" placeholder="Goal — what to achieve" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
       <label class="flex items-center gap-2 px-1 text-sm text-slate-600">
         <input type="checkbox" x-model="newProject.bootstrap" class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-200">
-        <span>Run bootstrap attempt</span>
+        <span x-text="'Run bootstrap attempt'"></span>
       </label>
 
       <div>
         <div class="flex items-center justify-between mb-2">
-          <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Hints (optional)</span>
-          <button type="button" @click="newProject.hints.push({ content: '' })" class="text-[11px] text-brand-500 hover:text-brand-600 font-medium">+ Add</button>
+          <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider" x-text="t('common.hints')"></span>
+          <button type="button" @click="newProject.hints.push({ content: '' })" class="text-[11px] text-brand-500 hover:text-brand-600 font-medium" x-text="`+ ${t('action.add')}`"></button>
         </div>
         <template x-for="(hint, idx) in newProject.hints" :key="idx">
           <div class="flex gap-2 mb-2">
-            <input x-model="hint.content" placeholder="Hint content" class="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
+            <input x-model="hint.content" :placeholder="t('placeholder.hint')" class="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
             <button type="button" @click="newProject.hints.splice(idx, 1)" x-show="newProject.hints.length > 1" class="px-2 text-slate-300 hover:text-red-400 transition text-sm">&times;</button>
           </div>
         </template>
@@ -827,9 +829,9 @@
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showNewProject = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="showNewProject = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.cancel')"></button>
       <button @click="createProject()" :disabled="!newProject.title || !newProject.origin || !newProject.goal"
-        class="px-5 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition disabled:opacity-30 shadow-sm shadow-brand-200">Create</button>
+        class="px-5 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition disabled:opacity-30 shadow-sm shadow-brand-200" x-text="t('action.create')"></button>
     </div>
   </div>
 </div>
@@ -837,9 +839,9 @@
 <!-- Create Intent -->
 <div x-show="showIntentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showIntentModal = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-1">New Intent</h3>
+    <h3 class="text-base font-semibold text-slate-700 mb-1" x-text="t('modal.newIntent')"></h3>
     <div class="mb-4">
-      <label class="text-[11px] text-slate-400 mb-1 block font-medium">From facts</label>
+      <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('common.from')"></label>
       <div class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 min-h-[42px] flex flex-wrap gap-1.5 items-center">
         <template x-for="fid in selectedFacts" :key="`intent-from-${fid}`">
           <span class="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-mono text-slate-600" x-text="fid"></span>
@@ -847,17 +849,17 @@
       </div>
     </div>
     <div class="space-y-3">
-      <textarea x-model="intentForm.description" placeholder="What will you explore?" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
+      <textarea x-model="intentForm.description" :placeholder="t('placeholder.intent')" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
       <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
-        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+        <span x-text="t('common.actor')"></span>: <span class="font-medium text-slate-700" x-text="actorName()"></span>
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showIntentModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="showIntentModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.cancel')"></button>
       <button @click="createIntent(false)" :disabled="!intentForm.description"
-        class="px-5 py-2 text-sm border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition disabled:opacity-30">Declare</button>
+        class="px-5 py-2 text-sm border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition disabled:opacity-30" x-text="t('action.declare')"></button>
       <button @click="createIntent(true)" :disabled="!intentForm.description"
-        class="px-5 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition disabled:opacity-30 shadow-sm shadow-brand-200">Declare &amp; Claim</button>
+        class="px-5 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition disabled:opacity-30 shadow-sm shadow-brand-200" x-text="t('action.declareClaim')"></button>
     </div>
   </div>
 </div>
@@ -865,18 +867,18 @@
 <!-- Conclude -->
 <div x-show="showConcludeModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showConcludeModal = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-1">Conclude Intent</h3>
+    <h3 class="text-base font-semibold text-slate-700 mb-1" x-text="t('modal.concludeIntent')"></h3>
     <p class="text-xs text-slate-400 mb-4 font-mono" x-text="concludeForm.intentId"></p>
     <div class="space-y-3">
       <textarea x-model="concludeForm.description" placeholder="What did you find? (new fact)" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
       <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
-        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+        <span x-text="t('common.actor')"></span>: <span class="font-medium text-slate-700" x-text="actorName()"></span>
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showConcludeModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="showConcludeModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.cancel')"></button>
       <button @click="concludeIntent()" :disabled="!concludeForm.description"
-        class="px-5 py-2 text-sm bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600 transition disabled:opacity-30 shadow-sm shadow-teal-200">Conclude</button>
+        class="px-5 py-2 text-sm bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600 transition disabled:opacity-30 shadow-sm shadow-teal-200" x-text="t('action.conclude')"></button>
     </div>
   </div>
 </div>
@@ -884,11 +886,11 @@
 <!-- Complete Project -->
 <div x-show="showCompleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showCompleteModal = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-1">Complete Project</h3>
-    <p class="text-xs text-slate-400 mb-4">Mark project as completed</p>
+    <h3 class="text-base font-semibold text-slate-700 mb-1" x-text="t('modal.completeProject')"></h3>
+    <p class="text-xs text-slate-400 mb-4" x-text="t('toast.projectCompleted')"></p>
     <div class="space-y-3">
       <div>
-        <label class="text-[11px] text-slate-400 mb-1 block font-medium">From facts</label>
+        <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('common.from')"></label>
         <div class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 min-h-[42px] flex flex-wrap gap-1.5 items-center">
           <template x-for="fid in selectedFacts" :key="`complete-from-${fid}`">
             <span class="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-mono text-slate-600" x-text="fid"></span>
@@ -897,13 +899,13 @@
       </div>
       <textarea x-model="completeForm.description" placeholder="Why is the goal met?" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
       <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
-        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+        <span x-text="t('common.actor')"></span>: <span class="font-medium text-slate-700" x-text="actorName()"></span>
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showCompleteModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="showCompleteModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.cancel')"></button>
       <button @click="completeProject()" :disabled="selectedFacts.length === 0 || !completeForm.description"
-        class="px-5 py-2 text-sm bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600 transition disabled:opacity-30 shadow-sm shadow-teal-200">Complete</button>
+        class="px-5 py-2 text-sm bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600 transition disabled:opacity-30 shadow-sm shadow-teal-200" x-text="t('action.complete')"></button>
     </div>
   </div>
 </div>
@@ -911,17 +913,17 @@
 <!-- Hint -->
 <div x-show="showHintModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showHintModal = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-4">Add Hint</h3>
+    <h3 class="text-base font-semibold text-slate-700 mb-4" x-text="t('modal.addHint')"></h3>
     <div class="space-y-3">
       <textarea x-model="hintForm.content" placeholder="Strategy advice or note..." rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
       <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
-        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+        <span x-text="t('common.actor')"></span>: <span class="font-medium text-slate-700" x-text="actorName()"></span>
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showHintModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="showHintModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.cancel')"></button>
       <button @click="addHint()" :disabled="!hintForm.content"
-        class="px-5 py-2 text-sm bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition disabled:opacity-30 shadow-sm shadow-amber-200">Add</button>
+        class="px-5 py-2 text-sm bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition disabled:opacity-30 shadow-sm shadow-amber-200" x-text="t('action.add')"></button>
     </div>
 </div>
 </div>
@@ -929,18 +931,18 @@
 <!-- Reopen -->
 <div x-show="showReopenModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showReopenModal = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-1">Reopen Project</h3>
+    <h3 class="text-base font-semibold text-slate-700 mb-1" x-text="t('modal.reopenProject')"></h3>
     <p class="text-xs text-slate-400 mb-4" x-text="projectLabel(reopenForm.projectId, reopenForm.projectTitle)"></p>
     <div class="space-y-3">
       <textarea x-model="reopenForm.description" placeholder="Why is this project not actually complete?" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
       <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
-        Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
+        <span x-text="t('common.actor')"></span>: <span class="font-medium text-slate-700" x-text="actorName()"></span>
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showReopenModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="showReopenModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.cancel')"></button>
       <button @click="reopenProject()" :disabled="!reopenForm.projectId || !reopenForm.description"
-        class="px-5 py-2 text-sm bg-sky-500 text-white rounded-xl font-medium hover:bg-sky-600 transition disabled:opacity-30 shadow-sm shadow-sky-200">Reopen</button>
+        class="px-5 py-2 text-sm bg-sky-500 text-white rounded-xl font-medium hover:bg-sky-600 transition disabled:opacity-30 shadow-sm shadow-sky-200" x-text="t('action.reopen')"></button>
     </div>
   </div>
 </div>
@@ -948,16 +950,16 @@
 <!-- Rename Project -->
 <div x-show="showRenameModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showRenameModal = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-1">Rename Project</h3>
+    <h3 class="text-base font-semibold text-slate-700 mb-1" x-text="t('modal.renameProject')"></h3>
     <p class="text-xs text-slate-400 mb-4" x-text="projectLabel(renameForm.projectId, renameForm.originalTitle)"></p>
     <div class="space-y-3">
-      <input x-ref="renameTitleInput" x-model="renameForm.title" @keydown.enter.prevent="renameProject()" placeholder="Project title" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
+      <input x-ref="renameTitleInput" x-model="renameForm.title" @keydown.enter.prevent="renameProject()" :placeholder="t('placeholder.projectTitle')" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
       <p class="text-[11px] text-slate-400">This only changes the project title and is allowed in any project status.</p>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showRenameModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="showRenameModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.cancel')"></button>
       <button @click="renameProject()" :disabled="!renameForm.projectId || !renameForm.title"
-        class="px-5 py-2 text-sm bg-slate-800 text-white rounded-xl font-medium hover:bg-slate-900 transition disabled:opacity-30 shadow-sm">Save</button>
+        class="px-5 py-2 text-sm bg-slate-800 text-white rounded-xl font-medium hover:bg-slate-900 transition disabled:opacity-30 shadow-sm" x-text="t('action.save')"></button>
     </div>
   </div>
 </div>
@@ -965,14 +967,14 @@
 <!-- Local Preferences -->
 <div x-show="showLocalPrefs" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showLocalPrefs = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-4">Local Preferences</h3>
+    <h3 class="text-base font-semibold text-slate-700 mb-4" x-text="t('local.preferences')"></h3>
     <div class="space-y-4">
       <div>
-        <label class="text-[11px] text-slate-400 mb-1 block font-medium">Actor</label>
+        <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('common.actor')"></label>
         <input x-model="localPrefs.actor_name" placeholder="Your name" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
       </div>
       <div>
-        <label class="text-[11px] text-slate-400 mb-1 block font-medium">Default layout</label>
+        <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('layout.default')"></label>
         <select x-model="localPrefs.layout_mode" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
           <option value="dagre_tb">Dagre ↓</option>
           <option value="dagre_lr">Dagre →</option>
@@ -982,11 +984,11 @@
           <option value="elk_lr">ELK →</option>
         </select>
       </div>
-      <p class="text-[11px] text-slate-400">Stored only in this browser.</p>
+      <p class="text-[11px] text-slate-400" x-text="t('local.storedOnly')"></p>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showLocalPrefs = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
-      <button @click="saveLocalSettings()" class="px-4 py-2 text-sm bg-slate-800 text-white rounded-xl font-medium hover:bg-slate-900 transition shadow-sm">Save Local</button>
+      <button @click="showLocalPrefs = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.close')"></button>
+      <button @click="saveLocalSettings()" class="px-4 py-2 text-sm bg-slate-800 text-white rounded-xl font-medium hover:bg-slate-900 transition shadow-sm" x-text="t('action.saveLocal')"></button>
     </div>
   </div>
 </div>
@@ -994,7 +996,7 @@
 <!-- Settings -->
 <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showSettings = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-4">Server Settings</h3>
+    <h3 class="text-base font-semibold text-slate-700 mb-4" x-text="t('modal.serverSettings')"></h3>
     <div>
       <label class="text-[11px] text-slate-400 mb-1 block font-medium">Intent timeout (seconds)</label>
       <input type="number" x-model.number="settingsForm.intent_timeout" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
@@ -1005,67 +1007,130 @@
       <p class="text-[11px] text-slate-400 mt-2">Shared backend configuration.</p>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showSettings = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
-      <button @click="saveServerSettings()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200">Save Server</button>
+      <button @click="showSettings = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.close')"></button>
+      <button @click="saveServerSettings()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200" x-text="t('action.saveServer')"></button>
     </div>
   </div>
 </div>
 
 <!-- Worker API Settings -->
 <div x-show="showWorkerConfig" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showWorkerConfig = false">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 border border-slate-200/60 max-h-[85vh] overflow-y-auto" @click.stop>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl p-6 border border-slate-200/60 max-h-[85vh] overflow-y-auto" @click.stop>
     <div class="flex items-start justify-between gap-4 mb-4">
       <div class="min-w-0">
-        <h3 class="text-base font-semibold text-slate-700">Worker API Profiles</h3>
-        <p class="text-[11px] text-slate-400 break-all mt-1" x-text="dispatcherConfigPath || 'No dispatcher config file found'"></p>
+        <h3 class="text-base font-semibold text-slate-700" x-text="t('api.title')"></h3>
+        <p class="text-[11px] text-slate-400 break-all mt-1" x-text="dispatcherConfigPath || t('api.noConfig')"></p>
       </div>
-      <button @click="loadDispatcherConfig()" type="button" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 transition shrink-0">Reload</button>
+      <div class="flex items-center gap-2 shrink-0">
+        <button @click="addWorkerProfile()" type="button" class="px-3 py-1.5 text-xs border border-brand-200 rounded-lg text-brand-600 hover:bg-brand-50 transition" x-text="t('api.addProfile')"></button>
+        <button @click="loadDispatcherConfig()" type="button" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 transition" x-text="t('action.reload')"></button>
+      </div>
     </div>
     <template x-if="dispatcherConfigForm.workers.length === 0">
       <div class="px-4 py-5 border border-dashed border-slate-200 rounded-xl text-sm text-slate-400">
-        No editable worker config found.
+        <span x-text="t('api.empty')"></span>
       </div>
     </template>
-    <div class="space-y-3">
-      <template x-for="worker in dispatcherConfigForm.workers" :key="worker.name">
-        <div class="border border-slate-200 rounded-xl p-4 space-y-3">
-          <div class="min-w-0">
-            <div class="text-sm font-medium text-slate-700 truncate" x-text="worker.name"></div>
-            <div class="text-[11px] text-slate-400 uppercase tracking-[0.12em]" x-text="worker.type"></div>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label class="text-[11px] text-slate-400 mb-1 block font-medium">Model</label>
-              <input x-model="worker.model" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
-            </div>
-            <div x-show="worker.api_mode_options && worker.api_mode_options.length > 0">
-              <label class="text-[11px] text-slate-400 mb-1 block font-medium">API mode</label>
-              <input x-model="worker.api_mode" :placeholder="workerApiModePlaceholder(worker)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
-              <div class="flex flex-wrap gap-2 mt-2">
-                <template x-for="mode in worker.api_mode_options" :key="`${worker.name}-${mode}`">
-                  <button type="button" @click="worker.api_mode = mode" class="px-2 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition" x-text="formatWorkerApiMode(mode)"></button>
-                </template>
+    <div x-show="dispatcherConfigForm.workers.length > 0" class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+      <aside class="space-y-2">
+        <template x-for="(worker, index) in dispatcherConfigForm.workers" :key="worker.name || index">
+          <button type="button" @click="selectWorkerProfile(index)"
+            class="w-full text-left rounded-xl border p-3 transition"
+            :class="selectedWorkerIndex === index ? 'border-brand-200 bg-brand-50/70' : 'border-slate-200 hover:bg-slate-50'">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-sm font-semibold text-slate-700 truncate" x-text="worker.name || t('api.unnamedProfile')"></div>
+                <div class="mt-0.5 text-[11px] text-slate-400 uppercase tracking-[0.12em]" x-text="worker.type"></div>
               </div>
-              <p x-show="workerApiModeHelp(worker)" class="text-[11px] text-slate-400 mt-2" x-text="workerApiModeHelp(worker)"></p>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                :class="worker.enabled ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-500'"
+                x-text="worker.enabled ? t('api.enabled') : t('api.disabled')"></span>
             </div>
-            <div class="md:col-span-2">
-              <label class="text-[11px] text-slate-400 mb-1 block font-medium">API base URL</label>
-              <input x-model="worker.base_url" :placeholder="workerBaseUrlPlaceholder(worker)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
-            </div>
-            <div class="md:col-span-2">
-              <label class="text-[11px] text-slate-400 mb-1 block font-medium">API key</label>
-              <input type="password" x-model="worker.api_key" :placeholder="workerApiKeyPlaceholder(worker)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
-              <p x-show="worker.api_mode === 'qizhi_openai' || worker.api_mode === 'iq_openai'" class="text-[11px] text-slate-400 mt-2">
-                Use the company token format <span class="font-mono">service_name|prompt_id|prompt_token</span>; requests are sent as a Bearer token.
-              </p>
-            </div>
+          </button>
+        </template>
+      </aside>
+
+      <template x-if="selectedWorker()">
+      <section class="border border-slate-200 rounded-xl p-4 space-y-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h4 class="text-sm font-semibold text-slate-700" x-text="t('api.editProfile')"></h4>
+            <p class="mt-1 text-[11px] text-slate-400" x-text="t('api.singleFormHelp')"></p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" @click="setActiveWorkerProfile(selectedWorkerIndex)"
+              class="px-3 py-1.5 text-xs rounded-lg border transition"
+              :class="selectedWorker()?.enabled ? 'border-teal-200 text-teal-700 bg-teal-50' : 'border-slate-200 text-slate-500 hover:bg-slate-50'"
+              x-text="selectedWorker()?.enabled ? t('api.currentEnabled') : t('api.enableThis')"></button>
+            <button type="button" @click="removeSelectedWorkerProfile()"
+              class="px-3 py-1.5 text-xs rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 transition"
+              x-text="t('action.delete')"></button>
           </div>
         </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('api.profileName')"></label>
+            <input x-model="selectedWorker().name" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('api.workerType')"></label>
+            <select x-model="selectedWorker().type" @change="onWorkerTypeChange(selectedWorker())"
+              class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+              <template x-for="type in workerTypeOptions()" :key="type">
+                <option :value="type" x-text="formatWorkerType(type)"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('api.model')"></label>
+            <input x-model="selectedWorker().model" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+          </div>
+          <div x-show="workerApiModeOptions(selectedWorker()).length > 0">
+            <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('api.mode')"></label>
+            <select x-model="selectedWorker().api_mode"
+              class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+              <template x-for="mode in workerApiModeOptions(selectedWorker())" :key="mode">
+                <option :value="mode" x-text="formatWorkerApiMode(mode)"></option>
+              </template>
+            </select>
+            <p x-show="workerApiModeHelp(selectedWorker())" class="text-[11px] text-slate-400 mt-2" x-text="workerApiModeHelp(selectedWorker())"></p>
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('api.baseUrl')"></label>
+            <input x-model="selectedWorker().base_url" :placeholder="workerBaseUrlPlaceholder(selectedWorker())" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-[11px] text-slate-400 mb-1 block font-medium" x-text="t('api.key')"></label>
+            <input type="password" x-model="selectedWorker().api_key" :placeholder="workerApiKeyPlaceholder(selectedWorker())" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+            <p x-show="selectedWorker()?.api_mode === 'qizhi_openai' || selectedWorker()?.api_mode === 'iq_openai'" class="text-[11px] text-slate-400 mt-2" x-text="t('api.companyTokenHelp')"></p>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+          <span x-text="t('api.enabledHelp')"></span>
+        </div>
+
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-h-5 text-xs">
+            <template x-if="selectedWorker()?._test">
+              <p :class="selectedWorker()._test.ok ? 'text-teal-600' : 'text-rose-500'">
+                <span x-text="selectedWorker()._test.ok ? t('api.testOk') : t('api.testFailed')"></span>
+                <span x-show="selectedWorker()._test.http_status" x-text="` - HTTP ${selectedWorker()._test.http_status}`"></span>
+                <span x-show="selectedWorker()._test.detail" x-text="` - ${selectedWorker()._test.detail}`"></span>
+              </p>
+            </template>
+          </div>
+          <button type="button" @click="testSelectedWorkerApi()" :disabled="isTestingWorker"
+            class="px-4 py-2 text-sm border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition disabled:opacity-40"
+            x-text="isTestingWorker ? t('api.testing') : t('api.testConnection')"></button>
+        </div>
+      </section>
       </template>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button @click="showWorkerConfig = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
-      <button @click="saveServerSettings()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200">Save</button>
+      <button @click="showWorkerConfig = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition" x-text="t('action.close')"></button>
+      <button @click="saveServerSettings()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200" x-text="t('action.save')"></button>
     </div>
   </div>
 </div>
@@ -1135,8 +1200,306 @@
 </div>
 
 <script>
+const CAIRN_I18N = {
+  zh: {
+    'language.current': '中文',
+    'language.switch': 'EN',
+    'action.add': '添加',
+    'action.back': '返回',
+    'action.cancel': '取消',
+    'action.claim': '认领',
+    'action.claimed': '已认领',
+    'action.close': '关闭',
+    'action.complete': '完成',
+    'action.conclude': '总结',
+    'action.copy': '复制',
+    'action.create': '创建',
+    'action.declare': '声明',
+    'action.declareClaim': '声明并认领',
+    'action.delete': '删除',
+    'action.exit': '退出',
+    'action.heartbeat': '心跳',
+    'action.pauseReplay': '暂停回放',
+    'action.release': '释放',
+    'action.reload': '重新加载',
+    'action.rename': '重命名',
+    'action.replay': '回放',
+    'action.reopen': '重新打开',
+    'action.restartReplay': '重新开始',
+    'action.resume': '恢复',
+    'action.resumeReplay': '继续回放',
+    'action.save': '保存',
+    'action.saveLocal': '保存本地设置',
+    'action.saveServer': '保存服务器设置',
+    'action.snapshot': '快照',
+    'action.stop': '停止',
+    'action.stopActive': '停止活跃项目',
+    'action.stopping': '正在停止...',
+    'api.addProfile': '新增',
+    'api.baseUrl': 'API 基础 URL',
+    'api.companyTokenHelp': '使用公司令牌格式 service_name|prompt_id|prompt_token；请求会以 Bearer token 发送。',
+    'api.currentEnabled': '当前启用',
+    'api.disabled': '未启用',
+    'api.editProfile': '编辑当前 API',
+    'api.empty': '没有可编辑的 API profile。点击“新增”创建一个。',
+    'api.enableThis': '启用这个',
+    'api.enabled': '已启用',
+    'api.enabledHelp': '只有启用的 profile 会参与调度和启动健康检查；未启用的 profile 可以暂时留空。',
+    'api.key': 'API Key',
+    'api.mode': 'API 模式',
+    'api.model': '模型',
+    'api.noConfig': '未找到 dispatcher 配置文件',
+    'api.profileName': 'Profile 名称',
+    'api.singleFormHelp': '一次只填写一个 API profile；需要更多配置时点击新增，再选择启用哪一个。',
+    'api.testConnection': '测试连接',
+    'api.testFailed': '连接失败',
+    'api.testing': '正在测试...',
+    'api.testOk': '连接成功',
+    'api.title': 'Worker API 配置',
+    'api.unnamedProfile': '未命名 profile',
+    'api.workerType': 'Worker 类型',
+    'common.actor': '操作者',
+    'common.completed': '已完成',
+    'common.created': '创建时间',
+    'common.creator': '创建者',
+    'common.detail': '详情',
+    'common.fact': '事实',
+    'common.from': '来源',
+    'common.goal': '目标',
+    'common.heartbeat': '心跳',
+    'common.hint': '提示',
+    'common.hints': '提示',
+    'common.intent': '意图',
+    'common.log': '日志',
+    'common.origin': '起点',
+    'common.producedBy': '产出来源',
+    'common.project': '项目',
+    'common.role': '角色',
+    'common.sequence': '序列',
+    'common.timeSpan': '时间跨度',
+    'common.to': '去向',
+    'common.worker': 'Worker',
+    'header.active': '活跃',
+    'header.all': '全部',
+    'header.completed': '完成',
+    'header.facts': '{count} 个事实',
+    'header.intents': '{count} 个意图',
+    'header.stopped': '停止',
+    'layout.default': '默认布局',
+    'local.preferences': '本地偏好',
+    'local.storedOnly': '仅存储在当前浏览器。',
+    'modal.addHint': '添加提示',
+    'modal.completeProject': '完成项目',
+    'modal.concludeIntent': '总结意图',
+    'modal.newIntent': '新意图',
+    'modal.newProject': '新建项目',
+    'modal.renameProject': '重命名项目',
+    'modal.reopenProject': '重新打开项目',
+    'modal.serverSettings': '服务器设置',
+    'placeholder.goal': '目标：希望达成什么',
+    'placeholder.hint': '提示内容',
+    'placeholder.intent': '你要探索什么？',
+    'placeholder.origin': '起点：从哪里开始',
+    'placeholder.projectTitle': '项目标题',
+    'status.active': '活跃',
+    'status.bootstrapPending': 'Bootstrap 等待中',
+    'status.bootstrapRunning': 'Bootstrap 运行中',
+    'status.completed': '已完成',
+    'status.concluded': '已总结',
+    'status.inProgress': '进行中',
+    'status.stopped': '已停止',
+    'status.unclaimed': '未认领',
+    'speed.fast': '快速',
+    'speed.normal': '正常',
+    'speed.slow': '慢速',
+    'toast.apiTestFailed': 'API 连接测试失败',
+    'toast.apiTestOk': 'API 连接测试成功',
+    'toast.copied': '已复制',
+    'toast.copyFailed': '复制失败',
+    'toast.hintAdded': '提示已添加',
+    'toast.heartbeatSent': '心跳已发送',
+    'toast.intentClaimed': '意图已认领',
+    'toast.intentConcluded': '意图已总结',
+    'toast.intentDeclared': '意图已声明',
+    'toast.intentDeclaredClaimed': '意图已声明并认领',
+    'toast.intentReleased': '意图已释放',
+    'toast.localSaved': '本地偏好已保存',
+    'toast.noTimeline': '没有可回放的时间线',
+    'toast.projectCompleted': '项目已完成',
+    'toast.projectCreated': '项目已创建',
+    'toast.projectDeleted': '已删除 {id}',
+    'toast.projectReopened': '项目已重新打开',
+    'toast.projectRenamed': '项目已重命名',
+    'toast.projectResumed': '项目已恢复',
+    'toast.projectStopped': '项目已停止',
+    'toast.serverSaved': '服务器设置已保存',
+    'timeline.conclude': '总结',
+    'timeline.complete': '完成',
+    'timeline.event': '事件',
+    'timeline.execute': '执行',
+    'timeline.hint': '提示',
+    'timeline.intent': '意图',
+    'timeline.project': '项目',
+    'timeline.reason': '推理',
+    'view.createFirst': '创建一个项目开始探索',
+    'view.noActivity': '暂无活动',
+    'view.noHints': '暂无提示',
+    'view.noProjects': '还没有项目',
+    'view.selectNode': '点击节点或边',
+    'view.shiftMulti': 'Shift+点击可多选'
+  },
+  en: {
+    'language.current': 'English',
+    'language.switch': '中文',
+    'action.add': 'Add',
+    'action.back': 'Back',
+    'action.cancel': 'Cancel',
+    'action.claim': 'Claim',
+    'action.claimed': 'Claimed',
+    'action.close': 'Close',
+    'action.complete': 'Complete',
+    'action.conclude': 'Conclude',
+    'action.copy': 'Copy',
+    'action.create': 'Create',
+    'action.declare': 'Declare',
+    'action.declareClaim': 'Declare & Claim',
+    'action.delete': 'Delete',
+    'action.exit': 'Exit',
+    'action.heartbeat': 'Heartbeat',
+    'action.pauseReplay': 'Pause replay',
+    'action.release': 'Release',
+    'action.reload': 'Reload',
+    'action.rename': 'Rename',
+    'action.replay': 'Replay',
+    'action.reopen': 'Reopen',
+    'action.restartReplay': 'Restart replay',
+    'action.resume': 'Resume',
+    'action.resumeReplay': 'Resume replay',
+    'action.save': 'Save',
+    'action.saveLocal': 'Save Local',
+    'action.saveServer': 'Save Server',
+    'action.snapshot': 'Snapshot',
+    'action.stop': 'Stop',
+    'action.stopActive': 'Stop Active',
+    'action.stopping': 'Stopping...',
+    'api.addProfile': 'Add',
+    'api.baseUrl': 'API base URL',
+    'api.companyTokenHelp': 'Use the company token format service_name|prompt_id|prompt_token; requests are sent as a Bearer token.',
+    'api.currentEnabled': 'Enabled',
+    'api.disabled': 'Disabled',
+    'api.editProfile': 'Edit Current API',
+    'api.empty': 'No editable API profile found. Click Add to create one.',
+    'api.enableThis': 'Enable this',
+    'api.enabled': 'Enabled',
+    'api.enabledHelp': 'Only enabled profiles are scheduled and startup-healthchecked; disabled profiles can be left incomplete.',
+    'api.key': 'API key',
+    'api.mode': 'API mode',
+    'api.model': 'Model',
+    'api.noConfig': 'No dispatcher config file found',
+    'api.profileName': 'Profile name',
+    'api.singleFormHelp': 'Fill one API profile at a time. Add more profiles, then choose which one is enabled.',
+    'api.testConnection': 'Test connection',
+    'api.testFailed': 'Connection failed',
+    'api.testing': 'Testing...',
+    'api.testOk': 'Connection succeeded',
+    'api.title': 'Worker API Profiles',
+    'api.unnamedProfile': 'Unnamed profile',
+    'api.workerType': 'Worker type',
+    'common.actor': 'Actor',
+    'common.completed': 'Completed',
+    'common.created': 'Created',
+    'common.creator': 'Creator',
+    'common.detail': 'Detail',
+    'common.fact': 'Fact',
+    'common.from': 'From',
+    'common.goal': 'Goal',
+    'common.heartbeat': 'Heartbeat',
+    'common.hint': 'Hint',
+    'common.hints': 'Hints',
+    'common.intent': 'Intent',
+    'common.log': 'Log',
+    'common.origin': 'Origin',
+    'common.producedBy': 'Produced By',
+    'common.project': 'Project',
+    'common.role': 'Role',
+    'common.sequence': 'Sequence',
+    'common.timeSpan': 'Time Span',
+    'common.to': 'To',
+    'common.worker': 'Worker',
+    'header.active': 'Active',
+    'header.all': 'All',
+    'header.completed': 'Completed',
+    'header.facts': '{count} facts',
+    'header.intents': '{count} intents',
+    'header.stopped': 'Stopped',
+    'layout.default': 'Default layout',
+    'local.preferences': 'Local Preferences',
+    'local.storedOnly': 'Stored only in this browser.',
+    'modal.addHint': 'Add Hint',
+    'modal.completeProject': 'Complete Project',
+    'modal.concludeIntent': 'Conclude Intent',
+    'modal.newIntent': 'New Intent',
+    'modal.newProject': 'New Project',
+    'modal.renameProject': 'Rename Project',
+    'modal.reopenProject': 'Reopen Project',
+    'modal.serverSettings': 'Server Settings',
+    'placeholder.goal': 'Goal - what to achieve',
+    'placeholder.hint': 'Hint content',
+    'placeholder.intent': 'What will you explore?',
+    'placeholder.origin': 'Origin - starting point',
+    'placeholder.projectTitle': 'Project title',
+    'status.active': 'Active',
+    'status.bootstrapPending': 'Bootstrap Pending',
+    'status.bootstrapRunning': 'Bootstrap Running',
+    'status.completed': 'Completed',
+    'status.concluded': 'Concluded',
+    'status.inProgress': 'In Progress',
+    'status.stopped': 'Stopped',
+    'status.unclaimed': 'Unclaimed',
+    'speed.fast': 'Fast',
+    'speed.normal': 'Normal',
+    'speed.slow': 'Slow',
+    'toast.apiTestFailed': 'API connection test failed',
+    'toast.apiTestOk': 'API connection test succeeded',
+    'toast.copied': 'Copied',
+    'toast.copyFailed': 'Copy failed',
+    'toast.hintAdded': 'Hint added',
+    'toast.heartbeatSent': 'Heartbeat sent',
+    'toast.intentClaimed': 'Intent claimed',
+    'toast.intentConcluded': 'Intent concluded',
+    'toast.intentDeclared': 'Intent declared',
+    'toast.intentDeclaredClaimed': 'Intent declared and claimed',
+    'toast.intentReleased': 'Intent released',
+    'toast.localSaved': 'Local preferences saved',
+    'toast.noTimeline': 'No timeline to replay',
+    'toast.projectCompleted': 'Project completed',
+    'toast.projectCreated': 'Project created',
+    'toast.projectDeleted': 'Deleted {id}',
+    'toast.projectReopened': 'Project reopened',
+    'toast.projectRenamed': 'Project renamed',
+    'toast.projectResumed': 'Project resumed',
+    'toast.projectStopped': 'Project stopped',
+    'toast.serverSaved': 'Server settings saved',
+    'timeline.conclude': 'Conclude',
+    'timeline.complete': 'Complete',
+    'timeline.event': 'Event',
+    'timeline.execute': 'Execute',
+    'timeline.hint': 'Hint',
+    'timeline.intent': 'Intent',
+    'timeline.project': 'Project',
+    'timeline.reason': 'Reason',
+    'view.createFirst': 'Create a project to start exploring',
+    'view.noActivity': 'No activity yet',
+    'view.noHints': 'No hints yet',
+    'view.noProjects': 'No projects yet',
+    'view.selectNode': 'Click a node or edge',
+    'view.shiftMulti': 'Shift+click for multi-select'
+  }
+};
+
 function cairnApp() {
   return {
+    language: 'zh',
     view: 'list',
     projects: [],
     project: null,
@@ -1178,6 +1541,8 @@ function cairnApp() {
     settingsForm: { intent_timeout: 5, reason_timeout: 5 },
     dispatcherConfigPath: '',
     dispatcherConfigForm: { workers: [] },
+    selectedWorkerIndex: 0,
+    isTestingWorker: false,
     deleteConfirm: { id: '', title: '' },
     isDeletingProject: false,
     yamlPreviewTitle: '',
@@ -1206,6 +1571,7 @@ function cairnApp() {
       this._panelResizeStop = () => this.stopPanelResize();
       window.addEventListener('pointermove', this._panelResizeMove);
       window.addEventListener('pointerup', this._panelResizeStop);
+      this.loadLanguage();
       this.loadLocalPrefs();
       await this.loadProjects();
       await this.loadSettings();
@@ -1257,8 +1623,52 @@ function cairnApp() {
       return text;
     },
 
+    t(key, params = {}) {
+      const dict = CAIRN_I18N[this.language] || CAIRN_I18N.zh;
+      const fallback = CAIRN_I18N.en || {};
+      const template = dict[key] || fallback[key] || key;
+      return String(template).replace(/\{(\w+)\}/g, (_, name) => params[name] ?? '');
+    },
+
+    hasTranslation(key) {
+      return Boolean(CAIRN_I18N[this.language]?.[key] || CAIRN_I18N.en?.[key]);
+    },
+
+    translatedMessage(message, params = {}) {
+      if (typeof message === 'string' && this.hasTranslation(message)) return this.t(message, params);
+      return message;
+    },
+
+    loadLanguage() {
+      try {
+        const saved = localStorage.getItem('cairn.language');
+        this.language = saved === 'en' || saved === 'zh' ? saved : 'zh';
+      } catch (e) {
+        this.language = 'zh';
+      }
+      document.documentElement.lang = this.language;
+    },
+
+    setLanguage(language) {
+      this.language = language === 'en' ? 'en' : 'zh';
+      document.documentElement.lang = this.language;
+      try {
+        localStorage.setItem('cairn.language', this.language);
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    toggleLanguage() {
+      this.setLanguage(this.language === 'zh' ? 'en' : 'zh');
+    },
+
+    languageSwitchLabel() {
+      return this.t('language.switch');
+    },
+
     showToast(msg, type = 'info') {
-      this.toast = { show: true, message: msg, type };
+      this.toast = { show: true, message: this.translatedMessage(msg), type };
       setTimeout(() => this.toast.show = false, 3000);
     },
 
@@ -1340,15 +1750,24 @@ function cairnApp() {
       return classes[status] || 'bg-slate-100 text-slate-500';
     },
 
+    projectStatusLabel(status) {
+      const labels = {
+        active: this.t('status.active'),
+        stopped: this.t('status.stopped'),
+        completed: this.t('status.completed'),
+      };
+      return labels[status] || status;
+    },
+
     reasonBadgeText(reason, compact = false) {
       if (!reason) return '';
-      if (compact) return `Reason · ${reason.worker}`;
-      const trigger = reason.trigger ? ` (${reason.trigger})` : '';
-      return `Reasoning · ${reason.worker}${trigger}`;
+      if (compact) return `${this.t('timeline.reason')} - ${reason.worker}`;
+      const translatedTriggerText = reason.trigger ? ` (${reason.trigger})` : '';
+      return `${this.t('timeline.reason')} - ${reason.worker}${translatedTriggerText}`;
     },
 
     workingIntentBadgeText(count) {
-      return `Exploring · ${count}`;
+      return `${this.t('timeline.execute')} - ${count}`;
     },
 
     isBootstrapIntent(intent) {
@@ -1478,9 +1897,9 @@ function cairnApp() {
       if (!this.yamlPreviewText) return;
       try {
         await this.copyText(this.yamlPreviewText);
-        this.showToast('Copied');
+        this.showToast('toast.copied');
       } catch {
-        this.showToast('Copy failed', 'error');
+        this.showToast('toast.copyFailed', 'error');
       }
     },
 
@@ -1636,7 +2055,7 @@ function cairnApp() {
         } else {
           await this.loadProjects();
         }
-        this.showToast(`Deleted ${projectId}`);
+        this.showToast(this.t('toast.projectDeleted', { id: projectId }));
       } catch (e) {
         this.showToast(e.message, 'error');
       } finally {
@@ -1657,15 +2076,156 @@ function cairnApp() {
       try {
         const config = await this.api('GET', '/dispatcher-config');
         this.dispatcherConfigPath = config.config_path || '';
-        this.dispatcherConfigForm.workers = Array.isArray(config.workers) ? config.workers : [];
+        this.dispatcherConfigForm.workers = Array.isArray(config.workers)
+          ? config.workers.map(worker => this.normalizeWorkerProfile(worker))
+          : [];
+        const enabledIndex = this.dispatcherConfigForm.workers.findIndex(worker => worker.enabled);
+        this.selectedWorkerIndex = enabledIndex >= 0 ? enabledIndex : 0;
       } catch (e) {
         this.dispatcherConfigPath = '';
         this.dispatcherConfigForm.workers = [];
+        this.selectedWorkerIndex = 0;
         console.error(e);
       }
     },
 
+    normalizeWorkerProfile(worker = {}) {
+      const type = this.workerTypeOptions().includes(worker.type) ? worker.type : 'codex';
+      const apiModeOptions = this.workerApiModeOptionsForType(type);
+      const apiMode = worker.api_mode || this.defaultApiMode(type);
+      return {
+        name: worker.name || this.nextWorkerProfileName(type),
+        type,
+        enabled: worker.enabled !== false,
+        model: worker.model || '',
+        base_url: worker.base_url || '',
+        api_key: worker.api_key || '',
+        api_mode: apiModeOptions.includes(apiMode) ? apiMode : this.defaultApiMode(type),
+        api_mode_options: apiModeOptions,
+        _test: null,
+      };
+    },
+
+    workerTypeOptions() {
+      return ['codex', 'claudecode', 'pi'];
+    },
+
+    formatWorkerType(type) {
+      const labels = {
+        codex: 'Codex',
+        claudecode: 'Claude Code',
+        pi: 'Pi',
+      };
+      return labels[type] || type;
+    },
+
+    selectedWorker() {
+      return this.dispatcherConfigForm.workers[this.selectedWorkerIndex] || null;
+    },
+
+    selectWorkerProfile(index) {
+      if (index < 0 || index >= this.dispatcherConfigForm.workers.length) return;
+      this.selectedWorkerIndex = index;
+    },
+
+    nextWorkerProfileName(type = 'codex') {
+      const prefix = `${type}_api`;
+      const existing = new Set(this.dispatcherConfigForm.workers.map(worker => worker.name));
+      let index = 1;
+      let name = `${prefix}_${index}`;
+      while (existing.has(name)) {
+        index += 1;
+        name = `${prefix}_${index}`;
+      }
+      return name;
+    },
+
+    addWorkerProfile() {
+      const worker = this.normalizeWorkerProfile({
+        name: this.nextWorkerProfileName('codex'),
+        type: 'codex',
+        enabled: true,
+      });
+      this.dispatcherConfigForm.workers.push(worker);
+      this.selectedWorkerIndex = this.dispatcherConfigForm.workers.length - 1;
+      this.setActiveWorkerProfile(this.selectedWorkerIndex);
+    },
+
+    setActiveWorkerProfile(index) {
+      if (index < 0 || index >= this.dispatcherConfigForm.workers.length) return;
+      this.dispatcherConfigForm.workers.forEach((worker, workerIndex) => {
+        worker.enabled = workerIndex === index;
+      });
+      this.selectedWorkerIndex = index;
+    },
+
+    removeSelectedWorkerProfile() {
+      const worker = this.selectedWorker();
+      if (!worker) return;
+      const wasEnabled = worker.enabled;
+      this.dispatcherConfigForm.workers.splice(this.selectedWorkerIndex, 1);
+      this.selectedWorkerIndex = Math.min(this.selectedWorkerIndex, Math.max(0, this.dispatcherConfigForm.workers.length - 1));
+      if (wasEnabled && this.dispatcherConfigForm.workers.length > 0) {
+        this.setActiveWorkerProfile(this.selectedWorkerIndex);
+      }
+    },
+
+    onWorkerTypeChange(worker) {
+      if (!worker) return;
+      worker.api_mode_options = this.workerApiModeOptionsForType(worker.type);
+      worker.api_mode = this.defaultApiMode(worker.type);
+      worker._test = null;
+    },
+
+    workerApiModeOptionsForType(type) {
+      if (type === 'codex') {
+        return ['responses', 'chat_completions', 'qizhi_openai', 'iq_openai', 'openai_compatible', 'dashscope_compatible'];
+      }
+      if (type === 'pi') {
+        return ['openai-completions', 'openai-chat-completions', 'qizhi_openai', 'iq_openai', 'dashscope_compatible'];
+      }
+      return [];
+    },
+
+    workerApiModeOptions(worker) {
+      if (!worker) return [];
+      return worker.api_mode_options?.length ? worker.api_mode_options : this.workerApiModeOptionsForType(worker.type);
+    },
+
+    defaultApiMode(type) {
+      if (type === 'pi') return 'openai-completions';
+      if (type === 'codex') return 'responses';
+      return '';
+    },
+
+    async testSelectedWorkerApi() {
+      const worker = this.selectedWorker();
+      if (!worker || this.isTestingWorker) return;
+      worker._test = { ok: false, detail: this.t('api.testing'), response_preview: '' };
+      this.isTestingWorker = true;
+      try {
+        const result = await this.api('POST', '/dispatcher-config/test', {
+          name: worker.name,
+          type: worker.type,
+          enabled: true,
+          model: worker.model,
+          base_url: worker.base_url,
+          api_key: worker.api_key,
+          api_mode: worker.api_mode,
+        });
+        worker._test = result;
+        this.showToast(result.ok ? 'toast.apiTestOk' : 'toast.apiTestFailed', result.ok ? 'info' : 'error');
+      } catch (e) {
+        worker._test = { ok: false, detail: e.message, response_preview: '' };
+        this.showToast(e.message, 'error');
+      } finally {
+        this.isTestingWorker = false;
+      }
+    },
+
     formatWorkerApiMode(mode) {
+      if (mode === 'qizhi_openai') return 'Qizhi OpenAI Compatible';
+      if (mode === 'iq_openai') return 'IQIYI OpenAI Compatible';
       const labels = {
         responses: 'OpenAI Responses',
         chat_completions: 'OpenAI Chat Completions',
@@ -1688,18 +2248,26 @@ function cairnApp() {
     workerApiModeHelp(worker) {
       const mode = String(worker?.api_mode || '').trim();
       if (mode === 'qizhi_openai' || mode === 'iq_openai') {
-        return 'Uses the company OpenAI-compatible gateway. Base URL usually ends with /v1 and requests go to /v1/chat/completions.';
+        return this.language === 'zh'
+          ? '使用公司 OpenAI 兼容网关。Base URL 通常以 /v1 结尾，请求会发送到 /v1/chat/completions。'
+          : 'Uses the company OpenAI-compatible gateway. Base URL usually ends with /v1 and requests go to /v1/chat/completions.';
       }
       if (mode === 'chat_completions' || mode === 'openai-chat-completions' || mode === 'openai_compatible' || mode === 'dashscope_compatible') {
-        return 'Compatible with OpenAI Chat Completions style APIs.';
+        return this.language === 'zh'
+          ? '兼容 OpenAI Chat Completions 风格的接口。'
+          : 'Compatible with OpenAI Chat Completions style APIs.';
       }
       if (mode === 'responses') {
-        return 'Uses the OpenAI Responses API.';
+        return this.language === 'zh' ? '使用 OpenAI Responses API。' : 'Uses the OpenAI Responses API.';
       }
       if (mode === 'openai-completions') {
-        return 'Uses the provider/completions style API expected by the pi worker.';
+        return this.language === 'zh'
+          ? '使用 Pi worker 期望的 provider/completions 风格接口。'
+          : 'Uses the provider/completions style API expected by the pi worker.';
       }
-      return mode ? 'Custom API mode. Make sure the worker adapter understands this value.' : '';
+      return mode
+        ? (this.language === 'zh' ? '自定义 API 模式，请确认 worker 适配器支持该值。' : 'Custom API mode. Make sure the worker adapter understands this value.')
+        : '';
     },
 
     workerBaseUrlPlaceholder(worker) {
@@ -1759,7 +2327,7 @@ function cairnApp() {
         }
       }
       if (reload) await this.loadProjects();
-      if (toast) this.showToast(status === 'stopped' ? 'Project stopped' : 'Project resumed');
+      if (toast) this.showToast(status === 'stopped' ? 'toast.projectStopped' : 'toast.projectResumed');
       return updated;
     },
 
@@ -1819,7 +2387,7 @@ function cairnApp() {
         this.showRenameModal = false;
         this.renameForm = { projectId: '', originalTitle: '', title: '' };
         await this.loadProjects();
-        this.showToast('Project renamed');
+        this.showToast('toast.projectRenamed');
       } catch (e) {
         this.showToast(e.message, 'error');
       }
@@ -2079,7 +2647,7 @@ function cairnApp() {
         }));
         const frames = this.buildReplayFrames(sourceProject, baseEvents);
         if (frames.length === 0) {
-          this.showToast('No timeline to replay', 'error');
+          this.showToast('toast.noTimeline', 'error');
           return;
         }
 
@@ -2190,7 +2758,7 @@ function cairnApp() {
           await this.loadProject(projectId);
           this.updateGraph();
         }
-        this.showToast('Project reopened');
+        this.showToast('toast.projectReopened');
       } catch (e) {
         this.showToast(e.message, 'error');
       }
@@ -2990,9 +3558,9 @@ function cairnApp() {
 
     selectedIntentPrimaryActionLabel() {
       const intent = this.selectedOpenIntentRecord();
-      if (!intent) return 'Claim';
-      if (!intent.worker) return 'Claim';
-      return intent.worker === this.actorName() ? 'Heartbeat' : 'Claimed';
+      if (!intent) return this.t('action.claim');
+      if (!intent.worker) return this.t('action.claim');
+      return intent.worker === this.actorName() ? this.t('action.heartbeat') : this.t('action.claimed');
     },
 
     getFactRecord(fid) {
@@ -3010,9 +3578,9 @@ function cairnApp() {
       return i.worker ? 'text-amber-600' : 'text-slate-400';
     },
     intentStatusLabel(i) {
-      if (i.to) return 'Concluded';
-      if (this.isBootstrapIntent(i)) return i.worker ? 'Bootstrap Running' : 'Bootstrap Pending';
-      return i.worker ? 'In Progress' : 'Unclaimed';
+      if (i.to) return this.t('status.concluded');
+      if (this.isBootstrapIntent(i)) return i.worker ? this.t('status.bootstrapRunning') : this.t('status.bootstrapPending');
+      return i.worker ? this.t('status.inProgress') : this.t('status.unclaimed');
     },
 
     timelineEvents() {
@@ -3192,15 +3760,15 @@ function cairnApp() {
 
     timelineEventBadge(entry) {
       const labels = {
-        project_created: 'Project',
-        hint_added: 'Hint',
-        reason_started: 'Reason',
-        intent_declared: 'Intent',
-        intent_running: 'Execute',
-        intent_concluded: 'Conclude',
-        project_completed: 'Complete',
+        project_created: this.t('timeline.project'),
+        hint_added: this.t('timeline.hint'),
+        reason_started: this.t('timeline.reason'),
+        intent_declared: this.t('timeline.intent'),
+        intent_running: this.t('timeline.execute'),
+        intent_concluded: this.t('timeline.conclude'),
+        project_completed: this.t('timeline.complete'),
       };
-      return labels[entry.type] || 'Event';
+      return labels[entry.type] || this.t('timeline.event');
     },
 
     timelineEventBadgeClass(entry) {
@@ -3305,9 +3873,9 @@ function cairnApp() {
 
       return {
         sequencePercent,
-        sequenceLabel: `${index + 1} / ${total} · ${sequencePercent}%`,
+        sequenceLabel: `${index + 1} / ${total} - ${sequencePercent}%`,
         timePercent,
-        timeLabel: `${this.formatDurationMs(elapsedDuration)} / ${this.formatDurationMs(totalDuration)} · ${timePercent}%`,
+        timeLabel: `${this.formatDurationMs(elapsedDuration)} / ${this.formatDurationMs(totalDuration)} - ${timePercent}%`,
       };
     },
 
@@ -3407,7 +3975,7 @@ function cairnApp() {
         this.newProject = { title:'', origin:'', goal:'', bootstrap: true, hints: [{ content:'' }] };
         await this.loadProjects();
         await this.openProject(data.project.id);
-        this.showToast('Project created');
+        this.showToast('toast.projectCreated');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 
@@ -3429,7 +3997,7 @@ function cairnApp() {
         this.showIntentModal = false;
         await this.loadProject(this.selectedProjectId);
         this.updateGraph();
-        this.showToast(claim ? 'Intent declared and claimed' : 'Intent declared');
+        this.showToast(claim ? 'toast.intentDeclaredClaimed' : 'toast.intentDeclared');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 
@@ -3442,7 +4010,7 @@ function cairnApp() {
         await this.api('POST', `/projects/${this.selectedProjectId}/intents/${intent.id}/heartbeat`, { worker: actor });
         await this.loadProject(this.selectedProjectId);
         this.updateGraph();
-        this.showToast(claiming ? 'Intent claimed' : 'Heartbeat sent');
+        this.showToast(claiming ? 'toast.intentClaimed' : 'toast.heartbeatSent');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 
@@ -3454,7 +4022,7 @@ function cairnApp() {
         await this.api('POST', `/projects/${this.selectedProjectId}/intents/${intent.id}/release`, { worker: actor });
         await this.loadProject(this.selectedProjectId);
         this.updateGraph();
-        this.showToast('Intent released');
+        this.showToast('toast.intentReleased');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 
@@ -3468,7 +4036,7 @@ function cairnApp() {
         this.selectedNode = null;
         await this.loadProject(this.selectedProjectId);
         this.updateGraph();
-        this.showToast('Intent concluded');
+        this.showToast('toast.intentConcluded');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 
@@ -3492,7 +4060,7 @@ function cairnApp() {
         await this.loadProjects();
         await this.loadProject(this.selectedProjectId);
         this.updateGraph();
-        this.showToast('Project completed');
+        this.showToast('toast.projectCompleted');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 
@@ -3506,7 +4074,7 @@ function cairnApp() {
         await this.loadProjects();
         await this.loadProject(this.selectedProjectId);
         this.sideTab = 'hints';
-        this.showToast('Hint added');
+        this.showToast('toast.hintAdded');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 
@@ -3518,7 +4086,7 @@ function cairnApp() {
         this.saveLocalPrefs();
         if (this.cy) this.cy.layout(this.layoutOpts()).run();
         this.showLocalPrefs = false;
-        this.showToast('Local preferences saved');
+        this.showToast('toast.localSaved');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 
@@ -3529,6 +4097,8 @@ function cairnApp() {
           await this.api('PUT', '/dispatcher-config', {
             workers: this.dispatcherConfigForm.workers.map(worker => ({
               name: worker.name,
+              type: worker.type,
+              enabled: worker.enabled,
               model: worker.model,
               base_url: worker.base_url,
               api_key: worker.api_key,
@@ -3539,7 +4109,7 @@ function cairnApp() {
         }
         this.showSettings = false;
         this.showWorkerConfig = false;
-        this.showToast('Server settings saved');
+        this.showToast('toast.serverSaved');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
   };

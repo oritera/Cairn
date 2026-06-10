@@ -2,8 +2,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from cairn.server.dispatcher_config import build_dispatcher_config_response, update_dispatcher_config
-from cairn.server.models import DispatcherConfigResponse, UpdateDispatcherConfigRequest
+from cairn.server.dispatcher_config import (
+    build_dispatcher_config_response,
+    test_dispatcher_api_connection,
+    update_dispatcher_config,
+)
+from cairn.server.models import (
+    DispatcherConfigResponse,
+    DispatcherConnectionTestRequest,
+    DispatcherConnectionTestResponse,
+    UpdateDispatcherConfigRequest,
+)
 
 router = APIRouter(tags=["dispatcher-config"])
 
@@ -18,3 +27,8 @@ def get_dispatcher_config():
 def save_dispatcher_config(body: UpdateDispatcherConfigRequest):
     path, workers = update_dispatcher_config(body.workers)
     return DispatcherConfigResponse(config_path=str(path), workers=workers)
+
+
+@router.post("/dispatcher-config/test", response_model=DispatcherConnectionTestResponse)
+def test_dispatcher_config(body: DispatcherConnectionTestRequest):
+    return test_dispatcher_api_connection(body)

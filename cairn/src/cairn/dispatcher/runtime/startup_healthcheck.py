@@ -32,7 +32,7 @@ def run_startup_healthchecks(
     show_commands: bool = False,
 ) -> list[StartupHealthcheckResult]:
     container_name = container_manager.create_startup_container()
-    workers = list(config.workers)
+    workers = list(config.enabled_workers)
     parallelism = max(1, min(len(workers), config.runtime.max_workers, 8))
     LOG.info(
         "[*] Startup healthcheck: workers=%s parallelism=%s",

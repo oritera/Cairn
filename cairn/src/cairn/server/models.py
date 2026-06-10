@@ -247,6 +247,7 @@ class ReopenResponse(BaseModel):
 class DispatcherWorkerConfig(BaseModel):
     name: str
     type: str
+    enabled: bool = True
     model: str | None = None
     base_url: str | None = None
     api_key: str | None = None
@@ -261,11 +262,40 @@ class DispatcherConfigResponse(BaseModel):
 
 class UpdateDispatcherWorkerConfigRequest(BaseModel):
     name: str
+    type: str | None = None
+    enabled: bool = True
     model: str | None = None
     base_url: str | None = None
     api_key: str | None = None
     api_mode: str | None = None
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("must not be empty")
+        return text
+
+    @field_validator("type", "model", "base_url", "api_key", "api_mode")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = value.strip()
+        return text or None
+
 
 class UpdateDispatcherConfigRequest(BaseModel):
     workers: list[UpdateDispatcherWorkerConfigRequest]
+
+
+class DispatcherConnectionTestRequest(UpdateDispatcherWorkerConfigRequest):
+    timeout: int = Field(default=20, ge=1, le=60)
+
+
+class DispatcherConnectionTestResponse(BaseModel):
+    ok: bool
+    http_status: int | None = None
+    detail: str
+    response_preview: str = ""
