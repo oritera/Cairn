@@ -101,10 +101,37 @@ def create_project(body: CreateProjectRequest):
             for h in body.hints:
                 hid = next_hint_id(conn, pid)
                 conn.execute(
-                    "INSERT INTO hints (id, project_id, content, creator, created_at) VALUES (?, ?, ?, ?, ?)",
-                    (hid, pid, h.content, h.creator, now),
+                    """
+                    INSERT INTO hints
+                        (id, project_id, content, creator, hint_type, priority, target_type, target_id, pinned, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        hid,
+                        pid,
+                        h.content,
+                        h.creator,
+                        h.hint_type,
+                        h.priority,
+                        h.target_type,
+                        h.target_id,
+                        int(h.pinned),
+                        now,
+                    ),
                 )
-                hints.append(Hint(id=hid, content=h.content, creator=h.creator, created_at=now))
+                hints.append(
+                    Hint(
+                        id=hid,
+                        content=h.content,
+                        creator=h.creator,
+                        hint_type=h.hint_type,
+                        priority=h.priority,
+                        target_type=h.target_type,
+                        target_id=h.target_id,
+                        pinned=h.pinned,
+                        created_at=now,
+                    )
+                )
 
         return ProjectDetail(
             project=ProjectMeta(
@@ -135,7 +162,7 @@ def get_project(project_id: str):
             "SELECT * FROM facts WHERE project_id = ?", (project_id,)
         ).fetchall()
         hints = conn.execute(
-            "SELECT * FROM hints WHERE project_id = ? ORDER BY created_at",
+            "SELECT * FROM hints WHERE project_id = ? ORDER BY pinned DESC, created_at",
             (project_id,),
         ).fetchall()
 

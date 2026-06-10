@@ -305,6 +305,19 @@ class DispatcherLoop:
                 selection.blocked_unhealthy,
                 selection.blocked_rejected,
             )
+            self._record_event(
+                project.project.id,
+                "worker_unavailable",
+                "No worker available for reason",
+                severity="warning",
+                task_type="reason",
+                details={
+                    "blocked_busy": selection.blocked_busy,
+                    "blocked_unhealthy": selection.blocked_unhealthy,
+                    "blocked_rejected": selection.blocked_rejected,
+                    "blocked_task_type": selection.blocked_task_type,
+                },
+            )
             return False
         self._clear_log_state(f"project:{project.project.id}:worker:reason")
         claim = self.client.claim_reason(project.project.id, worker.name, trigger)
@@ -317,6 +330,15 @@ class DispatcherLoop:
                 worker.name,
                 claim.status_code,
             )
+            self._record_event(
+                project.project.id,
+                "claim_failed",
+                "Reason claim failed",
+                severity="warning",
+                task_type="reason",
+                worker=worker.name,
+                details={"status_code": claim.status_code},
+            )
             return False
         if not claim.ok:
             LOG.warning(
@@ -324,6 +346,15 @@ class DispatcherLoop:
                 project.project.id,
                 worker.name,
                 claim.status_code,
+            )
+            self._record_event(
+                project.project.id,
+                "claim_failed",
+                "Reason claim failed",
+                severity="warning",
+                task_type="reason",
+                worker=worker.name,
+                details={"status_code": claim.status_code, "body": claim.text},
             )
             return False
         try:
@@ -340,6 +371,14 @@ class DispatcherLoop:
         except Exception:
             LOG.exception("failed to submit reason task project=%s worker=%s", project.project.id, worker.name)
             self._best_effort_release_reason(project.project.id, worker.name)
+            self._record_event(
+                project.project.id,
+                "task_submit_failed",
+                "Failed to submit reason task",
+                severity="error",
+                task_type="reason",
+                worker=worker.name,
+            )
             return False
         self.futures[future] = RunningTask(
             project.project.id,
@@ -350,10 +389,19 @@ class DispatcherLoop:
             fact_count=len(project.facts),
             hint_count=len(project.hints),
             open_intent_count=self._project_open_intent_count(project),
+            started_at=time.time(),
         )
         self.runtime_project_ids.add(project.project.id)
         self._clear_project_log_state(project.project.id)
         LOG.info("dispatched reason project=%s worker=%s trigger=%s", project.project.id, worker.name, trigger)
+        self._record_event(
+            project.project.id,
+            "task_dispatched",
+            "Dispatched reason task",
+            task_type="reason",
+            worker=worker.name,
+            details={"trigger": trigger},
+        )
         return True
 
     def _dispatch_bootstrap(self, project: ProjectDetail, intent: Intent) -> bool:
@@ -370,6 +418,20 @@ class DispatcherLoop:
                 selection.blocked_unhealthy,
                 selection.blocked_rejected,
             )
+            self._record_event(
+                project.project.id,
+                "worker_unavailable",
+                "No worker available for bootstrap",
+                severity="warning",
+                task_type="bootstrap",
+                intent_id=intent.id,
+                details={
+                    "blocked_busy": selection.blocked_busy,
+                    "blocked_unhealthy": selection.blocked_unhealthy,
+                    "blocked_rejected": selection.blocked_rejected,
+                    "blocked_task_type": selection.blocked_task_type,
+                },
+            )
             return False
         self._clear_log_state(f"project:{project.project.id}:worker:bootstrap")
         claim = self.client.heartbeat(project.project.id, intent.id, worker.name)
@@ -383,6 +445,16 @@ class DispatcherLoop:
                 worker.name,
                 claim.status_code,
             )
+            self._record_event(
+                project.project.id,
+                "claim_failed",
+                "Bootstrap claim failed",
+                severity="warning",
+                task_type="bootstrap",
+                worker=worker.name,
+                intent_id=intent.id,
+                details={"status_code": claim.status_code},
+            )
             return False
         if not claim.ok:
             LOG.warning(
@@ -391,6 +463,16 @@ class DispatcherLoop:
                 intent.id,
                 worker.name,
                 claim.status_code,
+            )
+            self._record_event(
+                project.project.id,
+                "claim_failed",
+                "Bootstrap claim failed",
+                severity="warning",
+                task_type="bootstrap",
+                worker=worker.name,
+                intent_id=intent.id,
+                details={"status_code": claim.status_code, "body": claim.text},
             )
             return False
         try:
@@ -407,11 +489,28 @@ class DispatcherLoop:
         except Exception:
             LOG.exception("failed to submit bootstrap task project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
             self._best_effort_release(project.project.id, intent.id, worker.name)
+            self._record_event(
+                project.project.id,
+                "task_submit_failed",
+                "Failed to submit bootstrap task",
+                severity="error",
+                task_type="bootstrap",
+                worker=worker.name,
+                intent_id=intent.id,
+            )
             return False
-        self.futures[future] = RunningTask(project.project.id, "bootstrap", worker.name, cancellation, intent_id=intent.id)
+        self.futures[future] = RunningTask(project.project.id, "bootstrap", worker.name, cancellation, intent_id=intent.id, started_at=time.time())
         self.runtime_project_ids.add(project.project.id)
         self._clear_project_log_state(project.project.id)
         LOG.info("dispatched bootstrap project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
+        self._record_event(
+            project.project.id,
+            "task_dispatched",
+            "Dispatched bootstrap task",
+            task_type="bootstrap",
+            worker=worker.name,
+            intent_id=intent.id,
+        )
         return True
 
     def _dispatch_explore(self, project: ProjectDetail, export_yaml: str, intent: Intent) -> bool:
@@ -428,6 +527,20 @@ class DispatcherLoop:
                 selection.blocked_unhealthy,
                 selection.blocked_rejected,
             )
+            self._record_event(
+                project.project.id,
+                "worker_unavailable",
+                "No worker available for explore",
+                severity="warning",
+                task_type="explore",
+                intent_id=intent.id,
+                details={
+                    "blocked_busy": selection.blocked_busy,
+                    "blocked_unhealthy": selection.blocked_unhealthy,
+                    "blocked_rejected": selection.blocked_rejected,
+                    "blocked_task_type": selection.blocked_task_type,
+                },
+            )
             return False
         self._clear_log_state(f"project:{project.project.id}:worker:explore")
         claim = self.client.heartbeat(project.project.id, intent.id, worker.name)
@@ -441,6 +554,16 @@ class DispatcherLoop:
                 worker.name,
                 claim.status_code,
             )
+            self._record_event(
+                project.project.id,
+                "claim_failed",
+                "Explore claim failed",
+                severity="warning",
+                task_type="explore",
+                worker=worker.name,
+                intent_id=intent.id,
+                details={"status_code": claim.status_code},
+            )
             return False
         if not claim.ok:
             LOG.warning(
@@ -449,6 +572,16 @@ class DispatcherLoop:
                 intent.id,
                 worker.name,
                 claim.status_code,
+            )
+            self._record_event(
+                project.project.id,
+                "claim_failed",
+                "Explore claim failed",
+                severity="warning",
+                task_type="explore",
+                worker=worker.name,
+                intent_id=intent.id,
+                details={"status_code": claim.status_code, "body": claim.text},
             )
             return False
         try:
@@ -466,11 +599,28 @@ class DispatcherLoop:
         except Exception:
             LOG.exception("failed to submit explore task project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
             self._best_effort_release(project.project.id, intent.id, worker.name)
+            self._record_event(
+                project.project.id,
+                "task_submit_failed",
+                "Failed to submit explore task",
+                severity="error",
+                task_type="explore",
+                worker=worker.name,
+                intent_id=intent.id,
+            )
             return False
-        self.futures[future] = RunningTask(project.project.id, "explore", worker.name, cancellation, intent_id=intent.id)
+        self.futures[future] = RunningTask(project.project.id, "explore", worker.name, cancellation, intent_id=intent.id, started_at=time.time())
         self.runtime_project_ids.add(project.project.id)
         self._clear_project_log_state(project.project.id)
         LOG.info("dispatched explore project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
+        self._record_event(
+            project.project.id,
+            "task_dispatched",
+            "Dispatched explore task",
+            task_type="explore",
+            worker=worker.name,
+            intent_id=intent.id,
+        )
         return True
 
     def _select_worker(self, project_id: str, task_type: str) -> WorkerSelection:
@@ -652,6 +802,9 @@ class DispatcherLoop:
             task = self.futures.pop(future)
             try:
                 outcome = future.result()
+                duration_ms = None
+                if task.started_at is not None:
+                    duration_ms = round((time.time() - task.started_at) * 1000)
                 if outcome == "cancelled":
                     LOG.info(
                         "task cancelled project=%s task=%s worker=%s",
@@ -667,6 +820,16 @@ class DispatcherLoop:
                         task.worker_name,
                         outcome,
                     )
+                self._record_event(
+                    task.project_id,
+                    "task_finished",
+                    f"Task finished with outcome {outcome}",
+                    severity="info" if outcome == "success" else "warning",
+                    task_type=task.task_type,
+                    worker=task.worker_name,
+                    intent_id=task.intent_id,
+                    details={"outcome": outcome, "duration_ms": duration_ms},
+                )
                 self._clear_project_log_state(task.project_id)
                 if outcome == "unhealthy":
                     retry_after_seconds = UNHEALTHY_RETRY_AFTER_SECONDS
@@ -675,6 +838,16 @@ class DispatcherLoop:
                         "worker marked unhealthy worker=%s retry_after=%.0fs",
                         task.worker_name,
                         retry_after_seconds,
+                    )
+                    self._record_event(
+                        task.project_id,
+                        "worker_marked_unhealthy",
+                        "Worker marked unhealthy",
+                        severity="warning",
+                        task_type=task.task_type,
+                        worker=task.worker_name,
+                        intent_id=task.intent_id,
+                        details={"retry_after_seconds": retry_after_seconds},
                     )
                 else:
                     self.worker_unhealthy_until.pop(task.worker_name, None)
@@ -688,6 +861,16 @@ class DispatcherLoop:
                         task.task_type,
                         task.worker_name,
                         retry_after_seconds,
+                    )
+                    self._record_event(
+                        task.project_id,
+                        "worker_marked_rejected",
+                        "Worker temporarily rejected for this task",
+                        severity="warning",
+                        task_type=task.task_type,
+                        worker=task.worker_name,
+                        intent_id=task.intent_id,
+                        details={"retry_after_seconds": retry_after_seconds},
                     )
                 else:
                     self.worker_rejected_until.pop(rejection_key, None)
@@ -709,6 +892,15 @@ class DispatcherLoop:
                     )
             except Exception:
                 LOG.exception("task crashed project=%s task=%s worker=%s", task.project_id, task.task_type, task.worker_name)
+                self._record_event(
+                    task.project_id,
+                    "task_crashed",
+                    "Task crashed while reaping future",
+                    severity="error",
+                    task_type=task.task_type,
+                    worker=task.worker_name,
+                    intent_id=task.intent_id,
+                )
 
     def _cleanup_completed_containers(self, summaries: list[ProjectSummary]) -> None:
         for summary in summaries:
@@ -783,6 +975,16 @@ class DispatcherLoop:
                     task.worker_name,
                     status,
                 )
+                self._record_event(
+                    task.project_id,
+                    "task_cancel_requested",
+                    "Cancellation requested because project is inactive",
+                    severity="warning",
+                    task_type=task.task_type,
+                    worker=task.worker_name,
+                    intent_id=task.intent_id,
+                    details={"status": status},
+                )
 
     def _initialize_reason_checkpoints(self, summaries: list[ProjectSummary]) -> None:
         for summary in summaries:
@@ -831,6 +1033,42 @@ class DispatcherLoop:
         for scope in list(self._log_state):
             if scope.startswith(prefix):
                 self._log_state.pop(scope, None)
+
+    def _record_event(
+        self,
+        project_id: str,
+        event_type: str,
+        message: str,
+        *,
+        severity: str = "info",
+        task_type: str | None = None,
+        worker: str | None = None,
+        intent_id: str | None = None,
+        details: dict[str, object] | None = None,
+    ) -> None:
+        client = getattr(self, "client", None)
+        if client is None or not hasattr(client, "record_event"):
+            return
+        try:
+            response = client.record_event(
+                project_id=project_id,
+                event_type=event_type,
+                task_type=task_type,
+                worker=worker,
+                intent_id=intent_id,
+                severity=severity,
+                message=message,
+                details=details,
+            )
+            if response is not None and not response.ok:
+                LOG.debug(
+                    "ops event write failed project=%s event=%s status=%s",
+                    project_id,
+                    event_type,
+                    response.status_code,
+                )
+        except Exception:
+            LOG.debug("ops event write failed project=%s event=%s", project_id, event_type, exc_info=True)
 
     def _validate_server_settings(self) -> None:
         settings = self.client.get_settings()

@@ -255,6 +255,18 @@
         <span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
         <span class="font-semibold text-slate-600 tabular-nums" x-text="countProjectsByStatus('completed')"></span>
       </span>
+      <span class="inline-flex items-center gap-1.5 shrink-0" title="Projects with active reason or running intents">
+        <span class="font-medium uppercase tracking-[0.12em] text-sky-500">Running</span>
+        <span class="font-semibold text-sky-700 tabular-nums" x-text="opsCount('running_count')"></span>
+      </span>
+      <span class="inline-flex items-center gap-1.5 shrink-0" title="Projects needing attention">
+        <span class="font-medium uppercase tracking-[0.12em] text-amber-500">Attention</span>
+        <span class="font-semibold text-amber-700 tabular-nums" x-text="opsCount('attention_count')"></span>
+      </span>
+      <span class="inline-flex items-center gap-1.5 shrink-0" title="Unclaimed open intents">
+        <span class="font-medium uppercase tracking-[0.12em] text-slate-400">Unclaimed</span>
+        <span class="font-semibold text-slate-600 tabular-nums" x-text="opsCount('unclaimed_intent_count')"></span>
+      </span>
       <button type="button"
         @click="stopAllActiveProjects()"
         :disabled="!hasActiveProjects() || isStoppingAllProjects"
@@ -280,6 +292,35 @@
     </div>
   </header>
 
+  <div class="shrink-0 border-b border-slate-200/60 bg-white/70 px-4 py-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <input x-model="projectSearch" type="search" placeholder="Search projects"
+        class="h-8 min-w-52 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400">
+      <select x-model="projectStatusFilter" class="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400">
+        <option value="all">All status</option>
+        <option value="active">Active</option>
+        <option value="stopped">Stopped</option>
+        <option value="completed">Completed</option>
+      </select>
+      <select x-model="projectOpsFilter" class="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400">
+        <option value="all">All ops</option>
+        <option value="running">Running</option>
+        <option value="attention">Attention</option>
+        <option value="idle">Idle</option>
+        <option value="unclaimed">Unclaimed</option>
+      </select>
+      <select x-model="projectSort" class="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400">
+        <option value="created_desc">Newest</option>
+        <option value="created_asc">Oldest</option>
+        <option value="title">Title</option>
+        <option value="activity_desc">Most active</option>
+        <option value="facts_desc">Most facts</option>
+        <option value="intents_desc">Most intents</option>
+      </select>
+      <span class="ml-auto text-[11px] text-slate-400 tabular-nums" x-text="`${filteredProjects().length} / ${projects.length}`"></span>
+    </div>
+  </div>
+
   <div x-ref="projectListScroll" @scroll.passive="rememberProjectListScroll()" class="flex-1 overflow-y-auto p-4">
     <template x-if="projects.length === 0">
       <div class="flex flex-col items-center justify-center h-full text-slate-400">
@@ -288,9 +329,15 @@
         <p class="text-sm mt-1">Create a project to start exploring</p>
       </div>
     </template>
+    <template x-if="projects.length > 0 && filteredProjects().length === 0">
+      <div class="flex flex-col items-center justify-center h-full text-slate-400">
+        <p class="text-lg font-medium text-slate-500">No matching projects</p>
+        <p class="text-sm mt-1">Adjust search or filters</p>
+      </div>
+    </template>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-      <template x-for="p in projects" :key="p.id">
+      <template x-for="p in filteredProjects()" :key="p.id">
         <div @click="openProject(p.id)"
           class="group h-full flex flex-col bg-white rounded-2xl border border-slate-200/60 p-5 cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-slate-200/50 hover:border-slate-300 hover:-translate-y-0.5">
           <div class="flex items-start justify-between mb-3">
@@ -321,6 +368,14 @@
                 <div class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700 intent-chip-running">
                   <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="8.5"/></svg>
                   <span x-text="workingIntentBadgeText(p.working_intent_count)"></span>
+                </div>
+              </template>
+              <template x-if="projectOps(p.id)">
+                <div class="inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-medium"
+                  :class="opsSeverityBadgeClass(projectOps(p.id).severity)"
+                  :title="projectOps(p.id).next_action">
+                  <span class="h-1.5 w-1.5 rounded-full shrink-0" :class="opsSeverityDotClass(projectOps(p.id).severity)"></span>
+                  <span class="truncate" x-text="projectOps(p.id).message"></span>
                 </div>
               </template>
             </div>
@@ -485,7 +540,7 @@
   <div class="flex-1 flex overflow-hidden" id="graphLayout">
     <!-- Graph -->
     <div class="flex-1 relative min-w-0">
-      <div class="absolute top-3 left-3 z-10 flex items-center gap-1.5">
+      <div class="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-1.5 pr-3 max-w-[calc(100%-1.5rem)]">
         <button @click="fitGraph()" class="h-7 w-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 text-slate-500 hover:text-slate-700 hover:bg-white transition inline-flex items-center justify-center" title="Fit graph" aria-label="Fit graph">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         </button>
@@ -498,6 +553,24 @@
           <option value="elk_tb">ELK ↓</option>
           <option value="elk_lr">ELK →</option>
         </select>
+        <select x-model="graphFocusMode" @change="applyGraphFocusMode()"
+          class="h-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 px-2.5 text-xs text-slate-600 hover:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 transition">
+          <option value="full">Full graph</option>
+          <option value="selected_upstream">Selected upstream</option>
+          <option value="selected_downstream">Selected downstream</option>
+          <option value="open_intents">Open intents</option>
+          <option value="goal_path">Goal path</option>
+          <option value="latest">Latest activity</option>
+        </select>
+        <button @click="jumpToLatestFact()" :disabled="!latestProducedFactId()"
+          class="h-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 px-2.5 text-xs text-slate-500 hover:bg-white hover:text-slate-700 transition disabled:opacity-35 disabled:hover:text-slate-500"
+          title="Jump to latest produced fact">Latest</button>
+        <button @click="jumpToNextUnclaimedIntent()" :disabled="!nextUnclaimedIntentId()"
+          class="h-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 px-2.5 text-xs text-slate-500 hover:bg-white hover:text-slate-700 transition disabled:opacity-35 disabled:hover:text-slate-500"
+          title="Jump to next unclaimed intent">Unclaimed</button>
+        <button @click="jumpToGoal()" :disabled="!getFactRecord('goal')"
+          class="h-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 px-2.5 text-xs text-slate-500 hover:bg-white hover:text-slate-700 transition disabled:opacity-35 disabled:hover:text-slate-500"
+          title="Jump to goal">Goal</button>
       </div>
 
       <template x-if="project.project.reason">
@@ -530,11 +603,13 @@
       <div class="absolute top-3 right-3 z-10 flex flex-wrap justify-end gap-2">
         <div class="flex gap-1.5" x-show="projectIsActive()">
           <button @click="openCreateIntent()" :disabled="!canActOnSelectedFacts()"
+            :title="operatorActionTitle()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-brand-200 text-brand-600 rounded-lg shadow-sm text-xs font-medium hover:bg-brand-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
             Intent
           </button>
           <button @click="openCompleteProject()" :disabled="!canActOnSelectedFacts()"
+            :title="operatorActionTitle()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-teal-200 text-teal-600 rounded-lg shadow-sm text-xs font-medium hover:bg-teal-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
             Complete
@@ -549,16 +624,19 @@
         </div>
         <div class="flex gap-1.5" x-show="projectIsActive()">
           <button @click="sendHeartbeatForSelectedIntent()" :disabled="!selectedActionableOpenIntentRecord()"
+            :title="operatorActionTitle()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-slate-200 text-slate-600 rounded-lg shadow-sm text-xs font-medium hover:bg-slate-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 12h3.5l2.75-6 3.5 12 2.75-7H21"/></svg>
             <span x-text="selectedIntentPrimaryActionLabel()"></span>
           </button>
           <button @click="releaseSelectedIntent()" :disabled="!selectedReleasableOpenIntentRecord()"
+            :title="operatorActionTitle()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-amber-200 text-amber-700 rounded-lg shadow-sm text-xs font-medium hover:bg-amber-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 10V7.75A3.75 3.75 0 1 1 16.5 7"/><path d="M7.5 10.5h9A1.5 1.5 0 0 1 18 12v6A1.5 1.5 0 0 1 16.5 19.5h-9A1.5 1.5 0 0 1 6 18v-6A1.5 1.5 0 0 1 7.5 10.5Z"/><path d="M12 14.25v1.5"/></svg>
             Release
           </button>
           <button @click="selectedActionableOpenIntentRecord() && openConclude(selectedActionableOpenIntentRecord())" :disabled="!selectedActionableOpenIntentRecord()"
+            :title="operatorActionTitle()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-teal-200 text-teal-600 rounded-lg shadow-sm text-xs font-medium hover:bg-teal-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.25 3H7.5A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V8.25L14.25 3Z"/><path d="M14.25 3v5.25h4.5"/><path d="M9 13.5 10.875 15.375 15 11.25"/></svg>
             Conclude
@@ -582,8 +660,138 @@
           :class="sideTab === 'hints' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">
           Hints <span class="ml-0.5 text-[10px] opacity-60" x-text="project.hints.length"></span>
         </button>
+        <button @click="sideTab = 'ops'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
+          :class="sideTab === 'ops' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Ops</button>
         <button @click="sideTab = 'log'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
           :class="sideTab === 'log' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Log</button>
+      </div>
+
+      <!-- Ops -->
+      <div x-show="sideTab === 'ops'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/40">
+        <template x-if="currentProjectDiagnostics()">
+          <div class="space-y-4">
+            <section class="rounded-2xl border bg-white shadow-sm overflow-hidden"
+              :class="opsSeverityBadgeClass(currentProjectDiagnostics().severity)">
+              <div class="px-4 py-3 border-b border-current/10 bg-white/70">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="h-2.5 w-2.5 rounded-full shrink-0" :class="opsSeverityDotClass(currentProjectDiagnostics().severity)"></span>
+                    <span class="text-[11px] font-semibold uppercase tracking-[0.14em]" x-text="currentProjectDiagnostics().severity"></span>
+                  </div>
+                  <span class="text-[11px] font-mono text-slate-400" x-text="currentProjectDiagnostics().project_id"></span>
+                </div>
+              </div>
+              <div class="p-4 space-y-3">
+                <p class="text-sm font-medium leading-relaxed text-slate-700" x-text="currentProjectDiagnostics().message"></p>
+                <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1">Next Action</p>
+                  <p class="text-xs leading-relaxed text-slate-600" x-text="currentProjectDiagnostics().next_action"></p>
+                </div>
+              </div>
+            </section>
+
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Runtime Counts</p>
+              </div>
+              <div class="grid grid-cols-2 gap-px bg-slate-100">
+                <div class="bg-white px-4 py-3">
+                  <p class="text-[10px] uppercase tracking-[0.12em] text-slate-400">Facts</p>
+                  <p class="mt-1 text-lg font-semibold text-slate-700 tabular-nums" x-text="currentProjectDiagnostics().fact_count"></p>
+                </div>
+                <div class="bg-white px-4 py-3">
+                  <p class="text-[10px] uppercase tracking-[0.12em] text-slate-400">Hints</p>
+                  <p class="mt-1 text-lg font-semibold text-amber-700 tabular-nums" x-text="currentProjectDiagnostics().hint_count"></p>
+                </div>
+                <div class="bg-white px-4 py-3">
+                  <p class="text-[10px] uppercase tracking-[0.12em] text-slate-400">Open</p>
+                  <p class="mt-1 text-lg font-semibold text-violet-700 tabular-nums" x-text="currentProjectDiagnostics().open_intent_count"></p>
+                </div>
+                <div class="bg-white px-4 py-3">
+                  <p class="text-[10px] uppercase tracking-[0.12em] text-slate-400">Concluded</p>
+                  <p class="mt-1 text-lg font-semibold text-teal-700 tabular-nums" x-text="currentProjectDiagnostics().concluded_intent_count"></p>
+                </div>
+              </div>
+            </section>
+
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Execution State</p>
+              </div>
+              <div class="p-4 space-y-3 text-xs">
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-slate-400 shrink-0">Working Intents</span>
+                  <span class="font-mono text-slate-700 tabular-nums" x-text="currentProjectDiagnostics().working_intent_count"></span>
+                </div>
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-slate-400 shrink-0">Unclaimed Intents</span>
+                  <span class="font-mono text-slate-700 tabular-nums" x-text="currentProjectDiagnostics().unclaimed_intent_count"></span>
+                </div>
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-slate-400 shrink-0">Reason</span>
+                  <span class="text-slate-700 text-right break-all" x-text="currentProjectDiagnostics().reason ? currentProjectDiagnostics().reason.worker : '—'"></span>
+                </div>
+                <template x-if="currentProjectDiagnostics().reason">
+                  <div class="pt-3 border-t border-slate-100 space-y-3">
+                    <div class="flex items-start justify-between gap-3">
+                      <span class="text-slate-400 shrink-0">Trigger</span>
+                      <span class="text-slate-700 text-right break-words" x-text="currentProjectDiagnostics().reason.trigger"></span>
+                    </div>
+                    <div class="flex items-start justify-between gap-3">
+                      <span class="text-slate-400 shrink-0">Started</span>
+                      <span class="text-slate-700 text-right break-words" x-text="formatTime(currentProjectDiagnostics().reason.started_at)"></span>
+                    </div>
+                    <div class="flex items-start justify-between gap-3">
+                      <span class="text-slate-400 shrink-0">Heartbeat</span>
+                      <span class="text-slate-700 text-right break-words" x-text="formatTime(currentProjectDiagnostics().reason.last_heartbeat_at)"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </section>
+
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Recent Events</p>
+                <span class="text-[10px] text-slate-400 tabular-nums" x-text="opsEvents.length"></span>
+              </div>
+              <template x-if="opsEvents.length === 0">
+                <div class="px-4 py-8 text-center">
+                  <p class="text-sm text-slate-300">No dispatcher events yet</p>
+                </div>
+              </template>
+              <template x-if="opsEvents.length > 0">
+                <div class="divide-y divide-slate-100">
+                  <template x-for="event in opsEvents" :key="event.id">
+                    <article class="group px-4 py-3">
+                      <div class="flex items-start gap-3">
+                        <span class="mt-0.5 shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]"
+                          :class="opsEventSeverityClass(event.severity)"
+                          x-text="event.severity"></span>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-start justify-between gap-2">
+                            <p class="min-w-0 text-xs font-semibold text-slate-700 break-words" x-text="event.event_type"></p>
+                            <button type="button" @click="copyOpsEvent(event)"
+                              class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-400 opacity-100 transition hover:bg-slate-50 hover:text-slate-600 md:opacity-0 md:group-hover:opacity-100"
+                              title="Copy event"
+                              :aria-label="`Copy ${event.event_type} event`">
+                              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg>
+                            </button>
+                          </div>
+                          <p class="mt-1 text-xs leading-relaxed text-slate-600 break-words" x-text="event.message"></p>
+                          <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
+                            <span x-text="formatTime(event.created_at)"></span>
+                            <span x-show="opsEventMetaText(event)" x-text="opsEventMetaText(event)"></span>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  </template>
+                </div>
+              </template>
+            </section>
+          </div>
+        </template>
       </div>
 
       <!-- Detail -->
@@ -596,6 +804,10 @@
         </template>
         <template x-if="selectedNode && selectedNode.type === 'fact' && selectedFacts.length > 1">
           <div class="space-y-3">
+            <div class="flex justify-end">
+              <button type="button" @click="copySelectedLineage()"
+                class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 transition">Copy Lineage</button>
+            </div>
             <template x-for="fact in selectedFactRecords()" :key="fact.id">
               <article class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
@@ -609,8 +821,12 @@
                         }" x-text="fact.id"></span>
                       <span class="text-[11px] text-slate-400 uppercase tracking-wider">Fact</span>
                     </div>
-                    <button type="button" @click="removeFactSelection(fact.id)"
-                      class="text-[11px] text-slate-400 hover:text-slate-600 transition">Remove</button>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <button type="button" @click="copySelectedFact(fact)"
+                        class="text-[11px] text-slate-400 hover:text-slate-600 transition">Copy</button>
+                      <button type="button" @click="removeFactSelection(fact.id)"
+                        class="text-[11px] text-slate-400 hover:text-slate-600 transition">Remove</button>
+                    </div>
                   </div>
                 </div>
                 <div class="p-4 space-y-3">
@@ -634,14 +850,22 @@
         <template x-if="selectedNode && selectedNode.type === 'fact' && selectedFactRecord() && selectedFacts.length <= 1">
           <section class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold"
-                  :class="{
-                    'bg-teal-50 text-teal-700': selectedFactId() === 'origin',
-                    'bg-rose-50 text-rose-600': selectedFactId() === 'goal',
-                    'bg-brand-50 text-brand-700': selectedFactId() !== 'origin' && selectedFactId() !== 'goal'
-                  }" x-text="selectedFactId()"></span>
-                <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Fact</span>
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold"
+                    :class="{
+                      'bg-teal-50 text-teal-700': selectedFactId() === 'origin',
+                      'bg-rose-50 text-rose-600': selectedFactId() === 'goal',
+                      'bg-brand-50 text-brand-700': selectedFactId() !== 'origin' && selectedFactId() !== 'goal'
+                    }" x-text="selectedFactId()"></span>
+                  <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Fact</span>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button type="button" @click="copySelectedLineage()"
+                    class="text-[11px] text-slate-400 hover:text-slate-600 transition">Lineage</button>
+                  <button type="button" @click="copySelectedFact()"
+                    class="text-[11px] text-slate-400 hover:text-slate-600 transition">Copy</button>
+                </div>
               </div>
             </div>
             <div class="p-4 space-y-4">
@@ -683,9 +907,17 @@
         <template x-if="selectedNode && selectedNode.type === 'intent' && selectedIntentRecord()">
           <section class="rounded-2xl border border-violet-200/80 bg-white shadow-sm overflow-hidden">
             <div class="px-4 py-3 border-b border-violet-100 bg-violet-50/70">
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[10px] font-mono font-bold" x-text="selectedIntentId()"></span>
-                <span class="text-[11px] font-medium" :class="intentStatusClass(selectedIntentRecord())" x-text="intentStatusLabel(selectedIntentRecord())"></span>
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[10px] font-mono font-bold" x-text="selectedIntentId()"></span>
+                  <span class="text-[11px] font-medium" :class="intentStatusClass(selectedIntentRecord())" x-text="intentStatusLabel(selectedIntentRecord())"></span>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button type="button" @click="copySelectedLineage()"
+                    class="text-[11px] text-violet-400 hover:text-violet-600 transition">Lineage</button>
+                  <button type="button" @click="copySelectedIntent()"
+                    class="text-[11px] text-violet-400 hover:text-violet-600 transition">Copy</button>
+                </div>
               </div>
             </div>
             <div class="p-4 space-y-4">
@@ -721,11 +953,17 @@
                 <div class="flex items-center gap-2 min-w-0">
                   <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
                   <span class="font-medium text-amber-800 truncate" x-text="h.creator"></span>
+                  <span x-show="h.pinned" class="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-700">Pinned</span>
                 </div>
                 <span class="text-amber-600/80 shrink-0 tabular-nums" x-text="formatTime(h.created_at)"></span>
               </div>
             </div>
             <div class="p-4">
+              <div class="mb-2 flex flex-wrap items-center gap-1.5">
+                <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500" x-text="h.hint_type || 'note'"></span>
+                <span class="rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-700" x-text="h.priority || 'normal'"></span>
+                <span x-show="h.target_type && h.target_id" class="rounded-md bg-brand-50 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-brand-700" x-text="`${h.target_type}:${h.target_id}`"></span>
+              </div>
               <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="h.content"></p>
             </div>
           </button>
@@ -734,8 +972,38 @@
 
       <!-- Log -->
       <div x-show="sideTab === 'log'" class="flex-1 overflow-y-auto p-4 space-y-3">
+        <section class="sticky top-0 z-20 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-3 py-3 shadow-sm space-y-3">
+          <div class="flex items-center gap-2">
+            <input x-model="timelineSearch" type="search" placeholder="Search logs"
+              class="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400">
+            <button type="button" @click="copyVisibleTimelineEntries()"
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition"
+              title="Copy visible logs" aria-label="Copy visible logs">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <template x-for="option in timelineFilterOptions()" :key="option.value">
+              <button type="button" @click="timelineTypeFilter = option.value"
+                class="rounded-lg border px-2 py-1 text-[11px] font-medium transition"
+                :class="timelineTypeFilter === option.value ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600'"
+                x-text="option.label"></button>
+            </template>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+            <label class="inline-flex items-center gap-1.5">
+              <input type="checkbox" x-model="timelineOnlySelected" class="h-3.5 w-3.5 rounded border-slate-300 text-brand-500 focus:ring-brand-200">
+              <span>Only selected</span>
+            </label>
+            <label class="inline-flex items-center gap-1.5">
+              <input type="checkbox" x-model="timelineLiveTail" class="h-3.5 w-3.5 rounded border-slate-300 text-brand-500 focus:ring-brand-200">
+              <span>Live tail</span>
+            </label>
+            <span class="tabular-nums" x-text="`${filteredTimelineEvents().length} / ${timelineEvents().length}`"></span>
+          </div>
+        </section>
         <template x-if="selectedTimelineSummary()">
-          <section class="sticky top-0 z-10 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
+          <section class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <div class="space-y-2.5">
               <div class="space-y-1">
                 <div class="flex items-center justify-between gap-3 text-[11px]">
@@ -758,10 +1026,10 @@
             </div>
           </section>
         </template>
-        <template x-if="timelineEvents().length === 0">
-          <p class="text-sm text-slate-300 text-center mt-12">No activity yet</p>
+        <template x-if="timelineEvents().length === 0 || filteredTimelineEvents().length === 0">
+          <p class="text-sm text-slate-300 text-center mt-12" x-text="timelineEvents().length === 0 ? 'No activity yet' : 'No logs match filters'"></p>
         </template>
-        <template x-for="entry in timelineEvents()" :key="entry.id">
+        <template x-for="entry in filteredTimelineEvents()" :key="entry.id">
           <div class="flex items-stretch gap-3" :id="timelineEntryDomId(entry.id)">
             <div class="flex flex-col items-center shrink-0">
               <div class="w-2.5 h-2.5 rounded-full mt-1.5" :class="timelineEventDotClass(entry)"></div>
@@ -895,6 +1163,38 @@
             <span class="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-mono text-slate-600" x-text="fid"></span>
           </template>
         </div>
+        <div class="mt-2 max-h-36 overflow-auto rounded-xl border border-slate-100 bg-white">
+          <template x-for="fact in selectedFactRecords()" :key="`complete-preview-${fact.id}`">
+            <div class="border-b border-slate-100 px-3 py-2 last:border-b-0">
+              <div class="mb-1 font-mono text-[10px] font-semibold text-brand-600" x-text="fact.id"></div>
+              <p class="text-xs leading-relaxed text-slate-600 whitespace-pre-wrap break-words" x-text="fact.description"></p>
+            </div>
+          </template>
+        </div>
+        <template x-if="completeSelectionWarning()">
+          <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-700" x-text="completeSelectionWarning()"></div>
+        </template>
+        <template x-if="completeLineagePreview().items.length > 0">
+          <div class="mt-2 rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <div class="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-3 py-2">
+              <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Upstream Lineage</span>
+              <span class="text-[11px] text-slate-400" x-text="completeLineagePreview().summary"></span>
+            </div>
+            <div class="max-h-40 overflow-auto divide-y divide-slate-100">
+              <template x-for="item in completeLineagePreview().items" :key="`complete-lineage-${item.kind}-${item.id}`">
+                <div class="px-3 py-2">
+                  <div class="mb-1 flex items-center gap-2">
+                    <span class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                      :class="item.kind === 'intent' ? 'bg-violet-50 text-violet-600' : 'bg-brand-50 text-brand-600'"
+                      x-text="item.kind"></span>
+                    <span class="font-mono text-[10px] font-semibold text-slate-500" x-text="item.id"></span>
+                  </div>
+                  <p class="text-xs leading-relaxed text-slate-600 whitespace-pre-wrap break-words" x-text="item.description"></p>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
       </div>
       <textarea x-model="completeForm.description" placeholder="Why is the goal met?" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
       <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
@@ -915,13 +1215,50 @@
     <h3 class="text-base font-semibold text-slate-700 mb-4">Add Hint</h3>
     <div class="space-y-3">
       <textarea x-model="hintForm.content" placeholder="Strategy advice or note..." rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-[11px] text-slate-400 mb-1 block font-medium">Type</label>
+          <select x-model="hintForm.hint_type" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+            <option value="note">Note</option>
+            <option value="strategy">Strategy</option>
+            <option value="evidence">Evidence</option>
+            <option value="correction">Correction</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] text-slate-400 mb-1 block font-medium">Priority</label>
+          <select x-model="hintForm.priority" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+            <option value="low">Low</option>
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-[11px] text-slate-400 mb-1 block font-medium">Target</label>
+          <select x-model="hintForm.target_type" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+            <option value="project">Project</option>
+            <option value="fact">Fact</option>
+            <option value="intent">Intent</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] text-slate-400 mb-1 block font-medium">Target ID</label>
+          <input x-model="hintForm.target_id" :disabled="hintForm.target_type === 'project'" placeholder="origin, f001, i001" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300 disabled:bg-slate-50 disabled:text-slate-300">
+        </div>
+      </div>
+      <label class="flex items-center gap-2 px-1 text-sm text-slate-600">
+        <input type="checkbox" x-model="hintForm.pinned" class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-200">
+        <span>Pin hint</span>
+      </label>
       <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
         Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-5">
       <button @click="showHintModal = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
-      <button @click="addHint()" :disabled="!hintForm.content"
+      <button @click="addHint()" :disabled="!hintForm.content || (hintForm.target_type !== 'project' && !hintForm.target_id)"
         class="px-5 py-2 text-sm bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition disabled:opacity-30 shadow-sm shadow-amber-200">Add</button>
     </div>
 </div>
@@ -933,6 +1270,22 @@
     <h3 class="text-base font-semibold text-slate-700 mb-1">Reopen Project</h3>
     <p class="text-xs text-slate-400 mb-4" x-text="projectLabel(reopenForm.projectId, reopenForm.projectTitle)"></p>
     <div class="space-y-3">
+      <template x-if="completionIntent()">
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mb-2">Current Completion</p>
+          <div class="space-y-1.5 text-xs">
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-slate-400 shrink-0">Intent</span>
+              <span class="font-mono text-slate-700 text-right" x-text="completionIntent().id"></span>
+            </div>
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-slate-400 shrink-0">From</span>
+              <span class="font-mono text-slate-700 text-right break-all" x-text="completionIntent().from.join(', ')"></span>
+            </div>
+            <p class="pt-1 leading-relaxed text-slate-600 whitespace-pre-wrap break-words" x-text="completionIntent().description"></p>
+          </div>
+        </div>
+      </template>
       <textarea x-model="reopenForm.description" placeholder="Why is this project not actually complete?" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300"></textarea>
       <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
         Actor: <span class="font-medium text-slate-700" x-text="actorName()"></span>
@@ -971,6 +1324,18 @@
       <div>
         <label class="text-[11px] text-slate-400 mb-1 block font-medium">Actor</label>
         <input x-model="localPrefs.actor_name" placeholder="Your name" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
+      </div>
+      <div>
+        <label class="text-[11px] text-slate-400 mb-1 block font-medium">Interaction mode</label>
+        <div class="grid grid-cols-2 rounded-xl border border-slate-200 overflow-hidden">
+          <button type="button" @click="localPrefs.interaction_mode = 'observer'"
+            class="px-3 py-2 text-sm font-medium transition"
+            :class="localPrefs.interaction_mode === 'observer' ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'">Observer</button>
+          <button type="button" @click="localPrefs.interaction_mode = 'operator'"
+            class="px-3 py-2 text-sm font-medium transition"
+            :class="localPrefs.interaction_mode === 'operator' ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'">Operator</button>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Observer disables manual intent, claim, conclude, and complete actions.</p>
       </div>
       <div>
         <label class="text-[11px] text-slate-400 mb-1 block font-medium">Default layout</label>
@@ -1082,6 +1447,8 @@ function cairnApp() {
     view: 'list',
     projects: [],
     project: null,
+    opsSummary: null,
+    opsEvents: [],
     selectedProjectId: '',
     polling: true,
     pollTimer: null,
@@ -1090,6 +1457,15 @@ function cairnApp() {
     selectedNode: null,
     selectedFacts: [],
     selectedTimelineEntryId: null,
+    timelineSearch: '',
+    timelineTypeFilter: 'all',
+    timelineOnlySelected: false,
+    timelineLiveTail: true,
+    projectSearch: '',
+    projectStatusFilter: 'all',
+    projectOpsFilter: 'all',
+    projectSort: 'created_desc',
+    graphFocusMode: 'full',
     layoutMode: 'dagre_tb',
     sidePanelWidth: 320,
     isResizingPanel: false,
@@ -1112,10 +1488,10 @@ function cairnApp() {
     intentForm: { description: '' },
     concludeForm: { description: '', intentId: '' },
     completeForm: { description: '' },
-    hintForm: { content: '' },
+    hintForm: { content: '', hint_type: 'note', priority: 'normal', target_type: 'project', target_id: '', pinned: false },
     reopenForm: { projectId: '', projectTitle: '', description: '' },
     renameForm: { projectId: '', originalTitle: '', title: '' },
-    localPrefs: { actor_name: 'Human', layout_mode: 'dagre_tb' },
+    localPrefs: { actor_name: 'Human', layout_mode: 'dagre_tb', interaction_mode: 'observer' },
     settingsForm: { intent_timeout: 5, reason_timeout: 5 },
     deleteConfirm: { id: '', title: '' },
     isDeletingProject: false,
@@ -1230,6 +1606,7 @@ function cairnApp() {
         } else {
           const parsed = JSON.parse(raw);
           if (typeof parsed.actor_name === 'string') this.localPrefs.actor_name = parsed.actor_name;
+          if (parsed.interaction_mode === 'observer' || parsed.interaction_mode === 'operator') this.localPrefs.interaction_mode = parsed.interaction_mode;
           if (this.isValidLayoutMode(parsed.layout_mode)) {
             this.localPrefs.layout_mode = parsed.layout_mode;
           } else if (parsed.layout_dir === 'TB' || parsed.layout_dir === 'LR') {
@@ -1245,6 +1622,7 @@ function cairnApp() {
         console.error(e);
       }
       if (!this.localPrefs.actor_name.trim()) this.localPrefs.actor_name = 'Human';
+      if (this.localPrefs.interaction_mode !== 'operator') this.localPrefs.interaction_mode = 'observer';
       if (!this.isValidLayoutMode(this.localPrefs.layout_mode)) this.localPrefs.layout_mode = 'dagre_tb';
       this.layoutMode = this.localPrefs.layout_mode;
     },
@@ -1267,6 +1645,14 @@ function cairnApp() {
 
     actorName() {
       return this.localPrefs.actor_name.trim() || 'Human';
+    },
+
+    isOperatorMode() {
+      return this.localPrefs.interaction_mode === 'operator';
+    },
+
+    operatorActionTitle() {
+      return this.isOperatorMode() ? '' : 'Switch to Operator mode in local preferences to use manual protocol actions';
     },
 
     projectStatusBadgeClass(status) {
@@ -1323,6 +1709,182 @@ function cairnApp() {
       return this.projects.filter(project => project.status === status).length;
     },
 
+    projectActivityScore(project) {
+      const ops = this.projectOps(project.id);
+      return (project.working_intent_count || 0)
+        + (project.unclaimed_intent_count || 0)
+        + (project.reason ? 1 : 0)
+        + (ops?.severity === 'attention' ? 2 : 0)
+        + (ops?.severity === 'running' ? 3 : 0);
+    },
+
+    projectMatchesListFilters(project) {
+      const query = this.projectSearch.trim().toLowerCase();
+      const ops = this.projectOps(project.id);
+      if (this.projectStatusFilter !== 'all' && project.status !== this.projectStatusFilter) return false;
+      if (this.projectOpsFilter === 'running' && ops?.severity !== 'running') return false;
+      if (this.projectOpsFilter === 'attention' && ops?.severity !== 'attention') return false;
+      if (this.projectOpsFilter === 'idle' && ops?.severity !== 'idle') return false;
+      if (this.projectOpsFilter === 'unclaimed' && project.unclaimed_intent_count <= 0) return false;
+      if (query) {
+        const text = [
+          project.id,
+          project.title,
+          project.status,
+          ops?.severity,
+          ops?.message,
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!text.includes(query)) return false;
+      }
+      return true;
+    },
+
+    filteredProjects() {
+      const items = this.projects.filter(project => this.projectMatchesListFilters(project));
+      const byCreated = (project) => Date.parse(project.created_at || '') || 0;
+      const comparators = {
+        created_desc: (a, b) => byCreated(b) - byCreated(a),
+        created_asc: (a, b) => byCreated(a) - byCreated(b),
+        title: (a, b) => a.title.localeCompare(b.title),
+        facts_desc: (a, b) => b.fact_count - a.fact_count,
+        intents_desc: (a, b) => b.intent_count - a.intent_count,
+        activity_desc: (a, b) => this.projectActivityScore(b) - this.projectActivityScore(a),
+      };
+      return [...items].sort(comparators[this.projectSort] || comparators.created_desc);
+    },
+
+    opsCount(key) {
+      return this.opsSummary?.[key] ?? 0;
+    },
+
+    currentProjectOps() {
+      if (!this.selectedProjectId || !this.opsSummary?.projects) return null;
+      return this.opsSummary.projects.find(project => project.project_id === this.selectedProjectId) || null;
+    },
+
+    projectOps(projectId) {
+      if (!projectId || !this.opsSummary?.projects) return null;
+      return this.opsSummary.projects.find(project => project.project_id === projectId) || null;
+    },
+
+    currentProjectDiagnostics() {
+      const ops = this.currentProjectOps();
+      const project = this.project;
+      if (!ops && !project) return null;
+      const working = ops?.working_intent_count ?? project.intents.filter(intent => !intent.to && intent.worker).length;
+      const unclaimed = ops?.unclaimed_intent_count ?? project.intents.filter(intent => !intent.to && !intent.worker).length;
+      const concluded = project?.intents?.filter(intent => intent.concluded_at).length ?? 0;
+      return {
+        project_id: ops?.project_id ?? project.project.id,
+        title: ops?.title ?? project.project.title,
+        status: ops?.status ?? project.project.status,
+        severity: ops?.severity ?? this.projectFallbackSeverity(project),
+        message: ops?.message ?? this.projectFallbackMessage(project),
+        next_action: ops?.next_action ?? this.projectFallbackNextAction(project),
+        fact_count: ops?.fact_count ?? project.facts.length,
+        hint_count: ops?.hint_count ?? project.hints.length,
+        intent_count: ops?.intent_count ?? project.intents.length,
+        working_intent_count: working,
+        unclaimed_intent_count: unclaimed,
+        open_intent_count: working + unclaimed,
+        concluded_intent_count: concluded,
+        reason: project?.project?.reason ?? ops?.reason ?? null,
+      };
+    },
+
+    projectFallbackSeverity(project) {
+      if (!project) return 'idle';
+      if (project.project.status === 'completed') return 'completed';
+      if (project.project.status === 'stopped') return 'stopped';
+      if (project.project.reason || project.intents.some(intent => !intent.to && intent.worker)) return 'running';
+      if (project.intents.some(intent => !intent.to && !intent.worker)) return 'attention';
+      return 'idle';
+    },
+
+    projectFallbackMessage(project) {
+      if (!project) return 'No project selected.';
+      if (project.project.status === 'completed') return 'Project is completed.';
+      if (project.project.status === 'stopped') return 'Project is stopped.';
+      if (project.project.reason) return `Reason is running on ${project.project.reason.worker}.`;
+      const working = project.intents.filter(intent => !intent.to && intent.worker).length;
+      if (working > 0) return `${working} open intent${working === 1 ? '' : 's'} being explored.`;
+      const unclaimed = project.intents.filter(intent => !intent.to && !intent.worker).length;
+      if (unclaimed > 0) return `${unclaimed} open intent${unclaimed === 1 ? '' : 's'} waiting for workers.`;
+      return 'Graph has no open intents and no active reason lease.';
+    },
+
+    projectFallbackNextAction(project) {
+      if (!project) return '';
+      if (project.project.status === 'completed') return 'Review the completion evidence or reopen if the conclusion is incorrect.';
+      if (project.project.status === 'stopped') return 'Resume the project when it should continue running.';
+      if (project.project.reason || project.intents.some(intent => !intent.to && intent.worker)) return 'Watch for concluded facts. If progress stalls, check worker heartbeat and dispatcher logs.';
+      if (project.intents.some(intent => !intent.to && !intent.worker)) return 'Dispatcher should claim an intent. If nothing starts, check worker availability.';
+      return 'Dispatcher should reason over the latest graph. Add a hint if human direction is needed.';
+    },
+
+    opsSeverityBadgeClass(severity) {
+      const classes = {
+        running: 'bg-sky-50 text-sky-700 border-sky-200',
+        attention: 'bg-amber-50 text-amber-700 border-amber-200',
+        blocked: 'bg-rose-50 text-rose-700 border-rose-200',
+        idle: 'bg-slate-50 text-slate-600 border-slate-200',
+        stopped: 'bg-amber-50 text-amber-700 border-amber-200',
+        completed: 'bg-slate-100 text-slate-600 border-slate-200',
+      };
+      return classes[severity] || classes.idle;
+    },
+
+    opsSeverityDotClass(severity) {
+      const classes = {
+        running: 'bg-sky-500',
+        attention: 'bg-amber-500',
+        blocked: 'bg-rose-500',
+        idle: 'bg-slate-400',
+        stopped: 'bg-amber-500',
+        completed: 'bg-slate-400',
+      };
+      return classes[severity] || classes.idle;
+    },
+
+    opsEventSeverityClass(severity) {
+      const classes = {
+        debug: 'bg-slate-50 text-slate-500 border-slate-200',
+        info: 'bg-sky-50 text-sky-700 border-sky-200',
+        warning: 'bg-amber-50 text-amber-700 border-amber-200',
+        error: 'bg-rose-50 text-rose-700 border-rose-200',
+      };
+      return classes[severity] || classes.info;
+    },
+
+    opsEventMetaText(event) {
+      return [event.task_type, event.worker, event.intent_id].filter(Boolean).join(' · ');
+    },
+
+    opsEventDetailsText(event) {
+      if (!event?.details || Object.keys(event.details).length === 0) return '';
+      try {
+        return JSON.stringify(event.details);
+      } catch {
+        return '';
+      }
+    },
+
+    async copyOpsEvent(event) {
+      if (!event) return;
+      const lines = [
+        `[${this.formatTimelineDate(event.created_at)} ${this.formatTime(event.created_at)}] ${event.severity.toUpperCase()} ${event.event_type}`,
+        this.opsEventMetaText(event),
+        event.message,
+        this.opsEventDetailsText(event),
+      ].filter(Boolean);
+      try {
+        await this.copyText(lines.join('\n'));
+        this.showToast('Event copied');
+      } catch {
+        this.showToast('Copy failed', 'error');
+      }
+    },
+
     hasActiveProjects() {
       return this.projects.some(project => project.status === 'active');
     },
@@ -1332,11 +1894,22 @@ function cairnApp() {
     },
 
     canActOnSelectedFacts() {
-      return this.projectIsActive() && this.selectedFacts.length > 0 && !this.selectedFacts.includes('goal');
+      return this.isOperatorMode() && this.projectIsActive() && this.selectedFacts.length > 0 && !this.selectedFacts.includes('goal');
     },
 
     async loadProjects() {
-      try { this.projects = await this.api('GET', '/projects'); } catch(e) { console.error(e); }
+      try {
+        const [projects, opsSummary] = await Promise.all([
+          this.api('GET', '/projects'),
+          this.api('GET', '/ops/summary'),
+        ]);
+        this.projects = projects;
+        this.opsSummary = opsSummary;
+      } catch(e) { console.error(e); }
+    },
+
+    async loadOpsSummary() {
+      try { this.opsSummary = await this.api('GET', '/ops/summary'); } catch(e) { console.error(e); }
     },
 
     rememberProjectListScroll() {
@@ -1439,6 +2012,89 @@ function cairnApp() {
         details,
         entry.title,
       ].filter(Boolean).join('\n');
+    },
+
+    factCopyText(fact) {
+      if (!fact) return '';
+      const producing = this.getProducingIntent(fact.id);
+      return [
+        `Fact ${fact.id}`,
+        fact.description,
+        producing ? `Produced by: ${producing.id}` : '',
+        producing ? `From: ${producing.from.join(', ')}` : '',
+      ].filter(Boolean).join('\n');
+    },
+
+    intentCopyText(intent) {
+      if (!intent) return '';
+      return [
+        `Intent ${intent.id}`,
+        `Status: ${this.intentStatusLabel(intent)}`,
+        `From: ${intent.from.join(', ')}`,
+        `To: ${intent.to || 'open'}`,
+        `Creator: ${intent.creator}`,
+        `Worker: ${intent.worker || 'none'}`,
+        intent.description,
+      ].filter(Boolean).join('\n');
+    },
+
+    lineageCopyText() {
+      if (!this.project || !this.selectedNode) return '';
+      const factIds = new Set();
+      const intentIds = new Set();
+      if (this.selectedNode.type === 'fact') {
+        for (const fid of this.selectedFacts.length ? this.selectedFacts : [this.selectedNode.id]) {
+          const lineage = this.collectFactLineage(fid);
+          for (const id of lineage.upstreamFacts) factIds.add(id);
+          for (const id of lineage.upstreamIntents) intentIds.add(id);
+        }
+      } else if (this.selectedNode.type === 'intent') {
+        const intent = this.selectedIntentRecord();
+        if (!intent) return '';
+        intentIds.add(intent.id);
+        for (const fid of intent.from) factIds.add(fid);
+        if (intent.to) factIds.add(intent.to);
+      }
+      const facts = this.project.facts.filter(fact => factIds.has(fact.id));
+      const intents = this.project.intents.filter(intent => intentIds.has(intent.id));
+      return [
+        `# Lineage ${this.selectedNode.type}:${this.selectedNode.id}`,
+        facts.length ? '## Facts' : '',
+        ...facts.map(fact => `- ${fact.id}: ${fact.description}`),
+        intents.length ? '## Intents' : '',
+        ...intents.map(intent => `- ${intent.id}: ${intent.description} (${intent.from.join(', ')} -> ${intent.to || 'open'})`),
+      ].filter(Boolean).join('\n');
+    },
+
+    async copySelectedFact(fact = this.selectedFactRecord()) {
+      if (!fact) return;
+      try {
+        await this.copyText(this.factCopyText(fact));
+        this.showToast('Fact copied');
+      } catch {
+        this.showToast('Copy failed', 'error');
+      }
+    },
+
+    async copySelectedIntent(intent = this.selectedIntentRecord()) {
+      if (!intent) return;
+      try {
+        await this.copyText(this.intentCopyText(intent));
+        this.showToast('Intent copied');
+      } catch {
+        this.showToast('Copy failed', 'error');
+      }
+    },
+
+    async copySelectedLineage() {
+      const text = this.lineageCopyText();
+      if (!text) return;
+      try {
+        await this.copyText(text);
+        this.showToast('Lineage copied');
+      } catch {
+        this.showToast('Copy failed', 'error');
+      }
     },
 
     async copyText(text) {
@@ -1611,7 +2267,16 @@ function cairnApp() {
     },
 
     async loadProject(id) {
-      try { this.project = await this.api('GET', `/projects/${id}`); } catch(e) { this.showToast(e.message, 'error'); }
+      try {
+        const [project, opsSummary, opsEvents] = await Promise.all([
+          this.api('GET', `/projects/${id}`),
+          this.api('GET', '/ops/summary'),
+          this.api('GET', `/ops/events?project_id=${encodeURIComponent(id)}&limit=20`),
+        ]);
+        this.project = project;
+        this.opsSummary = opsSummary;
+        this.opsEvents = opsEvents;
+      } catch(e) { this.showToast(e.message, 'error'); }
     },
 
     async toggleProjectStop() {
@@ -2141,6 +2806,7 @@ function cairnApp() {
       this.view = 'list';
       this.shouldRestoreProjectListScroll = true;
       this.project = null;
+      this.opsEvents = [];
       this.selectedProjectId = '';
       this.selectedNode = null;
       this.selectedFacts = [];
@@ -2157,6 +2823,7 @@ function cairnApp() {
         if (this.selectedProjectId && this.view === 'graph') {
           await this.loadProject(this.selectedProjectId);
           this.updateGraph();
+          this.followTimelineTailIfEnabled();
         } else {
           await this.loadProjects();
         }
@@ -2253,6 +2920,7 @@ function cairnApp() {
         { selector: 'edge.focus', style: { 'z-index':1000,'overlay-color':'#93c5fd','overlay-opacity':0.22,'overlay-padding':5 }},
         { selector: 'node.selected-fact', style: { 'border-width':0,'underlay-color':'#93c5fd','underlay-padding':8,'underlay-opacity':0.28,'z-index':1001 }},
         { selector: '.faded', style: { opacity:0.5 }},
+        { selector: '.focus-muted', style: { opacity:0.16 }},
         { selector: '.fresh', style: { opacity:0 }},
       ];
     },
@@ -2420,6 +3088,7 @@ function cairnApp() {
       if (changed) this.cy.layout(this.layoutOpts()).run();
       this.pulseActive();
       this.refreshGraphDecorations();
+      this.applyGraphFocusMode();
     },
 
     pulseActive() {
@@ -2594,6 +3263,136 @@ function cairnApp() {
       if (this.cy) this.cy.layout(this.layoutOpts()).run();
     },
 
+    applyGraphFocusMode() {
+      if (!this.cy || !this.project) return;
+      this.cy.elements().removeClass('focus-muted');
+      if (this.graphFocusMode === 'full') return;
+
+      let visible = this.cy.collection();
+      if (this.graphFocusMode === 'open_intents') {
+        const nodeIds = new Set();
+        const edgeIds = new Set();
+        for (const intent of this.project.intents.filter(intent => !intent.to)) {
+          this.collectIntentElements(intent, nodeIds, edgeIds);
+        }
+        visible = this.graphElementsFromIds(nodeIds, edgeIds);
+      } else if (this.graphFocusMode === 'latest') {
+        const latest = this.timelineEvents()[this.timelineEvents().length - 1];
+        visible = this.timelineEntryGraphElements(latest);
+      } else if (this.graphFocusMode === 'selected_upstream') {
+        visible = this.selectedGraphFocusElements();
+      } else if (this.graphFocusMode === 'selected_downstream') {
+        visible = this.selectedDownstreamGraphFocusElements();
+      } else if (this.graphFocusMode === 'goal_path') {
+        visible = this.goalPathGraphFocusElements();
+      }
+
+      if (!visible || visible.length === 0) return;
+      this.cy.elements().not(visible).addClass('focus-muted');
+    },
+
+    graphElementsFromIds(nodeIds, edgeIds) {
+      if (!this.cy) return null;
+      return this.cy.nodes().filter(node => nodeIds.has(node.id()))
+        .add(this.cy.edges().filter(edge => edgeIds.has(edge.id())));
+    },
+
+    selectedGraphFocusElements() {
+      if (!this.cy || !this.project || !this.selectedNode) return this.cy?.collection();
+      const nodeIds = new Set();
+      const edgeIds = new Set();
+      if (this.selectedNode.type === 'intent') {
+        const intent = this.selectedIntentRecord();
+        if (intent) this.collectIntentElements(intent, nodeIds, edgeIds);
+      } else if (this.selectedNode.type === 'fact') {
+        const facts = this.selectedFacts.length ? this.selectedFacts : [this.selectedNode.id];
+        for (const fid of facts) {
+          const lineage = this.collectFactLineage(fid);
+          for (const factId of lineage.upstreamFacts) nodeIds.add(factId);
+          for (const intentId of lineage.upstreamIntents) {
+            const intent = this.project.intents.find(item => item.id === intentId);
+            if (intent) this.collectIntentElements(intent, nodeIds, edgeIds);
+          }
+        }
+      }
+      return this.graphElementsFromIds(nodeIds, edgeIds);
+    },
+
+    selectedDownstreamGraphFocusElements() {
+      if (!this.cy || !this.project || !this.selectedNode) return this.cy?.collection();
+      const nodeIds = new Set();
+      const edgeIds = new Set();
+      if (this.selectedNode.type === 'intent') {
+        const intent = this.selectedIntentRecord();
+        if (intent) {
+          this.collectIntentElements(intent, nodeIds, edgeIds);
+          if (intent.to) {
+            const downstream = this.collectFactDownstream(intent.to);
+            for (const factId of downstream.downstreamFacts) nodeIds.add(factId);
+            for (const intentId of downstream.downstreamIntents) {
+              const nextIntent = this.project.intents.find(item => item.id === intentId);
+              if (nextIntent) this.collectIntentElements(nextIntent, nodeIds, edgeIds);
+            }
+          }
+        }
+      } else if (this.selectedNode.type === 'fact') {
+        const facts = this.selectedFacts.length ? this.selectedFacts : [this.selectedNode.id];
+        for (const fid of facts) {
+          const downstream = this.collectFactDownstream(fid);
+          for (const factId of downstream.downstreamFacts) nodeIds.add(factId);
+          for (const intentId of downstream.downstreamIntents) {
+            const intent = this.project.intents.find(item => item.id === intentId);
+            if (intent) this.collectIntentElements(intent, nodeIds, edgeIds);
+          }
+        }
+      }
+      return this.graphElementsFromIds(nodeIds, edgeIds);
+    },
+
+    goalPathGraphFocusElements() {
+      if (!this.cy || !this.project) return this.cy?.collection();
+      const nodeIds = new Set(['origin', 'goal']);
+      const edgeIds = new Set();
+      const completion = this.completionIntent();
+      if (completion) {
+        const lineage = this.collectFactLineage('goal');
+        for (const factId of lineage.upstreamFacts) nodeIds.add(factId);
+        for (const intentId of lineage.upstreamIntents) {
+          const intent = this.project.intents.find(item => item.id === intentId);
+          if (intent) this.collectIntentElements(intent, nodeIds, edgeIds);
+        }
+      } else {
+        for (const intent of this.project.intents.filter(item => this.isBootstrapIntent(item))) {
+          this.collectIntentElements(intent, nodeIds, edgeIds);
+        }
+      }
+      return this.graphElementsFromIds(nodeIds, edgeIds);
+    },
+
+    timelineEntryGraphElements(entry) {
+      if (!this.cy || !entry) return this.cy?.collection();
+      if (entry.targetType === 'intent' && entry.targetId) {
+        const intent = this.project.intents.find(item => item.id === entry.targetId);
+        if (!intent) return this.cy.collection();
+        const nodeIds = new Set();
+        const edgeIds = new Set();
+        this.collectIntentElements(intent, nodeIds, edgeIds);
+        return this.cy.nodes().filter(node => nodeIds.has(node.id()))
+          .add(this.cy.edges().filter(edge => edgeIds.has(edge.id())));
+      }
+      if (entry.targetType === 'fact' && entry.targetId) {
+        const node = this.cy.getElementById(entry.targetId);
+        const producing = this.getProducingIntent(entry.targetId);
+        if (!producing) return node;
+        const edgeIds = new Set();
+        const nodeIds = new Set([entry.targetId]);
+        this.collectIntentElements(producing, nodeIds, edgeIds);
+        return this.cy.nodes().filter(item => nodeIds.has(item.id()))
+          .add(this.cy.edges().filter(edge => edgeIds.has(edge.id())));
+      }
+      return this.cy.collection();
+    },
+
     clampPanelWidth(width) {
       const containerWidth = document.getElementById('graphLayout')?.getBoundingClientRect().width || window.innerWidth;
       const min = 260;
@@ -2624,7 +3423,8 @@ function cairnApp() {
       this.selectedNode = null;
       this.selectedFacts = [];
       if (!preserveTimeline) this.selectedTimelineEntryId = null;
-      if (this.cy) this.cy.elements().removeClass('highlight focus faded selected-fact');
+      if (this.cy) this.cy.elements().removeClass('highlight focus faded focus-muted selected-fact');
+      this.applyGraphFocusMode();
     },
 
     clearSelection() {
@@ -2703,6 +3503,7 @@ function cairnApp() {
       this.selectedTimelineEntryId = null;
       this.selectedNode = { type:'intent', id: intentId };
       this.applyLineageHighlightForIntent(intentId);
+      this.applyGraphFocusMode();
     },
 
     selectFact(fact) {
@@ -2713,24 +3514,29 @@ function cairnApp() {
       this.selectedNode = { type:'fact', id: factId };
       if (this.selectedFacts.length > 1) {
         this.applyMultiFactSelectionHighlight();
+        this.applyGraphFocusMode();
         return;
       }
       this.applyLineageHighlightForFact(factId);
+      this.applyGraphFocusMode();
     },
 
     refreshGraphDecorations() {
       if (!this.selectedNode) {
         this.syncFactSelections();
+        this.applyGraphFocusMode();
         return;
       }
       if (this.selectedNode.type === 'intent') this.applyLineageHighlightForIntent(this.selectedNode.id);
       if (this.selectedNode.type === 'fact') {
         if (this.selectedFacts.length > 1 && this.selectedFacts.includes(this.selectedNode.id)) {
           this.applyMultiFactSelectionHighlight();
+          this.applyGraphFocusMode();
           return;
         }
         this.applyLineageHighlightForFact(this.selectedNode.id);
       }
+      this.applyGraphFocusMode();
     },
 
     syncFactSelections() {
@@ -2766,6 +3572,30 @@ function cairnApp() {
       return { upstreamFacts, upstreamIntents };
     },
 
+    collectFactDownstream(fid) {
+      const downstreamFacts = new Set();
+      const downstreamIntents = new Set();
+
+      const walkFactDownstream = (factId) => {
+        if (downstreamFacts.has(factId) || !this.project) return;
+        downstreamFacts.add(factId);
+        for (const intent of this.project.intents) {
+          if (intent.from.includes(factId)) walkIntentDownstream(intent.id);
+        }
+      };
+
+      const walkIntentDownstream = (iid) => {
+        if (downstreamIntents.has(iid) || !this.project) return;
+        downstreamIntents.add(iid);
+        const intent = this.project.intents.find(i => i.id === iid);
+        if (!intent?.to) return;
+        walkFactDownstream(intent.to);
+      };
+
+      walkFactDownstream(fid);
+      return { downstreamFacts, downstreamIntents };
+    },
+
     collectIntentElements(intent, nodeIds, edgeIds) {
       if (intent.to) nodeIds.add(intent.to);
       else nodeIds.add(`_ph_${intent.id}`);
@@ -2783,7 +3613,7 @@ function cairnApp() {
       if (!this.cy || !this.project) return;
       const intent = this.project.intents.find(i => i.id === intentId);
       if (!intent) return;
-      this.cy.elements().removeClass('highlight focus faded');
+      this.cy.elements().removeClass('highlight focus faded focus-muted');
 
       const nodeIds = new Set();
       const edgeIds = new Set();
@@ -2810,7 +3640,7 @@ function cairnApp() {
         if (intent) this.collectIntentElements(intent, nodeIds, edgeIds);
       }
 
-      this.cy.elements().removeClass('highlight focus faded');
+      this.cy.elements().removeClass('highlight focus faded focus-muted');
       const highlightNodes = this.cy.nodes().filter(n => nodeIds.has(n.id()));
       const highlightEdges = this.cy.edges().filter(e => edgeIds.has(e.id()));
       const focusNode = this.cy.getElementById(factId);
@@ -2826,7 +3656,7 @@ function cairnApp() {
 
     applyMultiFactSelectionHighlight() {
       if (!this.cy) return;
-      this.cy.elements().removeClass('highlight focus faded selected-fact');
+      this.cy.elements().removeClass('highlight focus faded focus-muted selected-fact');
       this.syncFactSelections();
     },
 
@@ -2855,6 +3685,40 @@ function cairnApp() {
       return this.selectedFacts.map(fid => factsById.get(fid)).filter(Boolean);
     },
 
+    selectedFactsIncludeProducedFact() {
+      if (!this.project || this.selectedFacts.length === 0) return false;
+      return this.selectedFacts.some(fid => fid !== 'origin' && fid !== 'goal' && !!this.getProducingIntent(fid));
+    },
+
+    completeSelectionWarning() {
+      if (!this.project || this.selectedFacts.length === 0 || this.selectedFactsIncludeProducedFact()) return '';
+      return 'Selected facts do not include a newly produced fact. Completion will rely only on starting scope or static goal context.';
+    },
+
+    completeLineagePreview() {
+      if (!this.project || this.selectedFacts.length === 0) return { summary: '', items: [] };
+      const factIds = new Set();
+      const intentIds = new Set();
+
+      for (const fid of this.selectedFacts) {
+        const lineage = this.collectFactLineage(fid);
+        for (const factId of lineage.upstreamFacts) factIds.add(factId);
+        for (const intentId of lineage.upstreamIntents) intentIds.add(intentId);
+      }
+
+      const factItems = this.project.facts
+        .filter(fact => factIds.has(fact.id))
+        .map(fact => ({ kind: 'fact', id: fact.id, description: fact.description }));
+      const intentItems = this.project.intents
+        .filter(intent => intentIds.has(intent.id))
+        .map(intent => ({ kind: 'intent', id: intent.id, description: intent.description }));
+      const items = [...factItems, ...intentItems];
+      return {
+        summary: `${factItems.length} facts · ${intentItems.length} intents`,
+        items,
+      };
+    },
+
     selectedIntentId() {
       return this.selectedNode?.type === 'intent' ? this.selectedNode.id : null;
     },
@@ -2865,9 +3729,13 @@ function cairnApp() {
       return this.project.intents.find(i => i.id === intentId) || null;
     },
 
+    completionIntent() {
+      return this.project ? this.project.intents.find(intent => intent.to === 'goal') || null : null;
+    },
+
     selectedOpenIntentRecord() {
       const intent = this.selectedIntentRecord();
-      if (!intent || intent.to || !this.projectIsActive()) return null;
+      if (!intent || intent.to || !this.isOperatorMode() || !this.projectIsActive()) return null;
       return intent;
     },
 
@@ -3026,6 +3894,78 @@ function cairnApp() {
       this._timelineEventsCacheProject = this.project;
       this._timelineEventsCache = cached;
       return cached;
+    },
+
+    timelineFilterOptions() {
+      return [
+        { value: 'all', label: 'All' },
+        { value: 'project', label: 'Project' },
+        { value: 'hint', label: 'Hint' },
+        { value: 'intent', label: 'Intent' },
+        { value: 'conclude', label: 'Conclude' },
+        { value: 'complete', label: 'Complete' },
+      ];
+    },
+
+    timelineEntryFilterGroup(entry) {
+      if (entry.type === 'project_created') return 'project';
+      if (entry.type === 'hint_added') return 'hint';
+      if (entry.type === 'intent_concluded') return 'conclude';
+      if (entry.type === 'project_completed') return 'complete';
+      if (['intent_declared', 'intent_running', 'reason_started'].includes(entry.type)) return 'intent';
+      return 'project';
+    },
+
+    timelineEntrySearchText(entry) {
+      return [
+        this.timelineEventBadge(entry),
+        entry.type,
+        entry.actor,
+        entry.title,
+        ...(entry.meta || []),
+        entry.intentId,
+        entry.targetId,
+        ...(entry.sourceFactIds || []),
+      ].filter(Boolean).join(' ').toLowerCase();
+    },
+
+    timelineEntryMatchesSelection(entry) {
+      if (!this.timelineOnlySelected) return true;
+      if (this.selectedTimelineEntryId) return entry.id === this.selectedTimelineEntryId;
+      if (!this.selectedNode) return true;
+      if (this.selectedNode.type === 'intent') {
+        return entry.intentId === this.selectedNode.id || entry.targetId === this.selectedNode.id;
+      }
+      if (this.selectedNode.type === 'fact') {
+        const selectedFacts = new Set(this.selectedFacts.length ? this.selectedFacts : [this.selectedNode.id]);
+        return selectedFacts.has(entry.targetId)
+          || selectedFacts.has(entry.producedFactId)
+          || (entry.sourceFactIds || []).some(fid => selectedFacts.has(fid));
+      }
+      return true;
+    },
+
+    filteredTimelineEvents() {
+      const query = this.timelineSearch.trim().toLowerCase();
+      return this.timelineEvents().filter(entry => {
+        if (this.timelineTypeFilter !== 'all' && this.timelineEntryFilterGroup(entry) !== this.timelineTypeFilter) return false;
+        if (query && !this.timelineEntrySearchText(entry).includes(query)) return false;
+        return this.timelineEntryMatchesSelection(entry);
+      });
+    },
+
+    async copyVisibleTimelineEntries() {
+      const entries = this.filteredTimelineEvents();
+      if (entries.length === 0) {
+        this.showToast('No visible logs to copy', 'error');
+        return;
+      }
+      try {
+        await this.copyText(entries.map(entry => this.timelineEntryCopyText(entry)).join('\n\n'));
+        this.showToast(`Copied ${entries.length} logs`);
+      } catch {
+        this.showToast('Copy failed', 'error');
+      }
     },
 
     resolveTimelineBucket(bucket) {
@@ -3237,6 +4177,14 @@ function cairnApp() {
       this.scrollTimelineToEntry(this.latestTimelineEntryId(), { flash: false });
     },
 
+    followTimelineTailIfEnabled() {
+      if (this.replay.active || this.sideTab !== 'log' || !this.timelineLiveTail) return;
+      if (this.selectedNode || this.selectedTimelineEntryId || this.timelineOnlySelected || this.timelineSearch.trim()) return;
+      const visible = this.filteredTimelineEvents();
+      const latest = visible.length > 0 ? visible[visible.length - 1].id : this.latestTimelineEntryId();
+      this.scrollTimelineToEntry(latest, { flash: false });
+    },
+
     scrollTimelineToSelection() {
       if (this.sideTab !== 'log') return;
       this.scrollTimelineToEntry(this.activeTimelineEntryId(true));
@@ -3271,6 +4219,52 @@ function cairnApp() {
         this.selectedTimelineEntryId = entry.id;
         if (centerGraph) this.centerGraphOnFact(entry.targetId);
       }
+    },
+
+    latestProducedFactId() {
+      if (!this.project) return null;
+      const entries = this.timelineEvents();
+      for (let idx = entries.length - 1; idx >= 0; idx -= 1) {
+        const entry = entries[idx];
+        if (entry.producedFactId && entry.producedFactId !== 'goal') return entry.producedFactId;
+      }
+      return null;
+    },
+
+    nextUnclaimedIntentId() {
+      if (!this.project) return null;
+      return this.project.intents.find(intent => !intent.to && !intent.worker)?.id || null;
+    },
+
+    jumpToLatestFact() {
+      const factId = this.latestProducedFactId();
+      if (!factId) {
+        this.showToast('No produced fact yet', 'error');
+        return;
+      }
+      this.sideTab = 'detail';
+      this.selectedFacts = [factId];
+      this.selectFact(factId);
+      this.centerGraphOnFact(factId);
+    },
+
+    jumpToNextUnclaimedIntent() {
+      const intentId = this.nextUnclaimedIntentId();
+      if (!intentId) {
+        this.showToast('No unclaimed intent', 'error');
+        return;
+      }
+      this.sideTab = 'detail';
+      this.selectIntent(intentId);
+      this.centerGraphOnIntent(intentId);
+    },
+
+    jumpToGoal() {
+      if (!this.getFactRecord('goal')) return;
+      this.sideTab = 'detail';
+      this.selectedFacts = ['goal'];
+      this.selectFact('goal');
+      this.centerGraphOnFact('goal');
     },
 
     formatTime(ts) { if (!ts) return ''; return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); },
@@ -3314,6 +4308,10 @@ function cairnApp() {
     },
 
     async createIntent(claim = false) {
+      if (!this.isOperatorMode()) {
+        this.showToast('Switch to Operator mode first', 'error');
+        return;
+      }
       try {
         const actor = this.actorName();
         await this.api('POST', `/projects/${this.selectedProjectId}/intents`, {
@@ -3330,6 +4328,10 @@ function cairnApp() {
     },
 
     async sendHeartbeatForSelectedIntent() {
+      if (!this.isOperatorMode()) {
+        this.showToast('Switch to Operator mode first', 'error');
+        return;
+      }
       const intent = this.selectedActionableOpenIntentRecord();
       if (!intent) return;
       try {
@@ -3343,6 +4345,10 @@ function cairnApp() {
     },
 
     async releaseSelectedIntent() {
+      if (!this.isOperatorMode()) {
+        this.showToast('Switch to Operator mode first', 'error');
+        return;
+      }
       const intent = this.selectedReleasableOpenIntentRecord();
       if (!intent) return;
       try {
@@ -3357,6 +4363,10 @@ function cairnApp() {
     openConclude(intent) { this.concludeForm = { description:'', intentId: intent.id }; this.showConcludeModal = true; },
 
     async concludeIntent() {
+      if (!this.isOperatorMode()) {
+        this.showToast('Switch to Operator mode first', 'error');
+        return;
+      }
       try {
         const actor = this.actorName();
         await this.api('POST', `/projects/${this.selectedProjectId}/intents/${this.concludeForm.intentId}/conclude`, { worker: actor, description: this.concludeForm.description });
@@ -3376,11 +4386,17 @@ function cairnApp() {
 
     openHintModal() {
       if (!this.projectCanWriteHints()) return;
-      this.hintForm = { content:'' };
+      const targetType = this.selectedNode?.type === 'fact' ? 'fact' : this.selectedNode?.type === 'intent' ? 'intent' : 'project';
+      const targetId = targetType === 'project' ? '' : this.selectedNode.id;
+      this.hintForm = { content:'', hint_type:'note', priority:'normal', target_type: targetType, target_id: targetId, pinned:false };
       this.showHintModal = true;
     },
 
     async completeProject() {
+      if (!this.isOperatorMode()) {
+        this.showToast('Switch to Operator mode first', 'error');
+        return;
+      }
       try {
         const actor = this.actorName();
         await this.api('POST', `/projects/${this.selectedProjectId}/complete`, { from: this.selectedFacts, description: this.completeForm.description, worker: actor });
@@ -3396,9 +4412,17 @@ function cairnApp() {
       if (!this.projectCanWriteHints()) return;
       try {
         const actor = this.actorName();
-        await this.api('POST', `/projects/${this.selectedProjectId}/hints`, { content: this.hintForm.content, creator: actor });
+        await this.api('POST', `/projects/${this.selectedProjectId}/hints`, {
+          content: this.hintForm.content,
+          creator: actor,
+          hint_type: this.hintForm.hint_type,
+          priority: this.hintForm.priority,
+          target_type: this.hintForm.target_type === 'project' ? null : this.hintForm.target_type,
+          target_id: this.hintForm.target_type === 'project' ? null : this.hintForm.target_id,
+          pinned: this.hintForm.pinned,
+        });
         this.showHintModal = false;
-        this.hintForm = { content:'' };
+        this.hintForm = { content:'', hint_type:'note', priority:'normal', target_type:'project', target_id:'', pinned:false };
         await this.loadProjects();
         await this.loadProject(this.selectedProjectId);
         this.sideTab = 'hints';
@@ -3409,6 +4433,7 @@ function cairnApp() {
     saveLocalSettings() {
       try {
         this.localPrefs.actor_name = this.actorName();
+        this.localPrefs.interaction_mode = this.isOperatorMode() ? 'operator' : 'observer';
         this.localPrefs.layout_mode = this.isValidLayoutMode(this.localPrefs.layout_mode) ? this.localPrefs.layout_mode : 'dagre_tb';
         this.layoutMode = this.localPrefs.layout_mode;
         this.saveLocalPrefs();

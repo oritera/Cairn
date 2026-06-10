@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from concurrent.futures import Future
+import time
 
 from cairn.dispatcher.models import ReasonCheckpoint, RunningTask
+from cairn.dispatcher.protocol.client import ApiResult
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.scheduler.loop import DispatcherLoop
 from cairn.dispatcher.scheduler.worker_select import choose_worker
@@ -106,6 +108,40 @@ def test_reap_cleanup_future_records_only_successful_inactive_cleanup() -> None:
     assert loop.cleanup_futures == {}
     assert loop._cleanup_pending == set()
     assert loop._inactive_cleanup_done == {"proj-success": "completed"}
+
+
+def test_reap_future_records_task_finished_event() -> None:
+    loop = _loop()
+    events = []
+
+    class Client:
+        def record_event(self, **kwargs):
+            events.append(kwargs)
+            return ApiResult(201, {})
+
+    future: Future[str] = Future()
+    future.set_result("success")
+    loop.client = Client()
+    loop.futures = {
+        future: RunningTask(
+            "proj",
+            "explore",
+            "worker",
+            TaskCancellation(),
+            intent_id="i001",
+            started_at=time.time() - 0.1,
+        )
+    }
+
+    loop._reap_futures()
+
+    assert loop.futures == {}
+    assert events[0]["event_type"] == "task_finished"
+    assert events[0]["project_id"] == "proj"
+    assert events[0]["task_type"] == "explore"
+    assert events[0]["intent_id"] == "i001"
+    assert events[0]["details"]["outcome"] == "success"
+    assert events[0]["details"]["duration_ms"] >= 0
 
 
 def test_choose_worker_prefers_priority_then_lower_running_count() -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -33,6 +33,11 @@ class Hint(BaseModel):
     id: str
     content: str
     creator: str
+    hint_type: Literal["strategy", "evidence", "correction", "note"] = "note"
+    priority: Literal["low", "normal", "high"] = "normal"
+    target_type: Literal["project", "fact", "intent"] | None = None
+    target_id: str | None = None
+    pinned: bool = False
     created_at: str
 
 
@@ -67,13 +72,99 @@ class ProjectDetail(BaseModel):
     hints: list[Hint]
 
 
+class ProjectDiagnostics(BaseModel):
+    project_id: str
+    title: str
+    status: Literal["active", "stopped", "completed"]
+    severity: Literal["idle", "running", "attention", "blocked", "completed", "stopped"]
+    message: str
+    next_action: str
+    fact_count: int
+    hint_count: int
+    intent_count: int
+    open_intent_count: int
+    working_intent_count: int
+    unclaimed_intent_count: int
+    concluded_intent_count: int
+    reason: ProjectReason | None = None
+
+
+class OpsSummaryProject(BaseModel):
+    project_id: str
+    title: str
+    status: Literal["active", "stopped", "completed"]
+    severity: Literal["idle", "running", "attention", "blocked", "completed", "stopped"]
+    message: str
+    next_action: str
+    fact_count: int
+    hint_count: int
+    intent_count: int
+    working_intent_count: int
+    unclaimed_intent_count: int
+    reason: ProjectReason | None = None
+
+
+class OpsSummary(BaseModel):
+    project_count: int
+    active_count: int
+    stopped_count: int
+    completed_count: int
+    running_count: int
+    attention_count: int
+    working_intent_count: int
+    unclaimed_intent_count: int
+    reason_count: int
+    projects: list[OpsSummaryProject]
+
+
+class OpsEvent(BaseModel):
+    id: int
+    project_id: str | None = None
+    event_type: str
+    task_type: str | None = None
+    worker: str | None = None
+    intent_id: str | None = None
+    severity: Literal["debug", "info", "warning", "error"]
+    message: str
+    details: dict[str, Any] | None = None
+    created_at: str
+
+
+class CreateOpsEventRequest(BaseModel):
+    project_id: str | None = None
+    event_type: str
+    task_type: str | None = None
+    worker: str | None = None
+    intent_id: str | None = None
+    severity: Literal["debug", "info", "warning", "error"] = "info"
+    message: str
+    details: dict[str, Any] | None = None
+
+    @field_validator("project_id", "event_type", "task_type", "worker", "intent_id", "message")
+    @classmethod
+    def validate_optional_non_empty_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = value.strip()
+        if not text:
+            raise ValueError("must not be empty")
+        return text
+
+
 class CreateHintInline(BaseModel):
     content: str
     creator: str
+    hint_type: Literal["strategy", "evidence", "correction", "note"] = "note"
+    priority: Literal["low", "normal", "high"] = "normal"
+    target_type: Literal["project", "fact", "intent"] | None = None
+    target_id: str | None = None
+    pinned: bool = False
 
-    @field_validator("content", "creator")
+    @field_validator("content", "creator", "target_id")
     @classmethod
-    def validate_non_empty_text(cls, value: str) -> str:
+    def validate_non_empty_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         text = value.strip()
         if not text:
             raise ValueError("must not be empty")
@@ -99,10 +190,17 @@ class CreateProjectRequest(BaseModel):
 class CreateHintRequest(BaseModel):
     content: str
     creator: str
+    hint_type: Literal["strategy", "evidence", "correction", "note"] = "note"
+    priority: Literal["low", "normal", "high"] = "normal"
+    target_type: Literal["project", "fact", "intent"] | None = None
+    target_id: str | None = None
+    pinned: bool = False
 
-    @field_validator("content", "creator")
+    @field_validator("content", "creator", "target_id")
     @classmethod
-    def validate_non_empty_text(cls, value: str) -> str:
+    def validate_non_empty_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         text = value.strip()
         if not text:
             raise ValueError("must not be empty")

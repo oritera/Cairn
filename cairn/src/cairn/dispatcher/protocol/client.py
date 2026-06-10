@@ -128,6 +128,33 @@ class CairnClient:
             json={"from": from_ids, "description": description, "creator": creator, "worker": None},
         )
 
+    def record_event(
+        self,
+        *,
+        event_type: str,
+        message: str,
+        project_id: str | None = None,
+        task_type: str | None = None,
+        worker: str | None = None,
+        intent_id: str | None = None,
+        severity: str = "info",
+        details: dict[str, Any] | None = None,
+    ) -> ApiResult:
+        return self._request_json(
+            "POST",
+            "/ops/events",
+            json={
+                "project_id": project_id,
+                "event_type": event_type,
+                "task_type": task_type,
+                "worker": worker,
+                "intent_id": intent_id,
+                "severity": severity,
+                "message": message,
+                "details": details,
+            },
+        )
+
     def _request_json(self, method: str, path: str, json: dict[str, Any]) -> ApiResult:
         try:
             response = self._session().request(

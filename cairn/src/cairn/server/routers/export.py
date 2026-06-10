@@ -28,7 +28,7 @@ def _load_project_data(conn, project_id: str):
         "SELECT id, description FROM facts WHERE project_id = ?", (project_id,)
     ).fetchall()
     hints = conn.execute(
-        "SELECT content, creator, created_at FROM hints WHERE project_id = ? ORDER BY created_at",
+        "SELECT * FROM hints WHERE project_id = ? ORDER BY pinned DESC, created_at",
         (project_id,),
     ).fetchall()
     intents = conn.execute(
@@ -72,6 +72,11 @@ def _export_yaml(conn, project_id: str) -> str:
             {
                 "content": h["content"],
                 "creator": h["creator"],
+                "hint_type": h["hint_type"],
+                "priority": h["priority"],
+                "target_type": h["target_type"],
+                "target_id": h["target_id"],
+                "pinned": bool(h["pinned"]),
                 "created_at": format_export_timestamp(h["created_at"]),
             }
             for h in hints
@@ -115,7 +120,12 @@ def _export_timeline(conn, project_id: str) -> str:
 
     for h in hints:
         ts = format_export_timestamp(h["created_at"]) or ""
-        block = f"[{ts}] HINT by {h['creator']}\n  {h['content']}"
+        meta = f"  type: {h['hint_type']} priority: {h['priority']}"
+        if h["pinned"]:
+            meta += " pinned: true"
+        if h["target_type"] and h["target_id"]:
+            meta += f"\n  target: {h['target_type']}:{h['target_id']}"
+        block = f"[{ts}] HINT by {h['creator']}\n{meta}\n  {h['content']}"
         events.append((h["created_at"] or "", order, block))
         order += 1
 

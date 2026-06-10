@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
-from cairn.server.models import Intent, ProjectMeta, ProjectReason
+from cairn.server.models import Intent, ProjectDiagnostics, ProjectMeta, ProjectReason
 
 def utcnow() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -202,6 +202,68 @@ def project_meta_from_row(row: sqlite3.Row) -> ProjectMeta:
         bootstrap_enabled=bool(row["bootstrap_enabled"]),
         created_at=row["created_at"],
         reason=project_reason_from_row(row),
+    )
+
+
+def project_diagnostics_from_row(row: sqlite3.Row) -> ProjectDiagnostics:
+    reason = project_reason_from_row(row)
+    open_intent_count = row["working_intent_count"] + row["unclaimed_intent_count"]
+    severity = "idle"
+    message = "Project is active with no current work."
+    next_action = "Wait for reason to create the next intent, or add a hint if human guidance is needed."
+
+    if row["status"] == "completed":
+        severity = "completed"
+        message = "Project is completed."
+        next_action = "Review the completion evidence, export the report, or reopen if the conclusion is incorrect."
+    elif row["status"] == "stopped":
+        severity = "stopped"
+        message = "Project is stopped."
+        next_action = "Resume the project when it should continue running. Hints can still be added while stopped."
+    elif reason is not None:
+        severity = "running"
+        message = f"Reason is running on {reason.worker}."
+        next_action = "Watch for new intents or completion. If this does not change, check the reason heartbeat and dispatcher."
+    elif row["working_intent_count"] > 0:
+        severity = "running"
+        message = f"{row['working_intent_count']} intent is being explored."
+        if row["working_intent_count"] != 1:
+            message = f"{row['working_intent_count']} intents are being explored."
+        next_action = "Watch for concluded facts. If progress stalls, check worker heartbeat and task history."
+    elif row["unclaimed_intent_count"] > 0:
+        severity = "attention"
+        message = f"{row['unclaimed_intent_count']} open intent is waiting for a worker."
+        if row["unclaimed_intent_count"] != 1:
+            message = f"{row['unclaimed_intent_count']} open intents are waiting for workers."
+        next_action = "Dispatcher should claim an intent. If nothing starts, check worker availability."
+    elif row["status"] == "active" and row["intent_count"] == 0 and row["fact_count"] <= 2:
+        severity = "idle"
+        if row["bootstrap_enabled"]:
+            message = "Initial project is waiting for bootstrap or reason."
+            next_action = "Dispatcher should start bootstrap/reason. If it stays idle, check dispatcher and worker availability."
+        else:
+            message = "Initial project is waiting for reason."
+            next_action = "Dispatcher should start reason. Add a hint if the starting point needs more context."
+    elif row["status"] == "active" and open_intent_count == 0:
+        severity = "idle"
+        message = "Graph has no open intents and no active reason lease."
+        next_action = "Dispatcher should reason over the latest graph. Add a hint if human direction is needed."
+
+    return ProjectDiagnostics(
+        project_id=row["id"],
+        title=row["title"],
+        status=row["status"],
+        severity=severity,
+        message=message,
+        next_action=next_action,
+        fact_count=row["fact_count"],
+        hint_count=row["hint_count"],
+        intent_count=row["intent_count"],
+        open_intent_count=open_intent_count,
+        working_intent_count=row["working_intent_count"],
+        unclaimed_intent_count=row["unclaimed_intent_count"],
+        concluded_intent_count=row["concluded_intent_count"],
+        reason=reason,
     )
 
 

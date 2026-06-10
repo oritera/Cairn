@@ -207,3 +207,153 @@ def test_project_creation_rejects_invalid_bootstrap_enabled(client: TestClient) 
     )
 
     assert response.status_code == 422
+
+
+def test_ops_summary_and_project_diagnostics_report_runtime_state(client: TestClient) -> None:
+    running_project = _create_project(client)
+    waiting_project = _create_project(client)
+    completed_project = _create_project(client)
+    stopped_project = _create_project(client)
+
+    assert client.post(
+        f"/projects/{running_project}/intents",
+        json={"from": ["origin"], "description": "running work", "creator": "worker-a", "worker": "worker-a"},
+    ).status_code == 201
+    assert client.post(
+        f"/projects/{waiting_project}/intents",
+        json={"from": ["origin"], "description": "waiting work", "creator": "reasoner", "worker": None},
+    ).status_code == 201
+
+    assert client.post(
+        f"/projects/{completed_project}/intents",
+        json={"from": ["origin"], "description": "finish work", "creator": "worker-b", "worker": "worker-b"},
+    ).status_code == 201
+    assert client.post(
+        f"/projects/{completed_project}/intents/i001/conclude",
+        json={"worker": "worker-b", "description": "proof"},
+    ).status_code == 200
+    assert client.post(
+        f"/projects/{completed_project}/complete",
+        json={"from": ["f001"], "description": "done", "worker": "reasoner"},
+    ).status_code == 200
+
+    assert client.put(f"/projects/{stopped_project}/status", json={"status": "stopped"}).status_code == 200
+
+    summary = client.get("/ops/summary")
+    assert summary.status_code == 200
+    payload = summary.json()
+    assert payload["project_count"] == 4
+    assert payload["active_count"] == 2
+    assert payload["stopped_count"] == 1
+    assert payload["completed_count"] == 1
+    assert payload["running_count"] == 1
+    assert payload["attention_count"] == 1
+    assert payload["working_intent_count"] == 1
+    assert payload["unclaimed_intent_count"] == 1
+
+    projects = {item["project_id"]: item for item in payload["projects"]}
+    assert projects[running_project]["severity"] == "running"
+    assert projects[waiting_project]["severity"] == "attention"
+    assert projects[completed_project]["severity"] == "completed"
+    assert projects[stopped_project]["severity"] == "stopped"
+
+    diagnostics = client.get(f"/projects/{waiting_project}/diagnostics")
+    assert diagnostics.status_code == 200
+    detail = diagnostics.json()
+    assert detail["severity"] == "attention"
+    assert detail["open_intent_count"] == 1
+    assert detail["unclaimed_intent_count"] == 1
+    assert "worker" in detail["next_action"].lower()
+
+
+def test_project_diagnostics_reports_reason_lease(client: TestClient) -> None:
+    project_id = _create_project(client)
+    assert client.post(
+        f"/projects/{project_id}/reason/claim",
+        json={"worker": "reasoner", "trigger": "initial"},
+    ).status_code == 200
+
+    response = client.get(f"/projects/{project_id}/diagnostics")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["severity"] == "running"
+    assert payload["reason"]["worker"] == "reasoner"
+    assert "reason" in payload["message"].lower()
+
+
+def test_ops_events_can_be_created_and_filtered(client: TestClient) -> None:
+    project_id = _create_project(client)
+
+    response = client.post(
+        "/ops/events",
+        json={
+            "project_id": project_id,
+            "event_type": "task_dispatched",
+            "task_type": "reason",
+            "worker": "worker-a",
+            "severity": "info",
+            "message": "dispatched reason",
+            "details": {"trigger": "initial"},
+        },
+    )
+
+    assert response.status_code == 201
+    event = response.json()
+    assert event["id"] == 1
+    assert event["project_id"] == project_id
+    assert event["details"] == {"trigger": "initial"}
+
+    assert client.post(
+        "/ops/events",
+        json={
+            "event_type": "worker_unavailable",
+            "severity": "warning",
+            "message": "no worker available",
+        },
+    ).status_code == 201
+
+    project_events = client.get(f"/ops/events?project_id={project_id}").json()
+    assert [item["event_type"] for item in project_events] == ["task_dispatched"]
+
+    warning_events = client.get("/ops/events?severity=warning").json()
+    assert [item["event_type"] for item in warning_events] == ["worker_unavailable"]
+
+    typed_events = client.get("/ops/events?event_type=task_dispatched").json()
+    assert len(typed_events) == 1
+    assert typed_events[0]["task_type"] == "reason"
+
+
+def test_hint_metadata_is_persisted_and_exported(client: TestClient) -> None:
+    project_id = _create_project(client)
+
+    response = client.post(
+        f"/projects/{project_id}/hints",
+        json={
+            "content": "focus on uploaded evidence",
+            "creator": "human",
+            "hint_type": "strategy",
+            "priority": "high",
+            "target_type": "fact",
+            "target_id": "origin",
+            "pinned": True,
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["hint_type"] == "strategy"
+    assert payload["priority"] == "high"
+    assert payload["target_type"] == "fact"
+    assert payload["target_id"] == "origin"
+    assert payload["pinned"] is True
+
+    detail = client.get(f"/projects/{project_id}").json()
+    assert detail["hints"][0]["pinned"] is True
+    assert detail["hints"][0]["id"] == payload["id"]
+
+    exported = client.get(f"/projects/{project_id}/export?format=yaml").text
+    assert "hint_type: strategy" in exported
+    assert "priority: high" in exported
+    assert "target_type: fact" in exported
+    assert "pinned: true" in exported

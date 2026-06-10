@@ -62,9 +62,30 @@ CREATE TABLE IF NOT EXISTS hints (
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     creator TEXT NOT NULL,
+    hint_type TEXT NOT NULL DEFAULT 'note',
+    priority TEXT NOT NULL DEFAULT 'normal',
+    target_type TEXT,
+    target_id TEXT,
+    pinned INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     PRIMARY KEY (id, project_id)
 );
+
+CREATE TABLE IF NOT EXISTS ops_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    task_type TEXT,
+    worker TEXT,
+    intent_id TEXT,
+    severity TEXT NOT NULL,
+    message TEXT NOT NULL,
+    details_json TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ops_events_project_created ON ops_events(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_ops_events_type_created ON ops_events(event_type, created_at);
 
 CREATE TABLE IF NOT EXISTS counters (
     name TEXT PRIMARY KEY,
@@ -91,6 +112,7 @@ def configure(path: Path) -> None:
     with get_conn() as conn:
         conn.executescript(SCHEMA)
         _ensure_project_columns(conn)
+        _ensure_hint_columns(conn)
 
 
 def _ensure_project_columns(conn: sqlite3.Connection) -> None:
@@ -101,6 +123,20 @@ def _ensure_project_columns(conn: sqlite3.Connection) -> None:
             conn.execute(
                 "UPDATE projects SET bootstrap_enabled = CASE WHEN bootstrap_mode = 'disabled' THEN 0 ELSE 1 END"
             )
+
+
+def _ensure_hint_columns(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(hints)")}
+    additions = {
+        "hint_type": "ALTER TABLE hints ADD COLUMN hint_type TEXT NOT NULL DEFAULT 'note'",
+        "priority": "ALTER TABLE hints ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'",
+        "target_type": "ALTER TABLE hints ADD COLUMN target_type TEXT",
+        "target_id": "ALTER TABLE hints ADD COLUMN target_id TEXT",
+        "pinned": "ALTER TABLE hints ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
+    }
+    for column, statement in additions.items():
+        if column not in columns:
+            conn.execute(statement)
 
 
 @contextmanager
