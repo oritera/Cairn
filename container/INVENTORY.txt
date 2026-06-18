@@ -1,0 +1,94 @@
+================================================================================
+                    Cairn Worker Container - 组件清单
+================================================================================
+
+一、系统基础工具 (apt)
+--------------------------------------------------------------------------------
+  bsdextrautils          - 基础工具集
+  npm                    - Node.js 包管理器
+  jq                     - JSON 处理器
+  iputils-ping           - 网络连通性测试
+  sshpass                - SSH 密码自动输入
+  ncat                   - 网络工具
+  rlwrap                 - readline 包装器
+
+二、安全测试工具 (apt)
+--------------------------------------------------------------------------------
+  bloodyad               - Active Directory 权限提升
+  coercer                - 强制认证工具
+  enum4linux-ng          - Windows/Samba 信息枚举
+  pwncat                 - 后渗透工具
+  chisel-common-binaries  - TCP/UDP 隧道工具
+  dirsearch              - Web 目录爆破
+  yq                     - YAML 处理器
+  krb5-user              - Kerberos 客户端
+  gitleaks               - Git 密钥泄露扫描
+  naabu                  - 端口扫描
+  nikto                  - Web 服务器扫描
+  netexec                - 网络执行工具
+  adb                    - Android Debug Bridge
+
+三、安全工具 (pip3)
+--------------------------------------------------------------------------------
+  pwntools               - CTF/漏洞利用框架
+  pymongo                - MongoDB 客户端
+
+四、浏览器自动化 (npm)
+--------------------------------------------------------------------------------
+  @playwright/cli        - 浏览器自动化 CLI
+
+五、安全扫描器 (GitHub Release 安装)
+--------------------------------------------------------------------------------
+  katana v1.5.0          - Web 爬虫 (ProjectDiscovery)
+  nuclei v3.7.1          - 漏洞扫描引擎 (ProjectDiscovery)
+  nuclei-templates       - Nuclei 模板库
+  dalfox v2.12.0         - XSS 扫描器
+  cloudfox v2.0.1        - 云环境枚举 (BishopFox)
+  kerbrute v1.0.3        - Kerberos 爆破
+
+六、知识库 (/home/kali/knowledges/)
+--------------------------------------------------------------------------------
+  PayloadsAllTheThings   - 渗透测试 Payload 全集
+  InternalAllTheThings   - 内网渗透技术
+  hacktricks             - 黑客技术百科
+  hacktricks-cloud       - 云安全技术
+
+七、专项工具 (/home/kali/tools/)
+--------------------------------------------------------------------------------
+  ysoserial v0.0.6       - Java 反序列化 Payload 生成
+  jwt_tool               - JWT 令牌分析/攻击
+  jdwp-shellifier        - Java Debug Wire Protocol 利用
+
+八、PoC 漏洞库 (/home/kali/pocs/)
+--------------------------------------------------------------------------------
+  CVE-PoC                - CVE 概念验证合集
+  exphub                 - 漏洞利用合集
+  2023Hvv_               - 攻防演练相关
+  Awesome-POC            - 优秀 PoC 汇总
+  vulhub                 - 漏洞环境合集
+
+九、辅助工具 (dpkg 安装)
+--------------------------------------------------------------------------------
+  ripgrep 15.1.0         - 高速文本搜索
+  fd 10.4.2              - 高速文件查找
+
+十、云平台 CLI (pip3 + shell)
+--------------------------------------------------------------------------------
+  tccli                  - 腾讯云 CLI
+  awscli                 - AWS CLI
+  aliyun CLI             - 阿里云 CLI
+
+十一、AI Agent CLI (npm 全局安装)
+--------------------------------------------------------------------------------
+  @openai/codex@0.141.0              - OpenAI Codex CLI  (已更新 0.118.0 → 0.141.0)
+  @anthropic-ai/claude-code@2.1.181  - Anthropic Claude Code CLI  (已更新 2.1.98 → 2.1.181)
+  @mariozechner/pi-coding-agent@0.73.1 - Pi Coding Agent CLI  (已更新 0.73.0 → 0.73.1)
+
+十二、Agent 配置文件 (COPY 到 /home/kali/workspace/)
+--------------------------------------------------------------------------------
+  .agents/               - Agent 技能定义目录
+  AGENTS.md              - Agent 系统提示词 (同时复制为 CLAUDE.md)
+
+================================================================================
+  文件位置: container/Dockerfile + container/AGENTS.md + container/.agents/
+================================================================================
