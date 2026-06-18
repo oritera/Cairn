@@ -64,6 +64,11 @@ RUN cd /tmp && \
 RUN pip3 install tccli awscli --break-system-packages && \
     sudo bash -c "$(curl -fsSL https://aliyuncli.alicdn.com/install.sh)"
 
+RUN sudo apt update && \
+    sudo apt install -y xvfb x11vnc novnc fluxbox \
+    xfonts-base xfonts-75dpi xfonts-100dpi xfonts-scalable x11-apps xterm && \
+    sudo apt clean && sudo rm -rf /var/lib/apt/lists/*
+
 RUN sudo npm install -g @openai/codex@0.141.0
 RUN sudo npm install -g @anthropic-ai/claude-code@2.1.181
 RUN sudo npm install -g @mariozechner/pi-coding-agent@0.73.1
@@ -82,10 +87,14 @@ ENV TZ=Asia/Shanghai
 ENV PLAYWRIGHT_MCP_BROWSER=chromium
 ENV CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 ENV PYTHONUNBUFFERED=1
+ENV DISPLAY=:99
+ENV NOVNC_PORT=6080
 
+COPY start-vnc.sh /home/kali/start-vnc.sh
 COPY ./.agents /home/kali/workspace/.agents
 COPY ./.agents /home/kali/workspace/.claude
 COPY ./AGENTS.md /home/kali/workspace/AGENTS.md
 COPY ./AGENTS.md /home/kali/workspace/CLAUDE.md
 
 WORKDIR /home/kali/workspace
+ENTRYPOINT ["/bin/bash", "/home/kali/start-vnc.sh"]
