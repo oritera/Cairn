@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Question / Discussion / 提问 / 讨论"
+    url: https://github.com/oritera/Cairn/discussions
+    about: "Ask questions or start a discussion / 提问或发起讨论"
+  - name: "Discord"
+    url: https://discord.gg/nDSy4NZVP
+    about: "Chat with the community / 加入社区交流"
