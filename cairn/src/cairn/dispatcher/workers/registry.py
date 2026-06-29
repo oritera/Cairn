@@ -3,7 +3,6 @@ from __future__ import annotations
 from cairn.dispatcher.workers.adapters import ClaudeCodeDriver, CodexDriver, MockDriver, PiDriver
 from cairn.dispatcher.workers.base import WorkerDriver
 
-
 DRIVERS: dict[str, WorkerDriver] = {
     "claudecode": ClaudeCodeDriver(),
     "codex": CodexDriver(),
