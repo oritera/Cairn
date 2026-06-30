@@ -3,12 +3,12 @@ from __future__ import annotations
 import hashlib
 import secrets
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import bcrypt
 import jwt
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, field_validator
 
@@ -46,7 +46,7 @@ def _create_token(user_id: str, username: str) -> str:
     payload = {
         "sub": user_id,
         "username": username,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES),
+        "exp": datetime.now(UTC) + timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES),
     }
     return jwt.encode(payload, _jwt_secret(), algorithm=_JWT_ALGORITHM)
 
@@ -64,10 +64,10 @@ def get_current_user(
     try:
         payload = jwt.decode(credentials.credentials, _jwt_secret(), algorithms=[_JWT_ALGORITHM])
         return TokenUser(id=payload["sub"], username=payload["username"])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "token expired")
-    except (jwt.InvalidTokenError, KeyError):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token")
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "token expired") from exc
+    except (jwt.InvalidTokenError, KeyError) as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token") from exc
 
 
 def configure_api_keys(keys: list[str]) -> None:
@@ -114,7 +114,7 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token_type: str = "bearer"  # noqa: S105
     username: str
 
 
@@ -134,7 +134,7 @@ def register_user(req: RegisterRequest) -> TokenResponse:
         if existing is not None:
             raise HTTPException(status.HTTP_409_CONFLICT, "username already exists")
         user_id = _generate_user_id(req.username)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         conn.execute(
             "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
             (user_id, req.username, _hash_password(req.password), now),
@@ -144,7 +144,9 @@ def register_user(req: RegisterRequest) -> TokenResponse:
 
 def login_user(req: LoginRequest) -> TokenResponse:
     with get_conn() as conn:
-        row = conn.execute("SELECT id, username, password_hash FROM users WHERE username = ?", (req.username,)).fetchone()
+        row = conn.execute(
+            "SELECT id, username, password_hash FROM users WHERE username = ?", (req.username,)
+        ).fetchone()
     if row is None or not _verify_password(req.password, row["password_hash"]):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid username or password")
     return TokenResponse(access_token=_create_token(row["id"], row["username"]), username=row["username"])
