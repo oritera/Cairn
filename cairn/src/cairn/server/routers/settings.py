@@ -1,9 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from cairn.server.auth import require_auth
 from cairn.server.db import get_conn
 from cairn.server.models import Settings
 
-router = APIRouter(tags=["settings"])
+router = APIRouter(tags=["settings"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/settings", response_model=Settings)

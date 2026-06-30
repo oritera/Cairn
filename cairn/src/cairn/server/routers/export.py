@@ -1,13 +1,14 @@
 from datetime import datetime
 
 import yaml
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
+from cairn.server.auth import require_auth
 from cairn.server.db import get_conn
 from cairn.server.services import expire_reason_leases, expire_workers, get_project_or_404
 
-router = APIRouter(tags=["export"])
+router = APIRouter(tags=["export"], dependencies=[Depends(require_auth)])
 
 
 def format_export_timestamp(value: str | None) -> str | None:

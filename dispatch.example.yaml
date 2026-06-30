@@ -1,6 +1,10 @@
 # Cairn server API endpoint.
 server: "http://cairn-server:8000"
 
+# API key for authenticating dispatcher requests to the server.
+# Must match one of the comma-separated values in the server's CAIRN_API_KEYS env var.
+server_token: "change-me-to-a-secure-token"
+
 # Shared environment variables merged into every worker.
 common_env:
   TSEC_SERVER_HOST: "<SERVER_HOST>:8000"

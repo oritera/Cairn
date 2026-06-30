@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from cairn.server.auth import require_auth
 from cairn.server.db import get_conn
 from cairn.server.models import (
     ConcludeRequest,
@@ -22,7 +23,7 @@ from cairn.server.services import (
     validate_intent_creator_worker,
 )
 
-router = APIRouter(tags=["intents"])
+router = APIRouter(tags=["intents"], dependencies=[Depends(require_auth)])
 
 
 @router.post(

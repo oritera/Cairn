@@ -5,13 +5,17 @@ import pytest
 
 from cairn.server import db
 from cairn.server.app import app
+from cairn.server.auth import configure_api_keys
+
+_TEST_API_KEY = "test-key"
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch) -> TestClient:
     monkeypatch.setattr(db, "_db_path", None)
     db.configure(tmp_path / "cairn.db")
-    with TestClient(app) as test_client:
+    configure_api_keys([_TEST_API_KEY])
+    with TestClient(app, headers={"X-API-Key": _TEST_API_KEY}) as test_client:
         yield test_client
 
 
