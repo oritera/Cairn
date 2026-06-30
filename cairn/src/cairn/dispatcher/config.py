@@ -201,6 +201,7 @@ class DispatchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     server: str
+    server_token: str = ""
     runtime: RuntimeConfig
     tasks: TasksConfig
     container: ContainerConfig

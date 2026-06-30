@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from cairn import __version__
 from cairn.server import db
+from cairn.server.auth import configure_api_keys, _api_keys_configured
 from cairn.server.routers import auth, export, hints, intents, projects, settings
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -16,6 +18,9 @@ STATIC_DIR = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.configure(db.DEFAULT_DB)
+    if not _api_keys_configured():
+        api_keys = [k.strip() for k in os.environ.get("CAIRN_API_KEYS", "").split(",") if k.strip()]
+        configure_api_keys(api_keys)
     yield
 
 

@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from cairn.server.auth import require_auth
 from cairn.server.db import get_conn
 from cairn.server.models import (
     CompleteRequest,
@@ -38,7 +39,7 @@ from cairn.server.services import (
     validate_goal_not_in_sources,
 )
 
-router = APIRouter(tags=["projects"])
+router = APIRouter(tags=["projects"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/projects", response_model=list[ProjectSummary])

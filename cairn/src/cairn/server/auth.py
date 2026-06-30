@@ -8,7 +8,7 @@ from typing import Annotated
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, field_validator
 
@@ -17,6 +17,7 @@ from cairn.server.db import get_conn
 _JWT_ALGORITHM = "HS256"
 _ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 _bearer = HTTPBearer(auto_error=False)
+_api_keys: set[str] = set()
 
 
 def _get_or_create_secret(conn: sqlite3.Connection) -> str:
@@ -67,6 +68,30 @@ def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "token expired")
     except (jwt.InvalidTokenError, KeyError):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token")
+
+
+def configure_api_keys(keys: list[str]) -> None:
+    _api_keys.clear()
+    _api_keys.update(k for k in keys if k)
+
+
+def _api_keys_configured() -> bool:
+    return len(_api_keys) > 0
+
+
+def require_auth(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    x_api_key: Annotated[str | None, Header()] = None,
+) -> TokenUser | None:
+    if x_api_key and x_api_key in _api_keys:
+        return None
+    if credentials is not None:
+        try:
+            payload = jwt.decode(credentials.credentials, _jwt_secret(), algorithms=[_JWT_ALGORITHM])
+            return TokenUser(id=payload["sub"], username=payload["username"])
+        except (jwt.InvalidTokenError, KeyError):
+            pass
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "authentication required")
 
 
 class RegisterRequest(BaseModel):

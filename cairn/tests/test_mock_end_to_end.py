@@ -18,7 +18,10 @@ from cairn.dispatcher.runtime.process import ProcessResult
 from cairn.dispatcher.scheduler.loop import DispatcherLoop
 from cairn.server import db
 from cairn.server.app import app
+from cairn.server.auth import configure_api_keys
 from cairn.server.models import ProjectDetail, ProjectSummary, Settings
+
+_TEST_API_KEY = "test-key"
 
 
 class InProcessClient:
@@ -178,7 +181,8 @@ class LocalContainerManager:
 def http_client(tmp_path, monkeypatch) -> TestClient:
     monkeypatch.setattr(db, "_db_path", None)
     db.configure(tmp_path / "cairn.db")
-    with TestClient(app) as client:
+    configure_api_keys([_TEST_API_KEY])
+    with TestClient(app, headers={"X-API-Key": _TEST_API_KEY}) as client:
         yield client
 
 
