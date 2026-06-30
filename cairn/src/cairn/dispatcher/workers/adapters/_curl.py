@@ -3,7 +3,6 @@ from __future__ import annotations
 import shlex
 from dataclasses import dataclass
 
-
 _VERBOSE_CURL_SCRIPT = """
 url="$1"
 payload="$2"

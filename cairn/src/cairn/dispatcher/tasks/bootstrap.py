@@ -18,8 +18,8 @@ from cairn.dispatcher.tasks.common import (
     best_effort_release,
     cancel_reason,
     did_timeout,
-    project_allows_conclude_fallback,
     preview,
+    project_allows_conclude_fallback,
     run_healthcheck,
     run_worker_process,
     task_healthcheck_enabled,
@@ -173,7 +173,7 @@ def run_bootstrap_task(
                     lease,
                     cancellation,
                 )
-            if kind == "rejected":
+            if kind == "rejected" or data is None:
                 LOG.warning(
                     "bootstrap rejected project=%s intent=%s worker=%s execute_ms=%s total_ms=%s stdout_preview=%s",
                     project.project.id,
@@ -234,7 +234,9 @@ def run_bootstrap_task(
         best_effort_release(client, project.project.id, intent.id, worker.name)
         return "failed"
     except Exception:
-        LOG.exception("bootstrap task crashed project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
+        LOG.exception(
+            "bootstrap task crashed project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name
+        )
         best_effort_release(client, project.project.id, intent.id, worker.name)
         return "failed"
     finally:
@@ -301,7 +303,12 @@ def _try_conclude_fallback(
         _bootstrap_prompt_replacements(project),
     )
     conclude_argv = driver.build_conclude(worker, prompt, session)
-    LOG.info("starting bootstrap conclude fallback project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
+    LOG.info(
+        "starting bootstrap conclude fallback project=%s intent=%s worker=%s",
+        project.project.id,
+        intent.id,
+        worker.name,
+    )
     conclude_started = time.perf_counter()
     result = run_worker_process(
         container_manager,
@@ -385,7 +392,7 @@ def _try_conclude_fallback(
         project.project.id,
         intent.id,
         worker.name,
-        fact_description,
+        fact_description or "",
         source="bootstrap_conclude",
         phase_ms=conclude_ms,
     )

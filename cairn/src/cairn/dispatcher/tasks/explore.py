@@ -14,8 +14,8 @@ from cairn.dispatcher.tasks.common import (
     best_effort_release,
     cancel_reason,
     did_timeout,
-    project_allows_conclude_fallback,
     preview,
+    project_allows_conclude_fallback,
     run_healthcheck,
     run_worker_process,
     task_healthcheck_enabled,
@@ -197,7 +197,7 @@ def run_explore_task(
                 project.project.id,
                 intent.id,
                 worker.name,
-                description,
+                description or "",
                 source="explore_execute",
                 phase_ms=execute_ms,
                 total_ms=int((time.perf_counter() - task_started) * 1000),
@@ -274,7 +274,12 @@ def _try_conclude_fallback(
         best_effort_release(client, project_id, intent.id, worker.name)
         return "failed"
     if lease.failure is not None:
-        LOG.warning("conclude fallback skipped because heartbeat already lost project=%s intent=%s worker=%s", project_id, intent.id, worker.name)
+        LOG.warning(
+            "conclude fallback skipped because heartbeat already lost project=%s intent=%s worker=%s",
+            project_id,
+            intent.id,
+            worker.name,
+        )
         best_effort_release(client, project_id, intent.id, worker.name)
         return "failed"
     if cancellation.is_cancelled:
@@ -388,7 +393,7 @@ def _try_conclude_fallback(
         project_id,
         intent.id,
         worker.name,
-        description,
+        description or "",
         source="explore_conclude",
         phase_ms=conclude_ms,
     )

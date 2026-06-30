@@ -107,9 +107,4 @@ class CodexDriver(RegexSessionDriver):
 
     @staticmethod
     def _healthcheck_payload(worker: WorkerConfig) -> str:
-        return (
-            '{"input":[{"content":"ping","role":"user"}],'
-            '"model":"'
-            + worker.env["CODEX_MODEL"]
-            + '","stream":false}'
-        )
+        return '{"input":[{"content":"ping","role":"user"}],"model":"' + worker.env["CODEX_MODEL"] + '","stream":false}'

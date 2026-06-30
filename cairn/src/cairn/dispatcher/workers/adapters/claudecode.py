@@ -4,7 +4,6 @@ from cairn.dispatcher.config import WorkerConfig
 from cairn.dispatcher.workers.adapters._curl import build_verbose_curl_healthcheck, expand_env, render_curl_command
 from cairn.dispatcher.workers.base import DriverResult, SeedSessionDriver
 
-
 ANTHROPIC_VERSION = "2023-06-01"
 
 

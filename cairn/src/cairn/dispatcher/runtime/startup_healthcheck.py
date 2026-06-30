@@ -143,9 +143,7 @@ def _log_report(results: list[StartupHealthcheckResult], *, show_commands: bool)
             f"{duration_seconds:>8}  "
             f"{preview}"
         )
-    lines.append(
-        f"[=] Summary: total={len(results)} healthy={healthy_count} unhealthy={len(results) - healthy_count}"
-    )
+    lines.append(f"[=] Summary: total={len(results)} healthy={healthy_count} unhealthy={len(results) - healthy_count}")
     if show_commands:
         lines.append("")
         lines.append("[=] Startup healthcheck commands")

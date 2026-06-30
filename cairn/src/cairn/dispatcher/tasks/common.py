@@ -98,7 +98,9 @@ def run_healthcheck(
         cancellation.attach_process(process)
     started = time.perf_counter()
     try:
-        result = process.communicate(timeout=communicate_timeout(timeout_seconds, HEALTHCHECK_COMMUNICATE_GRACE_SECONDS))
+        result = process.communicate(
+            timeout=communicate_timeout(timeout_seconds, HEALTHCHECK_COMMUNICATE_GRACE_SECONDS)
+        )
     finally:
         if lease is not None:
             lease.attach_process(None)
