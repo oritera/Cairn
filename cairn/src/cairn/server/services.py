@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException
 
 from cairn.server.models import Intent, ProjectMeta, ProjectReason
 
+
 def utcnow() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def next_project_id(conn: sqlite3.Connection) -> str:
@@ -17,9 +18,7 @@ def next_project_id(conn: sqlite3.Connection) -> str:
     return f"proj_{row['value']:03d}"
 
 
-def _next_scoped_id(
-    conn: sqlite3.Connection, kind: str, prefix: str, project_id: str
-) -> str:
+def _next_scoped_id(conn: sqlite3.Connection, kind: str, prefix: str, project_id: str) -> str:
     conn.execute(
         "INSERT OR IGNORE INTO scoped_counters (project_id, kind, value) VALUES (?, ?, 0)",
         (project_id, kind),
@@ -76,13 +75,9 @@ def check_project_completed(conn: sqlite3.Connection, project_id: str) -> sqlite
     return row
 
 
-def validate_facts_exist(
-    conn: sqlite3.Connection, project_id: str, fact_ids: list[str]
-) -> None:
+def validate_facts_exist(conn: sqlite3.Connection, project_id: str, fact_ids: list[str]) -> None:
     for fid in fact_ids:
-        row = conn.execute(
-            "SELECT 1 FROM facts WHERE id = ? AND project_id = ?", (fid, project_id)
-        ).fetchone()
+        row = conn.execute("SELECT 1 FROM facts WHERE id = ? AND project_id = ?", (fid, project_id)).fetchone()
         if row is None:
             raise HTTPException(404, f"Fact {fid} not found")
 
@@ -97,9 +92,7 @@ def validate_intent_creator_worker(creator: str, worker: str | None) -> None:
         raise HTTPException(400, "worker must be null or equal to creator")
 
 
-def get_intent_or_404(
-    conn: sqlite3.Connection, project_id: str, intent_id: str
-) -> sqlite3.Row:
+def get_intent_or_404(conn: sqlite3.Connection, project_id: str, intent_id: str) -> sqlite3.Row:
     row = conn.execute(
         "SELECT * FROM intents WHERE id = ? AND project_id = ?",
         (intent_id, project_id),

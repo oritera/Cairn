@@ -28,10 +28,50 @@ build-backend = "uv_build"
 dev = [
     "httpx>=0.27",
     "pytest>=8.3",
+    "ruff>=0.12",
+    "pyright>=1.1",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "S",      # flake8-bandit (security)
+    "A",      # flake8-builtins
+    "T20",    # flake8-print
+    "SIM",    # flake8-simplify
+    "RUF",    # ruff-specific
+]
+ignore = [
+    "E501",   # line too long — log/SQL lines are fine
+    "S101",   # assert used — tests need it
+    "S108",   # hardcoded tmp path — intentional container paths
+    "S311",   # pseudo-random — used for load balancing, not crypto
+    "S603",   # subprocess without shell=True — intentional
+    "S607",   # partial executable path — intentional
+    "A002",   # shadowing builtin — query param naming
+    "SIM108", # ternary — readability preference
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["cairn"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+include = ["src"]
 
 [[tool.uv.index]]
 url = "https://mirrors.aliyun.com/pypi/simple"

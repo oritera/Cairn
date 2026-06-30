@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
 import logging
 import threading
+from dataclasses import dataclass
+from typing import Any
 
-from pydantic import TypeAdapter
 import requests
+from pydantic import TypeAdapter
 from requests.adapters import HTTPAdapter
 
-from cairn.server.models import Intent, ProjectDetail, ProjectSummary, Settings
+from cairn.server.models import ProjectDetail, ProjectSummary, Settings
 
 LOG = logging.getLogger(__name__)
 

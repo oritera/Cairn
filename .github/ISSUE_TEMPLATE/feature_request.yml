@@ -1,0 +1,56 @@
+name: "Feature Request / 功能建议"
+description: "Suggest a new feature or improvement / 提出新功能或改进建议"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We appreciate your ideas! Please describe what you'd like to see.
+        欢迎提出建议！请描述你希望看到的改进。
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: "Component / 组件"
+      description: "Which part of Cairn does this relate to? / 与 Cairn 的哪个部分相关？"
+      options:
+        - "Server (API / Web UI)"
+        - "Dispatcher (Scheduler / Tasks)"
+        - "Worker (Claude Code / Codex / Pi)"
+        - "Container / Docker"
+        - "New Worker Backend / 新 Worker 后端"
+        - "Documentation / 文档"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "Motivation / 动机"
+      description: "Why is this feature needed? What problem does it solve? / 为什么需要这个功能？它解决什么问题？"
+      placeholder: |
+        I'm trying to ... but currently ...
+        我尝试……但目前……
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "Proposed Solution / 方案描述"
+      description: "Describe how you'd like it to work. / 描述你期望的工作方式。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives Considered / 备选方案（optional / 可选）"
+      description: "Any alternatives you've thought about. / 你考虑过的其他方案。"
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "Additional Context / 补充信息（optional / 可选）"
+      description: "Mockups, references, or related issues. / 原型图、参考资料或相关 issue。"

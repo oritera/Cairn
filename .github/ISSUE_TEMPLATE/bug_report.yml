@@ -1,0 +1,80 @@
+name: "Bug Report / 缺陷报告"
+description: "Report a bug or unexpected behavior / 报告缺陷或异常行为"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting! Please fill in the sections below.
+        感谢反馈！请填写以下内容。
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: "Component / 组件"
+      description: "Which part of Cairn is affected? / 哪个部分受到影响？"
+      options:
+        - "Server (API / Web UI)"
+        - "Dispatcher (Scheduler / Tasks)"
+        - "Worker (Claude Code / Codex / Pi)"
+        - "Container / Docker"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description / 描述"
+      description: "A clear description of the bug. / 清晰描述该缺陷。"
+      placeholder: |
+        What happened? What did you expect?
+        发生了什么？你期望的行为是什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to Reproduce / 复现步骤"
+      description: "Minimal steps to reproduce the issue. / 最小化复现步骤。"
+      placeholder: |
+        1. Run `uv run cairn dispatch --config dispatch.yaml`
+        2. Create a project with origin "..." and goal "..."
+        3. Observe error in dispatcher logs
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs / Error Output / 日志 / 错误输出"
+      description: "Paste relevant logs or error messages. / 粘贴相关日志或错误信息。"
+      render: shell
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environment / 环境信息"
+      description: "Please provide your environment details. / 请提供环境信息。"
+      value: |
+        - OS / 系统:
+        - Python version / Python 版本:
+        - Cairn version / Cairn 版本:
+        - Deploy method / 部署方式: [Docker Compose / Manual]
+        - Worker backend / Worker 后端: [Claude Code / Codex / Pi]
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: "Configuration / 配置（optional / 可选）"
+      description: "Relevant parts of dispatch.yaml (redact API keys). / dispatch.yaml 相关配置（请隐去 API 密钥）。"
+      render: yaml
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "Additional Context / 补充信息（optional / 可选）"
+      description: "Screenshots, related issues, or anything else. / 截图、相关 issue 或其他信息。"

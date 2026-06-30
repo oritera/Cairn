@@ -60,7 +60,9 @@ def _looks_like_explore_data(payload: dict[str, Any]) -> bool:
 
 
 def validate_reason_payload(
-    payload: dict[str, Any], open_intents_empty: bool, max_intents: int,
+    payload: dict[str, Any],
+    open_intents_empty: bool,
+    max_intents: int,
 ) -> tuple[str, dict[str, Any] | list[dict[str, Any]] | None]:
     accepted, data = _unwrap_wrapped_payload(payload)
     if accepted is False:

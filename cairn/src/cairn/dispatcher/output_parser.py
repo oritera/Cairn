@@ -4,7 +4,6 @@ import json
 import re
 from typing import Any
 
-
 FENCED_BLOCK_RE = re.compile(r"```(?:json)?\s*\n?(.*?)```", re.IGNORECASE | re.DOTALL)
 
 

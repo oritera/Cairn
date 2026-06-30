@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev-*]
+  pull_request:
+    branches: [main, dev-*]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cairn
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Ruff check
+        run: uv run ruff check src/
+
+      - name: Ruff format
+        run: uv run ruff format --check src/
+
+      - name: Pyright
+        run: uv run pyright src/
+
+      - name: Tests
+        run: uv run pytest
