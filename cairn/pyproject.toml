@@ -13,6 +13,8 @@ dependencies = [
     "pyyaml>=6.0",
     "docker>=7.1.0",
     "requests>=2.32.3",
+    "pyjwt>=2.9",
+    "bcrypt>=4.2",
 ]
 
 [project.scripts]

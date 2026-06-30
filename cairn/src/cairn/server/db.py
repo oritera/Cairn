@@ -10,6 +10,18 @@ DEFAULT_DB = Path.home() / ".local" / "share" / "cairn" / "cairn.db"
 _db_path: Path | None = None
 
 SCHEMA = """\
+CREATE TABLE IF NOT EXISTS kv (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     intent_timeout INTEGER NOT NULL DEFAULT 15,
     reason_timeout INTEGER NOT NULL DEFAULT 15
@@ -91,6 +103,18 @@ def configure(path: Path) -> None:
     with get_conn() as conn:
         conn.executescript(SCHEMA)
         _ensure_project_columns(conn)
+        _ensure_user_tables(conn)
+
+
+def _ensure_user_tables(conn: sqlite3.Connection) -> None:
+    tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "users" not in tables:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS users "
+            "(id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TEXT NOT NULL)"
+        )
+    if "kv" not in tables:
+        conn.execute("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
 
 
 def _ensure_project_columns(conn: sqlite3.Connection) -> None:
