@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from cairn.server.db import get_conn
+from cairn.server.event_store import insert_runtime_event
 from cairn.server.models import (
     CompleteRequest,
     CreateProjectRequest,
@@ -102,6 +103,16 @@ def create_project(body: CreateProjectRequest):
                     (hid, pid, h.content, h.creator, now),
                 )
                 hints.append(Hint(id=hid, content=h.content, creator=h.creator, created_at=now))
+
+        insert_runtime_event(
+            conn,
+            project_id=pid,
+            event_type="project_created",
+            phase="project",
+            status="success",
+            message=f"Project created: {body.title}",
+            payload={"bootstrap_enabled": body.bootstrap_enabled},
+        )
 
         return ProjectDetail(
             project=ProjectMeta(

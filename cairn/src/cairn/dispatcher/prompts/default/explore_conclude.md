@@ -13,7 +13,7 @@ When rejecting a task, return the following:
 
 Normal return example:
 ```json
-{"accepted": true, "data": {"description": "..."}}
+{"accepted": true, "data": {"description": "...", "http_records": []}}
 ```
 
 # Rules
@@ -23,6 +23,7 @@ Normal return example:
 - This JSON summary is your final output for this phase. After outputting it, stop.
 - `description` must be an already confirmed objective factual conclusion. Do not output plans, guesses, or explanatory filler. Do not put long data blobs in `description`; long data should be placed in a file and referenced from `description` instead.
 - `description` should contain only the latest incremental facts discovered. Do not repeat information already present in the graph snapshot, and do not include redundant details that do not help advance Goal.
+- Include already-confirmed, materially useful HTTP exchanges in `data.http_records` using `method`, `url`, `request` (`headers`, `body`), `response` (`status`, `headers`, `body`), and `significance`. Omit routine or duplicate traffic and redact reusable credentials.
 
 # Context
 ## Graph

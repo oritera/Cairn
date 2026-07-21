@@ -50,7 +50,7 @@ class DispatcherLoop:
         else:
             assert self.config.container is not None
             self.container_manager = ContainerManager(self.config.container)
-        self.executor = ThreadPoolExecutor(max_workers=self.config.runtime.max_workers)
+        self.executor = ThreadPoolExecutor(max_workers=max(32, self.config.runtime.max_workers))
         self.cleanup_executor = ThreadPoolExecutor(max_workers=max(1, min(8, self.config.runtime.max_workers)))
         self.futures: dict[Future[str], RunningTask] = {}
         self.cleanup_futures: dict[Future[bool], tuple[str, str | None, str | None]] = {}
@@ -64,6 +64,7 @@ class DispatcherLoop:
         self.project_cursor = 0
         self._settings_checked = False
         self._startup_healthchecks_checked = False
+        self._config_mtime_ns = self.config_path.stat().st_mtime_ns
 
     def close(self) -> None:
         if self.futures:
@@ -82,6 +83,7 @@ class DispatcherLoop:
             self.run_startup_healthchecks()
             while True:
                 try:
+                    self._maybe_reload_config()
                     if not self._settings_checked:
                         self._validate_server_settings()
                         self._settings_checked = True
@@ -108,6 +110,49 @@ class DispatcherLoop:
                 time.sleep(self.config.runtime.interval)
         finally:
             self.close()
+
+    def _maybe_reload_config(self) -> None:
+        try:
+            mtime_ns = self.config_path.stat().st_mtime_ns
+        except OSError as exc:
+            LOG.warning("dispatch config stat failed path=%s error=%s", self.config_path, exc)
+            return
+        if mtime_ns == self._config_mtime_ns:
+            return
+        if self.futures or self.cleanup_futures:
+            LOG.info(
+                "dispatch config change detected; reload deferred until tasks are idle running=%s cleanup=%s",
+                len(self.futures),
+                len(self.cleanup_futures),
+            )
+            return
+        try:
+            updated = DispatchConfig.load(self.config_path)
+        except Exception as exc:
+            LOG.error("dispatch config reload failed path=%s error=%s", self.config_path, exc)
+            self._config_mtime_ns = mtime_ns
+            return
+        immutable_before = (
+            self.config.server,
+            self.config.runtime.execution,
+            self.config.container,
+            self.config.local,
+        )
+        immutable_after = (updated.server, updated.runtime.execution, updated.container, updated.local)
+        if immutable_before != immutable_after:
+            LOG.warning("dispatch config saved but server/backend changes require dispatcher restart")
+            self._config_mtime_ns = mtime_ns
+            return
+        self.config = updated
+        self._config_mtime_ns = mtime_ns
+        if self.config.runtime.execution == "local":
+            self._run_local_binary_check()
+        LOG.info(
+            "dispatch config hot-reloaded workers=%s max_workers=%s interval=%ss",
+            [worker.name for worker in self.config.workers],
+            self.config.runtime.max_workers,
+            self.config.runtime.interval,
+        )
 
     def run_startup_healthchecks_only(self) -> None:
         try:
@@ -425,6 +470,7 @@ class DispatcherLoop:
         self.runtime_project_ids.add(project.project.id)
         self._clear_project_log_state(project.project.id)
         LOG.info("dispatched reason project=%s worker=%s trigger=%s", project.project.id, worker.name, trigger)
+        self._record_task_event(project.project.id, "reason", worker.name, None, "running", f"Reason started: {trigger}")
         return True
 
     def _dispatch_bootstrap(self, project: ProjectDetail, intent: Intent) -> bool:
@@ -483,6 +529,7 @@ class DispatcherLoop:
         self.runtime_project_ids.add(project.project.id)
         self._clear_project_log_state(project.project.id)
         LOG.info("dispatched bootstrap project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
+        self._record_task_event(project.project.id, "bootstrap", worker.name, intent.id, "running", "Bootstrap worker started")
         return True
 
     def _dispatch_explore(self, project: ProjectDetail, export_yaml: str, intent: Intent) -> bool:
@@ -542,6 +589,7 @@ class DispatcherLoop:
         self.runtime_project_ids.add(project.project.id)
         self._clear_project_log_state(project.project.id)
         LOG.info("dispatched explore project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
+        self._record_task_event(project.project.id, "explore", worker.name, intent.id, "running", "Intent exploration started")
         return True
 
     def _select_worker(self, project_id: str, task_type: str) -> WorkerSelection:
@@ -723,6 +771,16 @@ class DispatcherLoop:
             task = self.futures.pop(future)
             try:
                 outcome = future.result()
+                self._record_task_event(
+                    task.project_id,
+                    task.task_type,
+                    task.worker_name,
+                    task.intent_id,
+                    "success" if outcome == "success" else ("warning" if outcome in ("cancelled", "rejected") else "error"),
+                    f"{task.task_type.capitalize()} finished: {outcome}",
+                    event_type="task_finished",
+                    payload={"outcome": outcome},
+                )
                 if outcome == "cancelled":
                     LOG.info(
                         "task cancelled project=%s task=%s worker=%s",
@@ -778,7 +836,17 @@ class DispatcherLoop:
                         task.hint_count,
                         task.open_intent_count,
                     )
-            except Exception:
+            except Exception as exc:
+                self._record_task_event(
+                    task.project_id,
+                    task.task_type,
+                    task.worker_name,
+                    task.intent_id,
+                    "error",
+                    f"{task.task_type.capitalize()} crashed: {type(exc).__name__}",
+                    event_type="task_finished",
+                    payload={"outcome": "crashed"},
+                )
                 LOG.exception("task crashed project=%s task=%s worker=%s", task.project_id, task.task_type, task.worker_name)
 
     def _cleanup_completed_containers(self, summaries: list[ProjectSummary]) -> None:
@@ -886,6 +954,37 @@ class DispatcherLoop:
         response = self.client.release_reason(project_id, worker_name)
         if not response.ok and response.status_code not in (403, 409):
             LOG.warning("reason release failed project=%s worker=%s status=%s", project_id, worker_name, response.status_code)
+
+    def _record_task_event(
+        self,
+        project_id: str,
+        task_type: str,
+        worker_name: str,
+        intent_id: str | None,
+        status: str,
+        message: str,
+        *,
+        event_type: str = "task_started",
+        payload: dict[str, object] | None = None,
+    ) -> None:
+        response = self.client.create_runtime_event(
+            project_id,
+            event_type=event_type,
+            phase=task_type,
+            status=status,
+            message=message,
+            worker=worker_name,
+            intent_id=intent_id,
+            payload=payload,
+        )
+        if not response.ok and response.status_code not in (403, 404):
+            LOG.warning(
+                "runtime event write failed project=%s task=%s worker=%s status=%s",
+                project_id,
+                task_type,
+                worker_name,
+                response.status_code,
+            )
 
     def _log_changed(self, scope: str, level: int, message: str, *args: object) -> None:
         state = (level, message, args)

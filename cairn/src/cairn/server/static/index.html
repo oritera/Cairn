@@ -274,7 +274,7 @@
       <button @click="showLocalPrefs = true" class="h-7 max-w-40 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center shrink-0">
         <span class="truncate block" x-text="actorName()"></span>
       </button>
-      <button @click="loadSettings(); showSettings = true" class="h-7 w-7 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition inline-flex items-center justify-center shrink-0">
+      <button @click="loadSettings(); loadDispatchConfig(); showSettings = true" class="h-7 w-7 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition inline-flex items-center justify-center shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7 7 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a7 7 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a7 7 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a7 7 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path d="M15 12a3 3 0 1 1-6 0-3 3 0 0 1 6 0Z"/></svg>
       </button>
     </div>
@@ -476,7 +476,7 @@
       <button @click="showLocalPrefs = true" class="h-7 max-w-40 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center shrink-0">
         <span class="truncate block" x-text="actorName()"></span>
       </button>
-      <button @click="loadSettings(); showSettings = true" class="h-7 w-7 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition inline-flex items-center justify-center shrink-0">
+      <button @click="loadSettings(); loadDispatchConfig(); showSettings = true" class="h-7 w-7 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition inline-flex items-center justify-center shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7 7 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a7 7 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a7 7 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a7 7 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path d="M15 12a3 3 0 1 1-6 0-3 3 0 0 1 6 0Z"/></svg>
       </button>
     </div>
@@ -578,12 +578,90 @@
       <div class="flex border-b border-slate-100 shrink-0">
         <button @click="sideTab = 'detail'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
           :class="sideTab === 'detail' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Detail</button>
-        <button @click="sideTab = 'hints'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
+        <button @click="sideTab = 'live'" class="flex-1 px-2 py-2.5 text-xs font-medium transition"
+          :class="sideTab === 'live' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-slate-400 hover:text-slate-600'">
+          Live <span class="ml-0.5 text-[10px] opacity-60" x-text="liveEvents.length"></span>
+        </button>
+        <button @click="sideTab = 'http'" class="flex-1 px-2 py-2.5 text-xs font-medium transition"
+          :class="sideTab === 'http' ? 'text-emerald-600 border-b-2 border-emerald-500' : 'text-slate-400 hover:text-slate-600'">
+          HTTP <span class="ml-0.5 text-[10px] opacity-60" x-text="httpRecords.length"></span>
+        </button>
+        <button @click="sideTab = 'hints'" class="flex-1 px-2 py-2.5 text-xs font-medium transition"
           :class="sideTab === 'hints' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">
           Hints <span class="ml-0.5 text-[10px] opacity-60" x-text="project.hints.length"></span>
         </button>
-        <button @click="sideTab = 'log'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
+        <button @click="sideTab = 'log'" class="flex-1 px-2 py-2.5 text-xs font-medium transition"
           :class="sideTab === 'log' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Log</button>
+      </div>
+
+      <!-- Live runtime events -->
+      <div x-show="sideTab === 'live'" class="flex-1 overflow-y-auto p-4 space-y-3 bg-sky-50/20">
+        <div class="sticky top-0 z-10 flex items-center justify-between rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur">
+          <div class="flex items-center gap-2 text-xs font-medium text-slate-600">
+            <span class="h-2 w-2 rounded-full" :class="sseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"></span>
+            <span x-text="sseConnected ? 'Live stream connected' : 'Reconnecting…'"></span>
+          </div>
+          <span class="text-[10px] text-slate-400">SSE</span>
+        </div>
+        <template x-if="liveEvents.length === 0">
+          <div class="rounded-2xl border border-dashed border-sky-200 bg-white/80 px-5 py-10 text-center">
+            <p class="text-sm text-slate-400">Waiting for runtime activity</p>
+            <p class="mt-1 text-xs text-slate-300">Worker phases will appear here instantly</p>
+          </div>
+        </template>
+        <template x-for="event in [...liveEvents].reverse()" :key="event.id">
+          <article class="rounded-2xl border bg-white px-3.5 py-3 shadow-sm" :class="runtimeEventCardClass(event)">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide" :class="runtimeEventBadgeClass(event)" x-text="event.phase || event.event_type"></span>
+                  <span x-show="event.status === 'running'" class="inline-flex items-center gap-1 text-[10px] text-sky-600"><span class="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse"></span>running</span>
+                </div>
+                <p class="mt-1.5 text-sm leading-relaxed text-slate-700 break-words" x-text="event.message"></p>
+                <p class="mt-1 text-[11px] text-slate-400 break-words" x-text="[event.worker, event.intent_id].filter(Boolean).join(' · ')"></p>
+              </div>
+              <div class="shrink-0 text-right text-[10px] text-slate-400 tabular-nums">
+                <div x-text="formatTime(event.created_at)"></div>
+                <div class="mt-1" x-text="runtimeEventElapsed(event)"></div>
+              </div>
+            </div>
+          </article>
+        </template>
+      </div>
+
+      <!-- HTTP evidence -->
+      <div x-show="sideTab === 'http'" class="flex-1 overflow-y-auto p-4 space-y-3 bg-emerald-50/20">
+        <template x-if="httpRecords.length === 0">
+          <div class="rounded-2xl border border-dashed border-emerald-200 bg-white/80 px-5 py-10 text-center">
+            <p class="text-sm text-slate-400">No meaningful HTTP evidence yet</p>
+            <p class="mt-1 text-xs text-slate-300">Routine scanner traffic is intentionally omitted</p>
+          </div>
+        </template>
+        <template x-for="record in [...httpRecords].reverse()" :key="record.id">
+          <details class="group rounded-2xl border border-emerald-200/80 bg-white shadow-sm overflow-hidden">
+            <summary class="cursor-pointer list-none px-4 py-3 hover:bg-emerald-50/40 transition">
+              <div class="flex items-start gap-3">
+                <span class="mt-0.5 rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700" x-text="record.method"></span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-xs font-mono text-slate-700" x-text="record.url"></p>
+                  <p class="mt-1 text-xs leading-relaxed text-slate-500" x-text="record.significance"></p>
+                </div>
+                <span class="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold" :class="httpStatusClass(record.response.status)" x-text="record.response.status || '—'"></span>
+              </div>
+            </summary>
+            <div class="border-t border-emerald-100 p-3 space-y-3 bg-slate-950 text-slate-200">
+              <div>
+                <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-sky-300">Request</p>
+                <pre class="whitespace-pre-wrap break-all text-[10px] leading-4" x-text="formatHttpMessage(record.request)"></pre>
+              </div>
+              <div>
+                <p class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-300">Response</p>
+                <pre class="max-h-72 overflow-auto whitespace-pre-wrap break-all text-[10px] leading-4" x-text="formatHttpMessage(record.response, true)"></pre>
+              </div>
+              <p class="text-[10px] text-slate-500" x-text="[record.id, record.intent_id, record.worker].filter(Boolean).join(' · ')"></p>
+            </div>
+          </details>
+        </template>
       </div>
 
       <!-- Detail -->
@@ -987,8 +1065,15 @@
 
 <!-- Settings -->
 <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showSettings = false">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-slate-200/60" @click.stop>
-    <h3 class="text-base font-semibold text-slate-700 mb-4">Server Settings</h3>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 border border-slate-200/60 overflow-hidden" @click.stop>
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h3 class="text-base font-semibold text-slate-700">Configuration</h3>
+      <div class="flex rounded-lg border border-slate-200 overflow-hidden">
+        <button @click="settingsTab = 'server'" class="px-3 py-1.5 text-xs font-medium" :class="settingsTab === 'server' ? 'bg-slate-100 text-slate-700' : 'text-slate-400'">Server</button>
+        <button @click="settingsTab = 'dispatch'" class="px-3 py-1.5 text-xs font-medium" :class="settingsTab === 'dispatch' ? 'bg-slate-100 text-slate-700' : 'text-slate-400'">Dispatcher YAML</button>
+      </div>
+    </div>
+    <div x-show="settingsTab === 'server'" class="p-6">
     <div>
       <label class="text-[11px] text-slate-400 mb-1 block font-medium">Intent timeout (seconds)</label>
       <input type="number" x-model.number="settingsForm.intent_timeout" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
@@ -1001,6 +1086,21 @@
     <div class="flex justify-end gap-2 mt-5">
       <button @click="showSettings = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
       <button @click="saveServerSettings()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200">Save Server</button>
+    </div>
+    </div>
+    <div x-show="settingsTab === 'dispatch'" class="p-6">
+      <div class="flex items-center justify-between gap-4 mb-3">
+        <div class="min-w-0">
+          <p class="text-xs font-medium text-slate-600 truncate" x-text="dispatchConfigForm.path || 'dispatch.yaml'"></p>
+          <p class="text-[11px] text-slate-400">Validated before save; scheduler settings hot-reload when workers are idle.</p>
+        </div>
+        <span x-show="dispatchConfigForm.redacted" class="shrink-0 rounded-lg bg-amber-50 px-2.5 py-1 text-[10px] font-medium text-amber-700">Secrets masked and preserved</span>
+      </div>
+      <textarea x-model="dispatchConfigForm.yaml" spellcheck="false" class="h-[52vh] w-full resize-none rounded-xl border border-slate-700 bg-slate-950 p-4 font-mono text-xs leading-5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-300"></textarea>
+      <div class="flex justify-end gap-2 mt-4">
+        <button @click="showSettings = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
+        <button @click="saveDispatchConfig()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200">Validate & Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1078,6 +1178,12 @@ function cairnApp() {
     selectedProjectId: '',
     polling: true,
     pollTimer: null,
+    eventSource: null,
+    sseConnected: false,
+    liveEvents: [],
+    httpRecords: [],
+    nowTick: Date.now(),
+    clockTimer: null,
     cy: null,
     sideTab: 'detail',
     selectedNode: null,
@@ -1096,6 +1202,7 @@ function cairnApp() {
     showRenameModal: false,
     showLocalPrefs: false,
     showSettings: false,
+    settingsTab: 'server',
     showYamlModal: false,
     exportTab: 'yaml',
     exportProjectId: '',
@@ -1110,6 +1217,7 @@ function cairnApp() {
     renameForm: { projectId: '', originalTitle: '', title: '' },
     localPrefs: { actor_name: 'Human', layout_mode: 'dagre_tb' },
     settingsForm: { intent_timeout: 5, reason_timeout: 5 },
+    dispatchConfigForm: { path: '', yaml: '', redacted: false, updated_at: null },
     deleteConfirm: { id: '', title: '' },
     isDeletingProject: false,
     yamlPreviewTitle: '',
@@ -1141,7 +1249,11 @@ function cairnApp() {
       this.loadLocalPrefs();
       await this.loadProjects();
       await this.loadSettings();
+      await this.loadDispatchConfig();
+      this.connectEventStream();
       this.startPolling();
+      this.clockTimer = setInterval(() => { this.nowTick = Date.now(); }, 1000);
+      window.addEventListener('beforeunload', () => this.closeEventStream());
       window.addEventListener('hashchange', () => this.handleRoute());
       this.handleRoute();
     },
@@ -1582,6 +1694,63 @@ function cairnApp() {
         this.settingsForm.intent_timeout = s.intent_timeout;
         this.settingsForm.reason_timeout = s.reason_timeout;
       } catch(e) { console.error(e); }
+    },
+
+    async loadDispatchConfig() {
+      try {
+        this.dispatchConfigForm = await this.api('GET', '/dispatch-config');
+      } catch (e) {
+        console.error(e);
+        this.dispatchConfigForm = { path: '', yaml: '', redacted: false, updated_at: null };
+      }
+    },
+
+    async loadProjectEvents(projectId = this.selectedProjectId) {
+      if (!projectId) { this.liveEvents = []; return; }
+      try {
+        this.liveEvents = await this.api('GET', `/projects/${projectId}/events?limit=500`);
+      } catch (e) { console.error(e); }
+    },
+
+    async loadHttpRecords(projectId = this.selectedProjectId) {
+      if (!projectId) { this.httpRecords = []; return; }
+      try {
+        this.httpRecords = await this.api('GET', `/projects/${projectId}/http-records`);
+      } catch (e) { console.error(e); }
+    },
+
+    closeEventStream() {
+      if (this.eventSource) this.eventSource.close();
+      this.eventSource = null;
+      this.sseConnected = false;
+    },
+
+    connectEventStream(projectId = null) {
+      this.closeEventStream();
+      const lastId = projectId && this.liveEvents.length ? this.liveEvents[this.liveEvents.length - 1].id : 0;
+      const params = new URLSearchParams();
+      if (projectId) params.set('project_id', projectId);
+      if (lastId) params.set('after_id', lastId);
+      const source = new EventSource(`/events/stream?${params.toString()}`);
+      this.eventSource = source;
+      source.onopen = () => { this.sseConnected = true; };
+      source.onerror = () => { this.sseConnected = false; };
+      source.addEventListener('runtime', async (message) => {
+        let event;
+        try { event = JSON.parse(message.data); } catch { return; }
+        if (projectId && event.project_id === projectId) {
+          if (!this.liveEvents.some(item => item.id === event.id)) {
+            this.liveEvents.push(event);
+            if (this.liveEvents.length > 500) this.liveEvents.shift();
+          }
+          if (['task_started', 'task_finished', 'project_created'].includes(event.event_type)) {
+            await this.loadProject(projectId);
+            await this.loadHttpRecords(projectId);
+            this.updateGraph();
+          }
+        }
+        await this.loadProjects();
+      });
     },
 
     async loadProject(id) {
@@ -2085,6 +2254,8 @@ function cairnApp() {
       this.selectedFacts = [];
       this.selectedTimelineEntryId = null;
       await this.loadProject(id);
+      await Promise.all([this.loadProjectEvents(id), this.loadHttpRecords(id)]);
+      this.connectEventStream(id);
       this.view = 'graph';
       if (location.hash !== `#/projects/${id}`) location.hash = `/projects/${id}`;
       this.$nextTick(() => {
@@ -2115,6 +2286,8 @@ function cairnApp() {
       this.view = 'list';
       this.shouldRestoreProjectListScroll = true;
       this.project = null;
+      this.liveEvents = [];
+      this.httpRecords = [];
       this.selectedProjectId = '';
       this.selectedNode = null;
       this.selectedFacts = [];
@@ -2122,6 +2295,7 @@ function cairnApp() {
       this.teardownAutoFit();
       if (this.cy) { this.cy.destroy(); this.cy = null; }
       if (!fromRoute) location.hash = '/';
+      this.connectEventStream();
       this.loadProjects().then(() => this.restoreProjectListScroll());
     },
 
@@ -2134,7 +2308,63 @@ function cairnApp() {
         } else {
           await this.loadProjects();
         }
-      }, 5000);
+      }, 15000);
+    },
+
+    runtimeEventCardClass(event) {
+      const classes = {
+        running: 'border-sky-200',
+        success: 'border-emerald-200',
+        warning: 'border-amber-200',
+        error: 'border-rose-200',
+      };
+      return classes[event.status] || 'border-slate-200';
+    },
+
+    runtimeEventBadgeClass(event) {
+      const classes = {
+        running: 'bg-sky-50 text-sky-700',
+        success: 'bg-emerald-50 text-emerald-700',
+        warning: 'bg-amber-50 text-amber-700',
+        error: 'bg-rose-50 text-rose-700',
+      };
+      return classes[event.status] || 'bg-slate-100 text-slate-600';
+    },
+
+    runtimeEventElapsed(event) {
+      if (event.event_type !== 'task_started') return '';
+      const finished = this.liveEvents.find(item =>
+        item.id > event.id && item.event_type === 'task_finished' && item.phase === event.phase &&
+        item.worker === event.worker && item.intent_id === event.intent_id
+      );
+      const end = finished ? Date.parse(finished.created_at) : this.nowTick;
+      return this.formatDuration(Math.max(0, end - Date.parse(event.created_at)));
+    },
+
+    formatDuration(ms) {
+      const seconds = Math.floor(ms / 1000);
+      if (seconds < 60) return `${seconds}s`;
+      return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    },
+
+    httpStatusClass(status) {
+      if (!status) return 'bg-slate-100 text-slate-500';
+      if (status >= 500) return 'bg-rose-100 text-rose-700';
+      if (status >= 400) return 'bg-amber-100 text-amber-700';
+      if (status >= 300) return 'bg-sky-100 text-sky-700';
+      return 'bg-emerald-100 text-emerald-700';
+    },
+
+    formatHttpMessage(message, includeStatus = false) {
+      if (!message) return '—';
+      const lines = [];
+      if (includeStatus && message.status) lines.push(`HTTP ${message.status}`);
+      for (const [name, value] of Object.entries(message.headers || {})) lines.push(`${name}: ${value}`);
+      if (message.body) {
+        if (lines.length) lines.push('');
+        lines.push(message.body);
+      }
+      return lines.join('\n') || '—';
     },
 
     buildElements() {
@@ -3398,6 +3628,18 @@ function cairnApp() {
         this.showSettings = false;
         this.showToast('Server settings saved');
       } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async saveDispatchConfig() {
+      try {
+        this.dispatchConfigForm = await this.api('PUT', '/dispatch-config', { yaml: this.dispatchConfigForm.yaml });
+        this.showToast(
+          this.dispatchConfigForm.restart_required
+            ? 'Config saved; restart dispatcher to apply backend changes'
+            : 'Dispatcher config saved; hot reload pending',
+          'info',
+        );
+      } catch (e) { this.showToast(e.message, 'error'); }
     },
   };
 }

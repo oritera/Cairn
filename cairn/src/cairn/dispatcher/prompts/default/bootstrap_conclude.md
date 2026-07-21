@@ -13,7 +13,7 @@ When rejecting a task, return the following (under no circumstances should you r
 
 Normal return example:
 ```json
-{"accepted": true, "data": {"fact": {"description": "..."}}}
+{"accepted": true, "data": {"fact": {"description": "..."}, "http_records": []}}
 ```
 
 ## Rules
@@ -24,6 +24,7 @@ Normal return example:
 - Do not output `complete` in this phase. Even if Goal is not achieved or you want to explain status, put that information into `fact.description` only.
 - `fact.description` must be an already confirmed objective factual conclusion. Do not output plans, guesses, or explanatory filler.
 - Do not put long data blobs in `fact.description`. Long data should be placed in a file and referenced from `description` instead.
+- Include already-confirmed, materially useful HTTP exchanges in `data.http_records` using `method`, `url`, `request` (`headers`, `body`), `response` (`status`, `headers`, `body`), and `significance`. Omit routine or duplicate traffic and redact reusable credentials.
 
 # Context
 ## Origin

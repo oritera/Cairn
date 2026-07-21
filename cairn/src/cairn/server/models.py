@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -242,3 +242,91 @@ class ReopenResponse(BaseModel):
     project: ProjectMeta
     fact: Fact
     intent: Intent
+
+
+class RuntimeEvent(BaseModel):
+    id: int
+    project_id: str | None = None
+    event_type: str
+    phase: str | None = None
+    status: str
+    message: str
+    worker: str | None = None
+    intent_id: str | None = None
+    payload: dict[str, Any] | None = None
+    created_at: str
+
+
+class CreateRuntimeEventRequest(BaseModel):
+    event_type: str
+    phase: str | None = None
+    status: str = "info"
+    message: str
+    worker: str | None = None
+    intent_id: str | None = None
+    payload: dict[str, Any] | None = None
+
+    @field_validator("event_type", "status", "message")
+    @classmethod
+    def validate_runtime_event_text(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("must not be empty")
+        return text
+
+
+class HttpMessage(BaseModel):
+    headers: dict[str, str] = Field(default_factory=dict)
+    body: str | None = None
+
+
+class HttpResponseMessage(HttpMessage):
+    status: int | None = Field(default=None, ge=100, le=599)
+
+
+class CreateHttpRecordRequest(BaseModel):
+    intent_id: str | None = None
+    worker: str | None = None
+    method: str
+    url: str
+    request: HttpMessage = Field(default_factory=HttpMessage)
+    response: HttpResponseMessage = Field(default_factory=HttpResponseMessage)
+    significance: str
+
+    @field_validator("method", "url", "significance")
+    @classmethod
+    def validate_http_record_text(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("must not be empty")
+        return text
+
+    @field_validator("method")
+    @classmethod
+    def normalize_http_method(cls, value: str) -> str:
+        return value.upper()
+
+
+class HttpRecord(CreateHttpRecordRequest):
+    id: str
+    project_id: str
+    created_at: str
+
+
+class DispatchConfigDocument(BaseModel):
+    path: str
+    yaml: str
+    redacted: bool
+    updated_at: str | None = None
+    restart_required: bool = False
+
+
+class UpdateDispatchConfigRequest(BaseModel):
+    yaml: str
+
+    @field_validator("yaml")
+    @classmethod
+    def validate_yaml_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("yaml must not be empty")
+        return value

@@ -12,7 +12,7 @@ When rejecting a task, return the following (under no circumstances should you r
 
 Normal return example:
 ```json
-{"accepted": true, "data": {"description": "..."}}
+{"accepted": true, "data": {"description": "...", "http_records": []}}
 ```
 
 # Rules
@@ -20,6 +20,8 @@ Normal return example:
 - If you later receive a conclude-phase instruction in the same session, that newer conclude instruction overrides this exploration instruction immediately. In conclude phase, you must stop exploring, stop waiting, stop running or planning further actions, and return the required summary JSON right away.
 - `description` must clearly state the confirmed key objective results. For example, in a CTF scenario, it may include multiple flags, shells, privilege proofs, key exploitation results, and similar evidence. Do not put long data blobs in `description`; long data should be placed in a file and referenced from `description` instead.
 - `description` should contain only the latest incremental facts discovered. Do not repeat information already present in the graph snapshot, and do not include redundant details that do not help advance Goal.
+- When an HTTP exchange materially proves a vulnerability, authentication bypass, sensitive disclosure, exploit step, or important negative result, add it to `data.http_records`. Each record must contain `method`, `url`, `request` (`headers`, `body`), `response` (`status`, `headers`, `body`), and `significance`. Omit routine scans, duplicates, static assets, and uninformative failures.
+- Redact credentials and reusable secrets in `Authorization`, `Cookie`, and `Set-Cookie` values unless the secret itself is the confirmed finding.
 
 # Context
 ## Graph

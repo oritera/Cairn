@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from cairn.server import db
+from cairn.server import dispatch_config_store
 from cairn.server.app import app
 
 
@@ -207,3 +208,94 @@ def test_project_creation_rejects_invalid_bootstrap_enabled(client: TestClient) 
     )
 
     assert response.status_code == 422
+
+
+def test_runtime_events_are_persisted_and_incremental(client: TestClient) -> None:
+    project_id = _create_project(client)
+
+    initial = client.get(f"/projects/{project_id}/events").json()
+    assert initial[0]["event_type"] == "project_created"
+
+    created = client.post(
+        f"/projects/{project_id}/events",
+        json={
+            "event_type": "task_started",
+            "phase": "explore",
+            "status": "running",
+            "message": "worker started",
+            "worker": "local-codex",
+            "intent_id": "i001",
+        },
+    )
+    assert created.status_code == 201
+    event_id = created.json()["id"]
+    incremental = client.get(f"/projects/{project_id}/events?after_id={event_id - 1}").json()
+    assert [event["id"] for event in incremental] == [event_id]
+
+
+def test_http_evidence_round_trip(client: TestClient) -> None:
+    project_id = _create_project(client)
+
+    response = client.post(
+        f"/projects/{project_id}/http-records",
+        json={
+            "intent_id": "i001",
+            "worker": "local-codex",
+            "method": "post",
+            "url": "https://target.test/login",
+            "request": {"headers": {"content-type": "application/json"}, "body": "{\"admin\":true}"},
+            "response": {"status": 200, "headers": {"x-proof": "yes"}, "body": "admin session"},
+            "significance": "Confirmed authentication bypass",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["id"] == "r001"
+    assert response.json()["method"] == "POST"
+    records = client.get(f"/projects/{project_id}/http-records").json()
+    assert records[0]["response"]["status"] == 200
+    assert records[0]["significance"] == "Confirmed authentication bypass"
+
+
+def test_dispatch_config_api_redacts_and_preserves_secrets(client: TestClient, tmp_path, monkeypatch) -> None:
+    config_path = tmp_path / "dispatch.yaml"
+    config_path.write_text(
+        """
+server: http://127.0.0.1:8000
+runtime:
+  execution: local
+  interval: 3
+  max_workers: 1
+  max_running_projects: 1
+  max_project_workers: 1
+  healthcheck_timeout: 5
+  worker_healthcheck: disabled
+  prompt_group: default
+tasks:
+  bootstrap: {timeout: 10, conclude_timeout: 5}
+  reason: {timeout: 10, max_intents: 1}
+  explore: {timeout: 10, conclude_timeout: 5}
+local: {completed_action: keep}
+workers:
+  - name: test
+    type: codex
+    task_types: [bootstrap, reason, explore]
+    max_running: 1
+    priority: 0
+    env: {OPENAI_API_KEY: secret-value}
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dispatch_config_store, "_config_path", config_path)
+
+    document = client.get("/dispatch-config").json()
+    assert "secret-value" not in document["yaml"]
+    assert "********" in document["yaml"]
+    updated_yaml = document["yaml"].replace("interval: 3", "interval: 4")
+    updated = client.put("/dispatch-config", json={"yaml": updated_yaml})
+    assert updated.status_code == 200
+    assert updated.json()["restart_required"] is False
+    saved = config_path.read_text(encoding="utf-8")
+    assert "interval: 4" in saved
+    assert "secret-value" in saved

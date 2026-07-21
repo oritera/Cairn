@@ -53,6 +53,28 @@ def task_healthcheck_enabled(config: DispatchConfig) -> bool:
     return config.runtime.worker_healthcheck == "startup_and_task"
 
 
+def persist_http_records(
+    client: CairnClient,
+    project_id: str,
+    intent_id: str | None,
+    worker_name: str,
+    records: list[dict],
+) -> None:
+    for record in records:
+        payload = {**record, "intent_id": intent_id, "worker": worker_name}
+        response = client.create_http_record(project_id, payload)
+        if response.ok:
+            continue
+        LOG.warning(
+            "http evidence write failed project=%s intent=%s worker=%s status=%s body=%s",
+            project_id,
+            intent_id,
+            worker_name,
+            response.status_code,
+            preview(response.text),
+        )
+
+
 def write_graph_snapshot_reference(
     container_manager: ContainerManager,
     container_name: str,

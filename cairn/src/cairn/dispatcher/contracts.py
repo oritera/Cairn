@@ -5,6 +5,47 @@ from typing import Any
 from cairn.dispatcher.output_parser import extract_json_object
 
 
+def detach_http_records(payload: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Remove and validate optional HTTP evidence without changing legacy result contracts."""
+    cleaned = dict(payload)
+    data = cleaned.get("data") if isinstance(cleaned.get("data"), dict) else cleaned
+    if data is not cleaned:
+        data = dict(data)
+        cleaned["data"] = data
+    records = data.pop("http_records", [])
+    if records is None:
+        return cleaned, []
+    if not isinstance(records, list):
+        raise ValueError("http_records must be an array")
+    normalized: list[dict[str, Any]] = []
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            raise ValueError(f"http_records[{index}] must be an object")
+        method = record.get("method")
+        url = record.get("url")
+        significance = record.get("significance")
+        if not isinstance(method, str) or not method.strip():
+            raise ValueError(f"http_records[{index}].method is required")
+        if not isinstance(url, str) or not url.strip():
+            raise ValueError(f"http_records[{index}].url is required")
+        if not isinstance(significance, str) or not significance.strip():
+            raise ValueError(f"http_records[{index}].significance is required")
+        request = record.get("request") or {}
+        response = record.get("response") or {}
+        if not isinstance(request, dict) or not isinstance(response, dict):
+            raise ValueError(f"http_records[{index}] request and response must be objects")
+        normalized.append(
+            {
+                "method": method.strip().upper(),
+                "url": url.strip(),
+                "request": request,
+                "response": response,
+                "significance": significance.strip(),
+            }
+        )
+    return cleaned, normalized
+
+
 def parse_json_output(stdout: str) -> dict[str, Any]:
     return extract_json_object(stdout)
 

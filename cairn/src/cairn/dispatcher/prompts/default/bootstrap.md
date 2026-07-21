@@ -11,7 +11,7 @@ When rejecting a task, return the following (under no circumstances should you r
 
 Only return the following after you have confirmed that Goal has been satisfied:
 ```json
-{"accepted": true, "data": {"fact": {"description": "..."}, "complete": {"description": "..."}}}
+{"accepted": true, "data": {"fact": {"description": "..."}, "complete": {"description": "..."}, "http_records": []}}
 ```
 
 # Rules
@@ -21,6 +21,8 @@ Only return the following after you have confirmed that Goal has been satisfied:
 - `fact.description` must clearly state the confirmed key objective results. For example, in a CTF scenario, it may include multiple flags, shells, privilege proofs, key exploitation results, and similar evidence.
 - `complete.description` should explain why the currently confirmed results are sufficient to prove that Goal has been achieved.
 - Do not put long data blobs in `description`. Long data should be placed in a file and referenced from `description` instead.
+- When an HTTP exchange materially proves a vulnerability, authentication bypass, sensitive disclosure, exploit step, or important negative result, add it to `data.http_records`. Each record must contain `method`, `url`, `request` (`headers`, `body`), `response` (`status`, `headers`, `body`), and `significance`. Omit routine scans, duplicates, static assets, and uninformative failures.
+- Redact credentials and reusable secrets in `Authorization`, `Cookie`, and `Set-Cookie` values unless the secret itself is the confirmed finding.
 
 # Context
 ## Origin

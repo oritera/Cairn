@@ -25,9 +25,19 @@ def main():
 )
 @click.option("--log-level", default="info", show_default=True, help="Uvicorn log level")
 @click.option("--access-log/--no-access-log", default=True, show_default=True, help="Enable Uvicorn access log")
-def serve(host: str, port: int, db_path: str, log_level: str, access_log: bool):
+@click.option(
+    "--dispatch-config",
+    type=click.Path(path_type=Path),
+    default="dispatch.yaml",
+    show_default=True,
+    help="Dispatcher YAML exposed through the local admin UI",
+)
+def serve(host: str, port: int, db_path: str, log_level: str, access_log: bool, dispatch_config: Path):
     """Start the Cairn API server."""
     db.configure(Path(db_path))
+    from cairn.server.dispatch_config_store import configure_dispatch_config
+
+    configure_dispatch_config(dispatch_config)
     from cairn.server.app import app
 
     uvicorn.run(

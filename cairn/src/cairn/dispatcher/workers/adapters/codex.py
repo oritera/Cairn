@@ -40,6 +40,7 @@ class CodexDriver(RegexSessionDriver):
                 argv=[
                     "codex",
                     "exec",
+                    "--skip-git-repo-check",
                     "--dangerously-bypass-approvals-and-sandbox",
                     "--",
                     prompt,
@@ -77,6 +78,7 @@ class CodexDriver(RegexSessionDriver):
                 "exec",
                 "resume",
                 session,
+                "--skip-git-repo-check",
                 "--dangerously-bypass-approvals-and-sandbox",
                 "--",
                 prompt,

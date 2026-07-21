@@ -79,6 +79,42 @@ CREATE TABLE IF NOT EXISTS scoped_counters (
     value INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (project_id, kind)
 );
+
+CREATE TABLE IF NOT EXISTS runtime_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    phase TEXT,
+    status TEXT NOT NULL,
+    message TEXT NOT NULL,
+    worker TEXT,
+    intent_id TEXT,
+    payload_json TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_runtime_events_project_id_id
+ON runtime_events(project_id, id);
+
+CREATE TABLE IF NOT EXISTS http_records (
+    id TEXT NOT NULL,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    intent_id TEXT,
+    worker TEXT,
+    method TEXT NOT NULL,
+    url TEXT NOT NULL,
+    request_headers_json TEXT NOT NULL,
+    request_body TEXT,
+    response_status INTEGER,
+    response_headers_json TEXT NOT NULL,
+    response_body TEXT,
+    significance TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (id, project_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_http_records_project_created
+ON http_records(project_id, created_at);
 """
 
 

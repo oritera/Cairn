@@ -5,6 +5,7 @@ import json
 import pytest
 
 from cairn.dispatcher.contracts import (
+    detach_http_records,
     parse_json_output,
     validate_explore_payload,
     validate_reason_payload,
@@ -93,4 +94,27 @@ def test_close_stream_closes_response_even_when_stream_close_fails() -> None:
     ManagedProcess._close_stream(stream)
 
     assert stream._response.closed
+
+
+def test_http_records_detach_without_changing_legacy_payload() -> None:
+    payload, records = detach_http_records(
+        {
+            "accepted": True,
+            "data": {
+                "description": "confirmed",
+                "http_records": [
+                    {
+                        "method": "get",
+                        "url": "https://target.test/admin",
+                        "request": {"headers": {}, "body": None},
+                        "response": {"status": 200, "headers": {}, "body": "ok"},
+                        "significance": "Admin endpoint accessible",
+                    }
+                ],
+            },
+        }
+    )
+
+    assert payload == {"accepted": True, "data": {"description": "confirmed"}}
+    assert records[0]["method"] == "GET"
 

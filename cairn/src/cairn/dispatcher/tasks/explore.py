@@ -4,7 +4,7 @@ import logging
 import time
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig
-from cairn.dispatcher.contracts import parse_json_output, validate_explore_payload
+from cairn.dispatcher.contracts import detach_http_records, parse_json_output, validate_explore_payload
 from cairn.dispatcher.prompting import load_prompt, render_prompt
 from cairn.dispatcher.protocol.client import CairnClient
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
@@ -16,6 +16,7 @@ from cairn.dispatcher.tasks.common import (
     did_timeout,
     project_allows_conclude_fallback,
     preview,
+    persist_http_records,
     run_worker_process,
     task_healthcheck_enabled,
     write_conclude_result,
@@ -143,6 +144,7 @@ def run_explore_task(
             try:
                 model_output = driver.extract_response_text(first.stdout, first.stderr)
                 payload = parse_json_output(model_output)
+                payload, http_records = detach_http_records(payload)
                 kind, description = validate_explore_payload(payload)
             except Exception as exc:
                 LOG.warning(
@@ -170,6 +172,7 @@ def run_explore_task(
                     lease,
                     cancellation,
                 )
+            persist_http_records(client, project.project.id, intent.id, worker.name, http_records)
             if kind == "rejected":
                 LOG.warning(
                     "explore rejected project=%s intent=%s worker=%s execute_ms=%s total_ms=%s stdout_preview=%s",
@@ -348,6 +351,7 @@ def _try_conclude_fallback(
     try:
         model_output = driver.extract_response_text(result.stdout, result.stderr)
         payload = parse_json_output(model_output)
+        payload, http_records = detach_http_records(payload)
         kind, description = validate_explore_payload(payload)
     except Exception as exc:
         LOG.warning(
@@ -362,6 +366,7 @@ def _try_conclude_fallback(
         )
         best_effort_release(client, project_id, intent.id, worker.name)
         return "failed"
+    persist_http_records(client, project_id, intent.id, worker.name, http_records)
     if kind == "rejected":
         LOG.warning(
             "conclude rejected project=%s intent=%s worker=%s conclude_ms=%s stdout_preview=%s",
