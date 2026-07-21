@@ -1,0 +1,14 @@
+{
+  "lang_button": "中文",
+  "label_all": "All",
+  "btn_new_project": "New Project",
+  "btn_snapshot": "Snapshot",
+  "no_projects": "No projects yet",
+  "create_project_prompt": "Create a project to start exploring",
+  "modal_new_project": "New Project",
+  "ph_project_title": "Project title",
+  "ph_origin": "Origin — starting point",
+  "ph_goal": "Goal — what to achieve",
+  "btn_cancel": "Cancel",
+  "btn_create": "Create"
+}
