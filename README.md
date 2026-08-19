@@ -209,8 +209,8 @@ The developers and contributors of this project do not endorse or accept respons
 
 ## Star History
 
-<a href="https://www.star-history.com/#oritera/Cairn&Date" target="_blank" rel="noopener noreferrer">
-  <img src="https://api.star-history.com/svg?repos=oritera/Cairn&type=Date" alt="Star History Chart" />
+<a href="https://star-history.dera.page/#oritera/Cairn&Date" target="_blank" rel="noopener noreferrer">
+  <img src="https://star-history.dera.page/svg?repos=oritera/Cairn&type=Date" alt="Star History Chart" />
 </a>
 
 ## ⚖️ License
