@@ -6,7 +6,7 @@ from cairn.dispatcher.config import DispatchConfig
 from cairn.dispatcher.protocol.client import ApiResult
 from cairn.dispatcher.workers.base import DriverResult
 from cairn.dispatcher.workers.health import HealthResult
-from cairn.server.models import Fact, Hint, Intent, ProjectDetail, ProjectMeta
+from cairn.server.models import AuditEvent, Fact, Hint, Intent, ProjectDetail, ProjectMeta
 
 
 def make_config() -> DispatchConfig:
@@ -31,13 +31,23 @@ def make_config() -> DispatchConfig:
                 "network_mode": "host",
                 "completed_action": "stop",
             },
+            "safety": {
+                "enabled": True,
+                "endpoint": "http://127.0.0.1:8000/internal/safety",
+            },
             "workers": [
                 {
                     "name": "test-worker",
-                    "type": "mock",
+                    "type": "pi",
                     "task_types": ["bootstrap", "reason", "explore"],
                     "max_running": 1,
                     "priority": 0,
+                    "env": {
+                        "PI_MODEL": "test-model",
+                        "PI_BASE_URL": "http://model.invalid/v1",
+                        "PI_API_KEY": "test-key",
+                        "PI_PROVIDER_API": "openai-completions",
+                    },
                 }
             ],
         }
@@ -116,6 +126,7 @@ class FakeClient:
     created_intents: list[tuple[str, list[str], str, str]] = field(default_factory=list)
     released: list[tuple[str, str, str]] = field(default_factory=list)
     released_reasons: list[tuple[str, str]] = field(default_factory=list)
+    audit_events: list[AuditEvent] = field(default_factory=list)
 
     def get_project(self, _project_id: str) -> ProjectDetail:
         return self.project
@@ -146,6 +157,17 @@ class FakeClient:
     def reason_heartbeat(self, _project_id: str, _worker: str) -> ApiResult:
         return ApiResult(200, {})
 
+    def list_audit_events(self, _project_id: str, **filters) -> list[AuditEvent]:
+        return [
+            event
+            for event in self.audit_events
+            if all(
+                value is None or getattr(event, key) == value
+                for key, value in filters.items()
+                if key in {"intent_id", "run_id", "event_type", "decision"}
+            )
+        ]
+
 
 class FakeDriver:
     def __init__(self) -> None:
@@ -166,9 +188,9 @@ class FakeDriver:
         self.execute_prompts.append(prompt)
         return DriverResult(["execute"], session=session)
 
-    def build_conclude(self, _worker, prompt: str, _session: str) -> list[str]:
+    def build_conclude(self, _worker, prompt: str, _session: str) -> DriverResult:
         self.conclude_prompts.append(prompt)
-        return ["conclude"]
+        return DriverResult(["conclude"], session=_session)
 
     def extract_session(self, session: str | None, _stdout: str, _stderr: str) -> str | None:
         return session

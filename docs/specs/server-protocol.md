@@ -862,3 +862,18 @@ intents:
    b. 项目回到 `active`，图中新增一条 `external_feedback` 结论边和一个纠错 Fact
    c. 回到步骤 1
 ```
+
+
+## Safety audit protocol
+
+### Internal writes
+
+`POST /internal/safety/preflight` classifies one proposed Pi tool call and atomically appends an `ACTION_DECISION`. `POST /internal/safety/events` appends result, assistant, agent-end, or Dispatcher backfill events. Both require `X-Cairn-Safety-Token`; a missing server token returns 503 and an invalid token returns 401. Event writes are append-only and idempotent by `event_id`; reusing an ID with different content returns 409.
+
+### Project audit query
+
+`GET /projects/{project_id}/audit` accepts `intent_id`, `run_id`, `event_type`, `decision`, `tool_name`, `after`, and `limit`. Results are ordered by server timestamp and event ID and return `items` plus an optional opaque `next` cursor. Each item includes correlation IDs, worker/phase/tool, decision/rule/reason, normalized payload, SHA-256, truncation flag, and timestamp.
+
+### Branch closure
+
+Committed `block` decisions map to `[V1][BRANCH_CLOSED]`; `resource_pause` decisions map to `[R1][RESOURCE_PAUSED]`. These Facts conclude only the associated current Intent. They do not complete or stop the project, and R1 does not confirm a vulnerability.

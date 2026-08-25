@@ -4,11 +4,9 @@ import requests
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig
 from cairn.dispatcher.runtime.startup_healthcheck import run_startup_healthchecks
-from cairn.dispatcher.workers.adapters.claudecode import ClaudeCodeDriver
-from cairn.dispatcher.workers.adapters.codex import CodexDriver
-from cairn.dispatcher.workers.adapters.mock import MockDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
 from cairn.dispatcher.workers.health import http_ping, proxies_from_env
+from support.mock_driver import MockDriver, install_mock_pi_driver
 
 
 class _Resp:
@@ -72,29 +70,6 @@ def _worker(worker_type: str, env: dict[str, str]) -> WorkerConfig:
     )
 
 
-def test_claudecode_check_health_hits_messages_with_bearer(monkeypatch) -> None:
-    captured = _capture_post(monkeypatch, _Resp(200))
-    worker = _worker("claudecode", {"ANTHROPIC_BASE_URL": "http://api", "ANTHROPIC_AUTH_TOKEN": "tok", "ANTHROPIC_MODEL": "m"})
-
-    result = ClaudeCodeDriver().check_health(worker, timeout=7)
-
-    assert result.ok
-    assert captured["url"] == "http://api/v1/messages"
-    assert captured["headers"]["Authorization"] == "Bearer tok"
-    assert captured["json"]["model"] == "m"
-    assert captured["timeout"] == 7
-
-
-def test_codex_check_health_hits_responses(monkeypatch) -> None:
-    captured = _capture_post(monkeypatch, _Resp(200))
-    worker = _worker("codex", {"CODEX_BASE_URL": "http://api/v1", "OPENAI_API_KEY": "k", "CODEX_MODEL": "m"})
-
-    CodexDriver().check_health(worker, timeout=5)
-
-    assert captured["url"] == "http://api/v1/responses"
-    assert captured["headers"]["Authorization"] == "Bearer k"
-
-
 def test_pi_check_health_openai_completions_uses_chat_completions(monkeypatch) -> None:
     captured = _capture_post(monkeypatch, _Resp(200))
     worker = _worker(
@@ -123,18 +98,24 @@ def test_pi_check_health_anthropic_uses_messages(monkeypatch) -> None:
 def test_check_health_uses_worker_proxy(monkeypatch) -> None:
     captured = _capture_post(monkeypatch, _Resp(200))
     worker = _worker(
-        "claudecode",
-        {"ANTHROPIC_BASE_URL": "http://api", "ANTHROPIC_AUTH_TOKEN": "t", "ANTHROPIC_MODEL": "m", "https_proxy": "http://127.0.0.1:7897"},
+        "pi",
+        {
+            "PI_BASE_URL": "http://api/v1",
+            "PI_API_KEY": "k",
+            "PI_MODEL": "m",
+            "PI_PROVIDER_API": "openai-completions",
+            "https_proxy": "http://127.0.0.1:7897",
+        },
     )
 
-    ClaudeCodeDriver().check_health(worker, timeout=5)
+    PiDriver().check_health(worker, timeout=5)
 
     assert captured["proxies"] == {"https": "http://127.0.0.1:7897"}
 
 
 def test_mock_check_health_reflects_configured_outcome() -> None:
-    ok = _worker("mock", {"MOCK_HEALTHCHECK": '{"delay":[0,0],"outcomes":{"ok":1.0,"fail":0.0}}'})
-    fail = _worker("mock", {"MOCK_HEALTHCHECK": '{"delay":[0,0],"outcomes":{"ok":0.0,"fail":1.0}}'})
+    ok = _worker("pi", {"MOCK_HEALTHCHECK": '{"delay":[0,0],"outcomes":{"ok":1.0,"fail":0.0}}'})
+    fail = _worker("pi", {"MOCK_HEALTHCHECK": '{"delay":[0,0],"outcomes":{"ok":0.0,"fail":1.0}}'})
 
     assert MockDriver().check_health(ok, timeout=1).ok
     assert not MockDriver().check_health(fail, timeout=1).ok
@@ -143,7 +124,14 @@ def test_mock_check_health_reflects_configured_outcome() -> None:
 # --------------------------------------------------------------------------- startup aggregation
 
 
-def test_run_startup_healthchecks_reports_each_worker() -> None:
+def test_run_startup_healthchecks_reports_each_worker(monkeypatch) -> None:
+    install_mock_pi_driver(monkeypatch)
+    pi_env = {
+        "PI_MODEL": "test-model",
+        "PI_BASE_URL": "http://model.invalid/v1",
+        "PI_API_KEY": "test-key",
+        "PI_PROVIDER_API": "openai-completions",
+    }
     config = DispatchConfig.model_validate(
         {
             "server": "http://127.0.0.1:8000",
@@ -161,11 +149,12 @@ def test_run_startup_healthchecks_reports_each_worker() -> None:
                 "explore": {"timeout": 10, "conclude_timeout": 5},
             },
             "container": {"image": "img", "network_mode": "host", "completed_action": "stop"},
+            "safety": {"endpoint": "http://127.0.0.1:8000/internal/safety"},
             "workers": [
-                {"name": "ok-worker", "type": "mock", "task_types": ["reason"], "max_running": 1, "priority": 0,
-                 "env": {"MOCK_HEALTHCHECK": '{"delay":[0,0],"outcomes":{"ok":1.0,"fail":0.0}}'}},
-                {"name": "fail-worker", "type": "mock", "task_types": ["reason"], "max_running": 1, "priority": 0,
-                 "env": {"MOCK_HEALTHCHECK": '{"delay":[0,0],"outcomes":{"ok":0.0,"fail":1.0}}'}},
+                {"name": "ok-worker", "type": "pi", "task_types": ["reason"], "max_running": 1, "priority": 0,
+                 "env": {**pi_env, "MOCK_HEALTHCHECK": '{"delay":[0,0],"outcomes":{"ok":1.0,"fail":0.0}}'}},
+                {"name": "fail-worker", "type": "pi", "task_types": ["reason"], "max_running": 1, "priority": 0,
+                 "env": {**pi_env, "MOCK_HEALTHCHECK": '{"delay":[0,0],"outcomes":{"ok":0.0,"fail":1.0}}'}},
             ],
         }
     )

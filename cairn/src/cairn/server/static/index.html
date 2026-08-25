@@ -1015,6 +1015,8 @@
             :class="exportTab === 'yaml' ? 'bg-slate-100 text-slate-700' : 'text-slate-400 hover:text-slate-600'">YAML</button>
           <button @click="switchExportTab('timeline')" class="px-2.5 py-1 text-xs font-medium transition"
             :class="exportTab === 'timeline' ? 'bg-slate-100 text-slate-700' : 'text-slate-400 hover:text-slate-600'">Timeline</button>
+          <button @click="switchExportTab('audit')" class="px-2.5 py-1 text-xs font-medium transition"
+            :class="exportTab === 'audit' ? 'bg-slate-100 text-slate-700' : 'text-slate-400 hover:text-slate-600'">Audit</button>
         </div>
         <p class="text-xs text-slate-400 truncate" x-text="yamlPreviewTitle"></p>
       </div>
@@ -1023,10 +1025,40 @@
         <button @click="showYamlModal = false" class="px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
       </div>
     </div>
-    <div class="max-h-[75vh] overflow-auto bg-slate-50 p-4">
+    <div x-show="exportTab !== 'audit'" class="max-h-[75vh] overflow-auto bg-slate-50 p-4">
       <div class="rounded-xl border border-slate-200 bg-white overflow-auto shadow-sm">
         <div class="min-w-max p-0 text-[12px] leading-6 font-mono select-text" x-html="yamlPreviewHtml"></div>
       </div>
+    </div>
+    <div x-show="exportTab === 'audit'" class="max-h-[75vh] overflow-auto bg-slate-50 p-4 space-y-3">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-2 rounded-xl border border-slate-200 bg-white p-3">
+        <input x-model="auditFilters.intent_id" @change="loadAudit(true)" placeholder="Intent ID" class="px-2 py-1.5 text-xs border border-slate-200 rounded-lg">
+        <select x-model="auditFilters.event_type" @change="loadAudit(true)" class="px-2 py-1.5 text-xs border border-slate-200 rounded-lg">
+          <option value="">All event types</option><option>ACTION_DECISION</option><option>ACTION_RESULT</option><option>ASSISTANT_MESSAGE</option><option>AGENT_END</option><option>AUDIT_BACKFILL</option>
+        </select>
+        <select x-model="auditFilters.decision" @change="loadAudit(true)" class="px-2 py-1.5 text-xs border border-slate-200 rounded-lg">
+          <option value="">All decisions</option><option value="block">Blocked only</option><option value="resource_pause">Resource paused</option><option value="allow">Allowed</option>
+        </select>
+        <input x-model="auditFilters.tool_name" @change="loadAudit(true)" placeholder="Tool" class="px-2 py-1.5 text-xs border border-slate-200 rounded-lg">
+        <button @click="loadAudit(true)" class="px-2 py-1.5 text-xs rounded-lg bg-slate-100 text-slate-600">Refresh</button>
+      </div>
+      <p x-show="auditLoading" class="text-xs text-slate-400">Loading audit events...</p>
+      <p x-show="!auditLoading && auditItems.length === 0" class="text-xs text-slate-400">No matching audit events.</p>
+      <template x-for="item in auditItems" :key="item.event_id">
+        <article class="rounded-xl border border-slate-200 bg-white p-3 text-xs space-y-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-slate-400" x-text="item.created_at"></span>
+            <span class="font-semibold text-slate-700" x-text="item.event_type"></span>
+            <span x-show="item.decision" class="px-1.5 py-0.5 rounded bg-slate-100" x-text="item.decision"></span>
+            <span class="font-mono text-slate-400" x-text="item.action_id || 'no-action-id'"></span>
+          </div>
+          <div class="text-slate-500" x-text="`intent=${item.intent_id || 'none'} run=${item.run_id} worker=${item.worker} phase=${item.phase} tool=${item.tool_name || 'none'}`"></div>
+          <div x-show="item.rule_id || item.reason" class="text-amber-700" x-text="`${item.rule_id || 'no-rule'}: ${item.reason || ''}`"></div>
+          <pre class="whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600" x-text="JSON.stringify(item.payload, null, 2)"></pre>
+          <div class="font-mono text-[10px] text-slate-400" x-text="`sha256=${item.payload_sha256} truncated=${item.truncated}`"></div>
+        </article>
+      </template>
+      <button x-show="auditCursor" @click="loadAudit(false)" :disabled="auditLoading" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-500 disabled:opacity-50">Load more</button>
     </div>
   </div>
 </div>
@@ -1099,6 +1131,10 @@ function cairnApp() {
     showYamlModal: false,
     exportTab: 'yaml',
     exportProjectId: '',
+    auditItems: [],
+    auditCursor: null,
+    auditFilters: { intent_id: '', event_type: '', decision: '', tool_name: '' },
+    auditLoading: false,
     showDeleteModal: false,
 
     newProject: { title: '', origin: '', goal: '', bootstrap: true, hints: [{ content: '' }] },
@@ -1532,7 +1568,8 @@ function cairnApp() {
     async switchExportTab(tab) {
       if (tab === this.exportTab) return;
       this.exportTab = tab;
-      await this.loadExportTab(tab);
+      if (tab === 'audit') await this.loadAudit(true);
+      else await this.loadExportTab(tab);
     },
 
     async loadExportTab(tab) {
@@ -1543,6 +1580,24 @@ function cairnApp() {
         this.yamlPreviewHtml = tab === 'yaml' ? this.highlightYaml(text) : this.highlightTimeline(text);
       } catch (e) {
         this.showToast(e.message, 'error');
+      }
+    },
+
+    async loadAudit(reset = true) {
+      if (!this.exportProjectId || this.auditLoading) return;
+      this.auditLoading = true;
+      try {
+        const params = new URLSearchParams({ limit: '50' });
+        for (const [key, value] of Object.entries(this.auditFilters)) if (value) params.set(key, value);
+        if (!reset && this.auditCursor) params.set('after', this.auditCursor);
+        const page = await this.api('GET', `/projects/${this.exportProjectId}/audit?${params.toString()}`);
+        this.auditItems = reset ? page.items : [...this.auditItems, ...page.items];
+        this.auditCursor = page.next || null;
+        this.yamlPreviewText = JSON.stringify(this.auditItems, null, 2);
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      } finally {
+        this.auditLoading = false;
       }
     },
 

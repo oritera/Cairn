@@ -1,6 +1,6 @@
 # Local execution example — workers run directly on the dispatcher host and reuse the
-# machine's already-configured claude / codex / pi CLIs. No API keys, base URLs or models
-# are configured here; each CLI uses its own host configuration and credentials.
+# machine's already-configured Pi CLI. No API keys, base URLs or models are configured
+# here; Pi uses its own host configuration and credentials.
 #
 # Usage:
 #   cp dispatch.local.example.yaml dispatch.yaml
@@ -15,12 +15,27 @@
 
 server: "http://127.0.0.1:8000"
 
+# Local mode is best-effort because Pi and the safety extension share host permissions.
+# Export CAIRN_SAFETY_TOKEN in both the server and dispatcher shells.
+safety:
+  enabled: true
+  endpoint: "http://127.0.0.1:8000/internal/safety"
+  token_env: "CAIRN_SAFETY_TOKEN"
+  request_timeout_ms: 2000
+  max_payload_bytes: 65536
+  resource_budget:
+    max_bulk_concurrency: 2
+    max_unattended_bulk_seconds: 600
+    auth_concurrency: 1
+    auth_attempts_per_minute: 10
+    auth_attempts_per_batch: 30
+
 runtime:
   execution: local            # run workers as host processes instead of per-project containers
   worker_healthcheck: disabled  # no base_url to probe; startup instead checks the CLIs are on PATH
-  max_workers: 3              # all workers share this host — size to the machine
+  max_workers: 1              # all workers share this host — size to the machine
   max_running_projects: 2
-  max_project_workers: 2
+  max_project_workers: 1
   interval: 3
   healthcheck_timeout: 15
   prompt_group: "default"
@@ -52,20 +67,8 @@ local:
 
 # No API keys needed — the host CLIs are used as-is. Per-worker `env:` overrides common_env.
 workers:
-  - name: "local-claude"
-    type: "claudecode"
+  - name: "local-pi"
+    type: "pi"
     task_types: [bootstrap, reason, explore]
     max_running: 1
     priority: 0
-
-  # - name: "local-codex"
-  #   type: "codex"
-  #   task_types: [explore]
-  #   max_running: 1
-  #   priority: 1
-
-  # - name: "local-pi"
-  #   type: "pi"
-  #   task_types: [reason]
-  #   max_running: 1
-  #   priority: 2

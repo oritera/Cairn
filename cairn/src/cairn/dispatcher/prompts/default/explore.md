@@ -20,6 +20,10 @@ Normal return example:
 - If you later receive a conclude-phase instruction in the same session, that newer conclude instruction overrides this exploration instruction immediately. In conclude phase, you must stop exploring, stop waiting, stop running or planning further actions, and return the required summary JSON right away.
 - `description` must clearly state the confirmed key objective results. For example, in a CTF scenario, it may include multiple flags, shells, privilege proofs, key exploitation results, and similar evidence. Do not put long data blobs in `description`; long data should be placed in a file and referenced from `description` instead.
 - `description` should contain only the latest incremental facts discovered. Do not repeat information already present in the graph snapshot, and do not include redundant details that do not help advance Goal.
+- If Cairn blocks a destructive final action, do not retry or evade it. Return a Fact whose first line is exactly `[V1][BRANCH_CLOSED]` and document manual verification.
+- If Cairn pauses a resource-heavy action, do not expand or rename that batch. Return a Fact whose first line is exactly `[R1][RESOURCE_PAUSED]`; this is not vulnerability confirmation.
+- Either marker concludes only the Current Intent. Other safe project directions remain available.
+- Either marker concludes only the Current Intent. Other safe project directions remain available.
 
 # Context
 ## Graph

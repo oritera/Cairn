@@ -21,6 +21,9 @@ Only return the following after you have confirmed that Goal has been satisfied:
 - `fact.description` must clearly state the confirmed key objective results. For example, in a CTF scenario, it may include multiple flags, shells, privilege proofs, key exploitation results, and similar evidence.
 - `complete.description` should explain why the currently confirmed results are sufficient to prove that Goal has been achieved.
 - Do not put long data blobs in `description`. Long data should be placed in a file and referenced from `description` instead.
+- A Cairn destructive-action block requires a fact beginning `[V1][BRANCH_CLOSED]`; never output `complete` for that blocked branch.
+- A Cairn resource pause requires a fact beginning `[R1][RESOURCE_PAUSED]`; it is not vulnerability confirmation and the same bulk action must not be expanded.
+- A block or resource pause closes only the current bootstrap Intent, not the project.
 
 # Context
 ## Origin

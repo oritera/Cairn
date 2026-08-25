@@ -64,8 +64,6 @@ RUN cd /tmp && \
 RUN pip3 install tccli awscli --break-system-packages && \
     sudo bash -c "$(curl -fsSL https://aliyuncli.alicdn.com/install.sh)"
 
-RUN sudo npm install -g @openai/codex@0.118.0
-RUN sudo npm install -g @anthropic-ai/claude-code@2.1.98
 RUN sudo npm install -g @mariozechner/pi-coding-agent@0.73.0
 
 RUN sudo chmod +x /usr/local/bin/kerbrute
@@ -80,12 +78,9 @@ RUN printf '%s\n' 'PS1="${PS1%\\n*} \[\033[0;36m\]\D{%y-%m-%d} - \t\[\033[;32m\]
     mkdir -p /home/kali/workspace && cd /home/kali/workspace && git init
 ENV TZ=Asia/Shanghai
 ENV PLAYWRIGHT_MCP_BROWSER=chromium
-ENV CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 ENV PYTHONUNBUFFERED=1
 
 COPY ./.agents /home/kali/workspace/.agents
-COPY ./.agents /home/kali/workspace/.claude
 COPY ./AGENTS.md /home/kali/workspace/AGENTS.md
-COPY ./AGENTS.md /home/kali/workspace/CLAUDE.md
 
 WORKDIR /home/kali/workspace

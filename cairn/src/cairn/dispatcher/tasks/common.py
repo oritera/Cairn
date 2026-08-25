@@ -1,27 +1,40 @@
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
 from dataclasses import dataclass
 
-from cairn.dispatcher.config import DispatchConfig, WorkerConfig
+from cairn.dispatcher.config import DispatchConfig, SafetyConfig, WorkerConfig, resolve_safety_token
 from cairn.dispatcher.protocol.client import CairnClient
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
-from cairn.dispatcher.runtime.containers import ContainerManager
+from cairn.dispatcher.runtime.backend import ExecutionBackend
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.runtime.process import ProcessResult
+from cairn.dispatcher.workers.base import DriverResult
+from cairn.server.models import AuditEvent, AuditEventCreate
 
 PROCESS_COMMUNICATE_GRACE_SECONDS = 15
 LOG_PREVIEW_LIMIT = 1200
 GRAPH_SNAPSHOT_ROOT = "/tmp/cairn-prompts"
 LOG = logging.getLogger(__name__)
+SAFETY_FALLBACK_PREFIX = "CAIRN_SAFETY_FALLBACK "
 
 
 @dataclass(slots=True)
 class ConcludeWriteResult:
     status: str
     fact_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SafetyRunContext:
+    run_id: str
+    project_id: str
+    intent_id: str | None
+    worker: str
+    phase: str
 
 
 def preview(text: str, limit: int = LOG_PREVIEW_LIMIT) -> str:
@@ -33,6 +46,102 @@ def preview(text: str, limit: int = LOG_PREVIEW_LIMIT) -> str:
 
 def did_timeout(result: ProcessResult) -> bool:
     return not result.cancelled and (result.timed_out or result.returncode in (124, 137))
+
+
+def parse_safety_fallbacks(stderr: str) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+    for line in stderr.splitlines():
+        if not line.startswith(SAFETY_FALLBACK_PREFIX):
+            continue
+        try:
+            record = json.loads(line[len(SAFETY_FALLBACK_PREFIX) :])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict) or record.get("schema_version") != 1:
+            continue
+        failed_event = record.get("failed_event")
+        transport_error = record.get("transport_error")
+        if not isinstance(failed_event, dict) or not isinstance(transport_error, str) or not transport_error:
+            continue
+        original_event_id = failed_event.get("event_id")
+        if not isinstance(original_event_id, str) or not original_event_id:
+            continue
+        candidate = {
+            "schema_version": 1,
+            "event_id": f"backfill:{original_event_id}",
+            "action_id": failed_event.get("action_id"),
+            "run_id": failed_event.get("run_id"),
+            "project_id": failed_event.get("project_id"),
+            "intent_id": failed_event.get("intent_id"),
+            "worker": failed_event.get("worker"),
+            "phase": failed_event.get("phase"),
+            "event_type": "AUDIT_BACKFILL",
+            "tool_name": failed_event.get("tool_name"),
+            "decision": failed_event.get("decision"),
+            "rule_id": failed_event.get("rule_id"),
+            "reason": failed_event.get("reason"),
+            "payload": {
+                "original_event_id": original_event_id,
+                "failed_event": failed_event,
+                "transport_error": transport_error,
+            },
+        }
+        try:
+            validated = AuditEventCreate.model_validate(candidate)
+        except ValueError:
+            continue
+        events.append(validated.model_dump(mode="json"))
+    return events
+
+
+def backfill_safety_fallbacks(
+    client: CairnClient,
+    stderr: str,
+    safety: SafetyConfig | None,
+) -> int:
+    events = parse_safety_fallbacks(stderr)
+    if not events or safety is None:
+        return 0
+    try:
+        token = resolve_safety_token(safety)
+    except ValueError as exc:
+        LOG.error("cannot backfill safety events because the shared token is unavailable: %s", exc)
+        return 0
+    written = 0
+    for event in events:
+        response = client.backfill_audit_event(event, token)
+        if response.ok:
+            written += 1
+            continue
+        LOG.warning(
+            "safety audit backfill failed event=%s project=%s status=%s body=%s",
+            event.get("event_id"),
+            event.get("project_id"),
+            response.status_code,
+            response.text,
+        )
+    return written
+
+
+def latest_blocked_action(
+    client: CairnClient,
+    project_id: str,
+    run_id: str,
+) -> AuditEvent | None:
+    events: list[AuditEvent] = []
+    for event_type in ("ACTION_DECISION", "AUDIT_BACKFILL"):
+        events.extend(
+            client.list_audit_events(
+                project_id,
+                run_id=run_id,
+                event_type=event_type,
+                limit=100,
+            )
+        )
+    limited = [event for event in events if event.decision in ("block", "resource_pause")]
+    if not limited:
+        return None
+    return max(limited, key=lambda event: (event.created_at, event.event_id))
 
 
 def cancel_reason(result: ProcessResult, cancellation: TaskCancellation | None = None) -> str | None:
@@ -71,13 +180,15 @@ def write_graph_snapshot_reference(
 
 
 def run_worker_process(
-    container_manager: ContainerManager,
+    container_manager: ExecutionBackend,
     container_name: str,
     worker: WorkerConfig,
-    argv: list[str],
+    command: DriverResult,
     *,
     phase: str,
     timeout_seconds: int,
+    safety: SafetyConfig | None = None,
+    safety_context: SafetyRunContext | None = None,
     lease: HeartbeatLease | None = None,
     cancellation: TaskCancellation | None = None,
 ) -> ProcessResult:
@@ -88,10 +199,46 @@ def run_worker_process(
         phase,
         timeout_seconds,
     )
+    for asset in command.assets:
+        container_manager.write_text_file(container_name, asset.path, asset.content)
+
+    exec_env = dict(worker.env)
+    if safety is not None and safety_context is not None:
+        if safety_context.worker != worker.name:
+            raise ValueError("safety context worker does not match worker config")
+        if safety_context.phase != phase:
+            raise ValueError("safety context phase does not match execution phase")
+        exec_env.update(
+            {
+                "CAIRN_SAFETY_ENDPOINT": safety.endpoint.rstrip("/"),
+                "CAIRN_SAFETY_TOKEN": resolve_safety_token(safety),
+                "CAIRN_PROJECT_ID": safety_context.project_id,
+                "CAIRN_INTENT_ID": safety_context.intent_id or "",
+                "CAIRN_RUN_ID": safety_context.run_id,
+                "CAIRN_WORKER": safety_context.worker,
+                "CAIRN_PHASE": safety_context.phase,
+                "CAIRN_SAFETY_TIMEOUT_MS": str(safety.request_timeout_ms),
+                "CAIRN_SAFETY_MAX_PAYLOAD_BYTES": str(safety.max_payload_bytes),
+                "CAIRN_SAFETY_MAX_BULK_CONCURRENCY": str(
+                    safety.resource_budget.max_bulk_concurrency
+                ),
+                "CAIRN_SAFETY_MAX_UNATTENDED_BULK_SECONDS": str(
+                    safety.resource_budget.max_unattended_bulk_seconds
+                ),
+                "CAIRN_SAFETY_AUTH_CONCURRENCY": str(safety.resource_budget.auth_concurrency),
+                "CAIRN_SAFETY_AUTH_ATTEMPTS_PER_MINUTE": str(
+                    safety.resource_budget.auth_attempts_per_minute
+                ),
+                "CAIRN_SAFETY_AUTH_ATTEMPTS_PER_BATCH": str(
+                    safety.resource_budget.auth_attempts_per_batch
+                ),
+            }
+        )
+
     process = container_manager.build_exec_process(
         container_name,
-        dict(worker.env),
-        argv,
+        exec_env,
+        command.argv,
         timeout_seconds=timeout_seconds,
     )
     process.start()

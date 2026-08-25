@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
@@ -13,7 +14,6 @@ from cairn.dispatcher.runtime.local_process import LocalProcess
 from cairn.dispatcher.scheduler import loop as loop_module
 from cairn.dispatcher.tasks import common, explore
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
-from cairn.dispatcher.workers.adapters.codex import CodexDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
 from cairn.dispatcher.workers.registry import get_driver
 
@@ -21,11 +21,16 @@ from conftest import FakeClient, make_config, make_intent, make_project
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+requires_posix_processes = pytest.mark.skipif(
+    os.name == "nt",
+    reason="local worker execution currently requires POSIX process groups and /bin/sh",
+)
 
 
 # --------------------------------------------------------------------------- LocalProcess
 
 
+@requires_posix_processes
 def test_local_process_captures_stdout_and_exit_code() -> None:
     process = LocalProcess(
         ["python3", "-c", "import sys; print('hello'); sys.exit(3)"],
@@ -41,6 +46,7 @@ def test_local_process_captures_stdout_and_exit_code() -> None:
     assert not result.timed_out
 
 
+@requires_posix_processes
 def test_local_process_inherits_cwd(tmp_path: Path) -> None:
     process = LocalProcess(
         ["python3", "-c", "import os; print(os.getcwd())"],
@@ -54,6 +60,7 @@ def test_local_process_inherits_cwd(tmp_path: Path) -> None:
     assert Path(result.stdout.strip()).resolve() == tmp_path.resolve()
 
 
+@requires_posix_processes
 def test_local_process_times_out_and_kills_within_grace() -> None:
     process = LocalProcess(
         ["sh", "-c", "sleep 30"],
@@ -71,6 +78,7 @@ def test_local_process_times_out_and_kills_within_grace() -> None:
     assert elapsed < 10  # killed on its own timeout, not the 30s outer backstop
 
 
+@requires_posix_processes
 def test_local_process_kill_terminates_child_process_group(tmp_path: Path) -> None:
     pid_file = tmp_path / "child.pid"
     script = f"sleep 30 & echo $! > {pid_file}; wait"
@@ -97,6 +105,7 @@ def test_local_process_kill_terminates_child_process_group(tmp_path: Path) -> No
         raise AssertionError(f"child process {child_pid} survived the group kill")
 
 
+@requires_posix_processes
 def test_local_process_cancel_records_reason() -> None:
     process = LocalProcess(
         ["sh", "-c", "sleep 30"],
@@ -125,6 +134,7 @@ def test_local_backend_creates_isolated_project_dir(tmp_path: Path) -> None:
     assert backend.container_name("proj_001") == str(tmp_path / "proj_001")
 
 
+@requires_posix_processes
 def test_local_backend_merges_host_env_with_worker_env(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("CAIRN_HOST_VAR", "host")
     backend = LocalBackend(LocalConfig(workspace_root=str(tmp_path)))
@@ -142,6 +152,7 @@ def test_local_backend_merges_host_env_with_worker_env(tmp_path: Path, monkeypat
     assert result.stdout == "host-worker"
 
 
+@requires_posix_processes
 def test_local_common_env_reaches_worker_subprocess(tmp_path: Path, monkeypatch) -> None:
     # common_env (e.g. an outbound proxy) merges into every worker's env and must survive
     # all the way to the host subprocess in local mode.
@@ -153,7 +164,7 @@ def test_local_common_env_reaches_worker_subprocess(tmp_path: Path, monkeypatch)
         "all_proxy": "http://127.0.0.1:7897",
     }
     config = DispatchConfig.model_validate(payload)
-    worker = next(w for w in config.workers if w.type == "claudecode")
+    worker = config.workers[0]
     assert worker.env["https_proxy"] == "http://127.0.0.1:7897"
 
     assert config.local is not None
@@ -229,9 +240,13 @@ def _local_payload() -> dict:
             "explore": {"timeout": 10, "conclude_timeout": 5},
         },
         "workers": [
-            {"name": "local-claude", "type": "claudecode", "task_types": ["explore"], "max_running": 1, "priority": 0},
-            {"name": "local-codex", "type": "codex", "task_types": ["explore"], "max_running": 1, "priority": 1},
-            {"name": "local-pi", "type": "pi", "task_types": ["reason"], "max_running": 1, "priority": 2},
+            {
+                "name": "local-pi",
+                "type": "pi",
+                "task_types": ["bootstrap", "reason", "explore"],
+                "max_running": 1,
+                "priority": 0,
+            },
         ],
     }
 
@@ -268,6 +283,7 @@ def test_container_execution_still_requires_worker_env() -> None:
     payload["runtime"]["execution"] = "container"
     payload["runtime"]["worker_healthcheck"] = "startup_only"
     payload["container"] = {"image": "img", "network_mode": "host", "completed_action": "stop"}
+    payload["safety"] = make_config().safety.model_dump()
 
     with pytest.raises(ValidationError, match="missing env keys"):
         DispatchConfig.model_validate(payload)
@@ -291,12 +307,11 @@ def _bare_loop(config: DispatchConfig) -> loop_module.DispatcherLoop:
     return loop
 
 
-def test_local_cli_check_passes_when_cli_present() -> None:
-    payload = _local_payload()
-    payload["workers"] = [{"name": "m", "type": "mock", "task_types": ["reason"], "max_running": 1, "priority": 0}]
-    config = DispatchConfig.model_validate(payload)
+def test_local_cli_check_passes_when_cli_present(monkeypatch) -> None:
+    config = DispatchConfig.model_validate(_local_payload())
+    monkeypatch.setattr(loop_module.DispatcherLoop, "_probe_local_cli", staticmethod(lambda _binary: ("/bin/pi", True)))
 
-    _bare_loop(config)._run_local_binary_check()  # mock -> python3 --help runs; must not raise
+    _bare_loop(config)._run_local_binary_check()
 
 
 def test_local_cli_check_exits_when_no_cli_installed(monkeypatch) -> None:
@@ -310,28 +325,14 @@ def test_local_cli_check_exits_when_no_cli_installed(monkeypatch) -> None:
 # --------------------------------------------------------------------------- drivers
 
 
-def _bare_worker(worker_type: str) -> WorkerConfig:
+def _bare_worker() -> WorkerConfig:
     return WorkerConfig.model_validate(
-        {"name": worker_type, "type": worker_type, "task_types": ["explore"], "max_running": 1, "priority": 0}
+        {"name": "pi", "type": "pi", "task_types": ["explore"], "max_running": 1, "priority": 0}
     )
 
 
-def test_codex_local_driver_omits_provider_injection() -> None:
-    worker = _bare_worker("codex")
-    argv = CodexDriver(local=True).build_execute(worker, "PROMPT", None).argv
-
-    assert argv == ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--", "PROMPT"]
-    assert not any("model_providers" in part for part in argv)
-    assert "--model" not in argv
-
-    conclude = CodexDriver(local=True).build_conclude(worker, "PROMPT", "sess-1")
-    assert conclude[:4] == ["codex", "exec", "resume", "sess-1"]
-    assert conclude[-2:] == ["--", "PROMPT"]
-    assert not any("model_providers" in part for part in conclude)
-
-
 def test_pi_local_driver_omits_models_json_and_provider() -> None:
-    worker = _bare_worker("pi")
+    worker = _bare_worker()
     argv = PiDriver(local=True).build_execute(worker, "PROMPT", None).argv
 
     assert argv[0] == "/bin/sh"
@@ -342,18 +343,17 @@ def test_pi_local_driver_omits_models_json_and_provider() -> None:
 
 
 def test_get_driver_selects_local_or_container_variant() -> None:
-    assert get_driver("codex", "local").local is True
-    assert get_driver("codex").local is False
     assert get_driver("pi", "local").local is True
-    # claudecode and mock are shared instances across both modes
-    assert get_driver("claudecode", "local") is get_driver("claudecode")
-    assert get_driver("mock", "local") is get_driver("mock")
+    assert get_driver("pi").local is False
+    for removed_type in ("claudecode", "codex", "mock"):
+        with pytest.raises(KeyError):
+            get_driver(removed_type)
 
 
 # --------------------------------------------------------------------------- end to end
 
 
-def _local_config_for_worker(name: str, worker_type: str) -> DispatchConfig:
+def _local_config_for_worker(name: str) -> DispatchConfig:
     return DispatchConfig.model_validate(
         {
             "server": "in-process",
@@ -373,7 +373,7 @@ def _local_config_for_worker(name: str, worker_type: str) -> DispatchConfig:
                 "explore": {"timeout": 30, "conclude_timeout": 10},
             },
             "workers": [
-                {"name": name, "type": worker_type, "task_types": ["explore"], "max_running": 1, "priority": 0}
+                {"name": name, "type": "pi", "task_types": ["explore"], "max_running": 1, "priority": 0}
             ],
         }
     )
@@ -388,18 +388,27 @@ def _install_fake_cli(tmp_path: Path, monkeypatch, name: str, body: str) -> None
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
 
 
+def _pi_response_body(payload: dict) -> str:
+    event = {
+        "type": "turn_end",
+        "message": {"role": "assistant", "content": [{"type": "text", "text": json.dumps(payload)}]},
+    }
+    return f"printf '%s\\n' '{json.dumps(event)}'"
+
+
+@requires_posix_processes
 def test_explore_runs_real_local_cli_end_to_end(tmp_path: Path, monkeypatch) -> None:
-    # A fake `claude` on PATH stands in for the real CLI: the whole local path is exercised
+    # A fake `pi` on PATH stands in for the real CLI: the whole local path is exercised
     # for real — driver argv -> LocalBackend -> LocalProcess subprocess -> stdout parsing.
     _install_fake_cli(
         tmp_path,
         monkeypatch,
-        "claude",
-        "echo '{\"accepted\":true,\"data\":{\"description\":\"local fake fact\"}}'",
+        "pi",
+        _pi_response_body({"accepted": True, "data": {"description": "local fake fact"}}),
     )
     monkeypatch.setattr(common, "GRAPH_SNAPSHOT_ROOT", str(tmp_path / "prompts"))
 
-    config = _local_config_for_worker("test-worker", "claudecode")
+    config = _local_config_for_worker("test-worker")
     backend = LocalBackend(LocalConfig(workspace_root=str(tmp_path / "work")))
     intent = make_intent()
     project = make_project(intents=[intent])
@@ -423,16 +432,17 @@ def test_explore_runs_real_local_cli_end_to_end(tmp_path: Path, monkeypatch) -> 
     assert any(p.name == "graph.yaml" for p in snapshot_root.rglob("*"))
 
 
+@requires_posix_processes
 def test_explore_local_cli_rejection_releases_intent(tmp_path: Path, monkeypatch) -> None:
     _install_fake_cli(
         tmp_path,
         monkeypatch,
-        "claude",
-        "echo '{\"accepted\":false,\"reason\":\"policy_refusal\"}'",
+        "pi",
+        _pi_response_body({"accepted": False, "reason": "policy_refusal"}),
     )
     monkeypatch.setattr(common, "GRAPH_SNAPSHOT_ROOT", str(tmp_path / "prompts"))
 
-    config = _local_config_for_worker("test-worker", "claudecode")
+    config = _local_config_for_worker("test-worker")
     backend = LocalBackend(LocalConfig(workspace_root=str(tmp_path / "work")))
     intent = make_intent()
     project = make_project(intents=[intent])

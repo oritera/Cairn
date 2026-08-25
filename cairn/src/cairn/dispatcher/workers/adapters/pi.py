@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from importlib import resources
 import json
-from pathlib import PurePosixPath
+import os
+from pathlib import Path, PurePosixPath
+import tempfile
 from typing import Any
 
 from cairn.dispatcher.config import WorkerConfig
-from cairn.dispatcher.workers.base import DriverResult, WorkerDriver
+from cairn.dispatcher.workers.base import DriverResult, RuntimeAsset, WorkerDriver
 from cairn.dispatcher.workers.health import HealthResult, http_ping, proxies_from_env
 
 
@@ -55,8 +58,13 @@ class PiDriver(WorkerDriver):
         return f"POST {env['PI_BASE_URL']} (api={env['PI_PROVIDER_API']}, model={env['PI_MODEL']})"
 
     def build_execute(self, worker: WorkerConfig, prompt: str, session: str | None) -> DriverResult:
+        assets = self._extension_assets(worker, local=self.local)
         if self.local:
-            return DriverResult(argv=self._local_argv(worker, prompt, session), session=session)
+            return DriverResult(
+                argv=self._local_argv(worker, prompt, session),
+                session=session,
+                assets=assets,
+            )
         env = worker.env
         argv = [
             "--provider",
@@ -71,11 +79,20 @@ class PiDriver(WorkerDriver):
         if session:
             argv.extend(["--session", session])
         argv.extend(["-p", prompt])
-        return DriverResult(argv=self._wrap_with_models(worker, argv), session=session)
+        return DriverResult(
+            argv=self._wrap_with_models(worker, argv),
+            session=session,
+            assets=assets,
+        )
 
-    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> list[str]:
+    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> DriverResult:
+        assets = self._extension_assets(worker, local=self.local)
         if self.local:
-            return self._local_argv(worker, prompt, session)
+            return DriverResult(
+                argv=self._local_argv(worker, prompt, session),
+                session=session,
+                assets=assets,
+            )
         env = worker.env
         argv = [
             "--provider",
@@ -91,7 +108,11 @@ class PiDriver(WorkerDriver):
             "-p",
             prompt,
         ]
-        return self._wrap_with_models(worker, argv)
+        return DriverResult(
+            argv=self._wrap_with_models(worker, argv),
+            session=session,
+            assets=assets,
+        )
 
     def _local_argv(self, worker: WorkerConfig, prompt: str, session: str | None) -> list[str]:
         # Native pi: no models.json injection and no --provider/--model overrides, so pi uses
@@ -102,13 +123,7 @@ class PiDriver(WorkerDriver):
             "json",
             "--session-dir",
             session_dir,
-            "--no-extensions",
-            "--no-skills",
-            "--no-prompt-templates",
-            "--no-themes",
-            "--no-context-files",
-            "--tools",
-            "read,write,edit,bash,grep,find,ls",
+            *self._resource_argv(worker, extension_dir=self._extension_dir(worker, local=True)),
         ]
         if session:
             pi_argv.extend(["--session", session])
@@ -168,15 +183,7 @@ class PiDriver(WorkerDriver):
             'printf "%s" "$models_json" > "$agent_dir/models.json"\n'
             'exec env PI_CODING_AGENT_DIR="$agent_dir" pi "$@"\n'
         )
-        argv = [
-            "--no-extensions",
-            "--no-skills",
-            "--no-prompt-templates",
-            "--no-themes",
-            "--no-context-files",
-        ]
-        if enable_tools:
-            argv.extend(["--tools", "read,write,edit,bash,grep,find,ls"])
+        argv = self._resource_argv(worker, enable_tools=enable_tools)
         return [
             "/bin/sh",
             "-lc",
@@ -195,6 +202,50 @@ class PiDriver(WorkerDriver):
     @staticmethod
     def _session_dir(worker: WorkerConfig) -> str:
         return str(PurePosixPath(PiDriver._agent_dir(worker)) / "sessions")
+
+    @staticmethod
+    def _extension_dir(worker: WorkerConfig, *, local: bool = False) -> str:
+        if local and os.name == "nt":
+            return str(Path(tempfile.gettempdir()) / "cairn-pi" / worker.name / "cairn-safety")
+        return str(PurePosixPath(PiDriver._agent_dir(worker)) / "cairn-safety")
+
+    @staticmethod
+    def _extension_assets(worker: WorkerConfig, *, local: bool = False) -> tuple[RuntimeAsset, ...]:
+        source = resources.files("cairn.safety.pi_extension")
+        if local and os.name == "nt":
+            target = Path(PiDriver._extension_dir(worker, local=True))
+        else:
+            target = PurePosixPath(PiDriver._extension_dir(worker))
+        return tuple(
+            RuntimeAsset(
+                path=str(target / name),
+                content=source.joinpath(name).read_text(encoding="utf-8"),
+            )
+            for name in ("index.ts", "transport.mjs")
+        )
+
+    @staticmethod
+    def _resource_argv(
+        worker: WorkerConfig,
+        *,
+        enable_tools: bool = True,
+        extension_dir: str | None = None,
+    ) -> list[str]:
+        extension_path = str(Path(extension_dir) / "index.ts") if extension_dir and os.name == "nt" else str(
+            PurePosixPath(extension_dir or PiDriver._extension_dir(worker)) / "index.ts"
+        )
+        argv = [
+            "--no-extensions",
+            "-e",
+            extension_path,
+            "--no-skills",
+            "--no-prompt-templates",
+            "--no-themes",
+            "--no-context-files",
+        ]
+        if enable_tools:
+            argv.extend(["--tools", "read,write,edit,bash,grep,find,ls"])
+        return argv
 
     @staticmethod
     def _iter_events(stdout: str) -> list[dict[str, Any]]:

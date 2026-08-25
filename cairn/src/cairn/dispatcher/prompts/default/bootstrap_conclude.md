@@ -24,6 +24,8 @@ Normal return example:
 - Do not output `complete` in this phase. Even if Goal is not achieved or you want to explain status, put that information into `fact.description` only.
 - `fact.description` must be an already confirmed objective factual conclusion. Do not output plans, guesses, or explanatory filler.
 - Do not put long data blobs in `fact.description`. Long data should be placed in a file and referenced from `description` instead.
+- When Safety Decision Context has `decision: block`, `fact.description` must start with `[V1][BRANCH_CLOSED]`.
+- When Safety Decision Context has `decision: resource_pause`, `fact.description` must start with `[R1][RESOURCE_PAUSED]` and must say it is not vulnerability confirmation.
 
 # Context
 ## Origin
@@ -39,4 +41,9 @@ Normal return example:
 ## Hints
 ```
 {hints}
+```
+
+## Safety Decision Context
+```
+{safety_decision_context}
 ```

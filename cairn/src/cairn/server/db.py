@@ -79,6 +79,34 @@ CREATE TABLE IF NOT EXISTS scoped_counters (
     value INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (project_id, kind)
 );
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    event_id TEXT PRIMARY KEY,
+    action_id TEXT,
+    run_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    intent_id TEXT,
+    worker TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    tool_name TEXT,
+    decision TEXT,
+    rule_id TEXT,
+    reason TEXT,
+    payload_json TEXT NOT NULL,
+    payload_sha256 TEXT NOT NULL,
+    truncated INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_project_created
+ON audit_events(project_id, created_at, event_id);
+
+CREATE INDEX IF NOT EXISTS idx_audit_intent_created
+ON audit_events(project_id, intent_id, created_at, event_id);
+
+CREATE INDEX IF NOT EXISTS idx_audit_action
+ON audit_events(action_id, created_at, event_id);
 """
 
 

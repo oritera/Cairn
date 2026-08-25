@@ -23,6 +23,8 @@ Normal return example:
 - This JSON summary is your final output for this phase. After outputting it, stop.
 - `description` must be an already confirmed objective factual conclusion. Do not output plans, guesses, or explanatory filler. Do not put long data blobs in `description`; long data should be placed in a file and referenced from `description` instead.
 - `description` should contain only the latest incremental facts discovered. Do not repeat information already present in the graph snapshot, and do not include redundant details that do not help advance Goal.
+- When Safety Decision Context has `decision: block`, `description` must start with `[V1][BRANCH_CLOSED]` and must state that the requested action was not executed.
+- When Safety Decision Context has `decision: resource_pause`, `description` must start with `[R1][RESOURCE_PAUSED]`, must not claim a vulnerability, and must prohibit autonomous expansion of the same batch.
 
 # Context
 ## Graph
@@ -38,4 +40,9 @@ Normal return example:
 ## Current Intent Description
 ```
 {intent_description}
+```
+
+## Safety Decision Context
+```
+{safety_decision_context}
 ```

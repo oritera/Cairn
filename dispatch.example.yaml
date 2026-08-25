@@ -1,6 +1,19 @@
 # Cairn server API endpoint.
 server: "http://cairn-server:8000"
 
+safety:
+  enabled: true
+  endpoint: "http://cairn-server:8000/internal/safety"
+  token_env: "CAIRN_SAFETY_TOKEN"
+  request_timeout_ms: 2000
+  max_payload_bytes: 65536
+  resource_budget:
+    max_bulk_concurrency: 2
+    max_unattended_bulk_seconds: 600
+    auth_concurrency: 1
+    auth_attempts_per_minute: 10
+    auth_attempts_per_batch: 30
+
 # Shared environment variables merged into every worker.
 common_env:
   TSEC_SERVER_HOST: "<SERVER_HOST>:8000"
@@ -10,11 +23,11 @@ runtime:
   # Scheduler tick interval in seconds.
   interval: 3
   # Global concurrency cap across all workers and all projects.
-  max_workers: 8
+  max_workers: 2
   # Maximum number of projects that may be actively scheduled at the same time.
-  max_running_projects: 3
+  max_running_projects: 1
   # Per-project worker cap. Prevents one project from monopolizing the whole dispatcher.
-  max_project_workers: 4
+  max_project_workers: 2
   # Timeout for each enabled worker healthcheck.
   healthcheck_timeout: 20
   # "startup_and_task" checks at dispatcher startup and before every task.
@@ -54,35 +67,15 @@ container:
 
 workers:
   # Worker priority is ascending: lower numbers are preferred first.
-  # max_running is per-worker concurrency. Slower backends such as Pi usually benefit from lower values.
-  - name: "claudecode_deepseek-v4-pro"
-    type: "claudecode"
+  # max_running is per-worker concurrency. Keep it within the local host budget.
+  - name: "pi_qwen3.6-plus"
+    type: "pi"
     task_types: [bootstrap, reason, explore]
     max_running: 2
     priority: 0
     env:
-      ANTHROPIC_MODEL: "deepseek-v4-pro"
-      ANTHROPIC_BASE_URL: "https://api.deepseek.com/anthropic"
-      ANTHROPIC_AUTH_TOKEN: "sk-xxx"
-
-  # - name: "codex_qwen3.6-plus"
-  #   type: "codex"
-  #   task_types: [bootstrap,reason,explore]
-  #   max_running: 2
-  #   priority: 0
-  #   env:
-  #     CODEX_MODEL: "qwen3.6-plus"
-  #     CODEX_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  #     OPENAI_API_KEY: "sk-xxx"
-
-  # - name: "pi_qwen3.6-plus"
-  #   type: "pi"
-  #   task_types: [bootstrap,reason,explore]
-  #   max_running: 2
-  #   priority: 0
-  #   env:
-  #     PI_MODEL: "qwen3.6-plus"
-  #     PI_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  #     PI_API_KEY: "sk-xxx"
-  #     PI_PROVIDER_API: "openai-completions"
-  #     PI_MODEL_CONTEXT_WINDOW: "262144"
+      PI_MODEL: "qwen3.6-plus"
+      PI_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      PI_API_KEY: "sk-xxx"
+      PI_PROVIDER_API: "openai-completions"
+      PI_MODEL_CONTEXT_WINDOW: "262144"

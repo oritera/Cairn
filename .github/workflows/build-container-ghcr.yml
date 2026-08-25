@@ -7,12 +7,39 @@ on:
       - main
     paths:
       - "container/**"
+      - "cairn/**"
+      - "docker-compose.yaml"
+      - "dispatch*.yaml"
+      - ".github/workflows/build-container-ghcr.yml"
 
 permissions:
   packages: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.9"
+          enable-cache: true
+
+      - name: Run Python safety suite
+        run: uv run --project cairn pytest cairn/tests -q
+
+      - name: Build wheel
+        run: uv build --project cairn
+
+      - name: Verify packaged Pi safety extension
+        run: python -c "import glob,zipfile; p=glob.glob('cairn/dist/*.whl')[0]; n=zipfile.ZipFile(p).namelist(); assert any(x.endswith('safety/pi_extension/index.ts') for x in n); assert any(x.endswith('safety/pi_extension/transport.mjs') for x in n)"
+
   docker:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
@@ -28,6 +55,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build local Pi-only worker image
+        run: docker build ./container -t cairn-worker-container:pi-safety-mvp
+
+      - name: Smoke-test worker binaries
+        run: docker run --rm --entrypoint /bin/bash cairn-worker-container:pi-safety-mvp -lc 'pi --version && ! command -v claude && ! command -v codex'
 
       - name: Build and push
         uses: docker/build-push-action@v6

@@ -18,7 +18,14 @@ from cairn.dispatcher.runtime.process import ProcessResult
 from cairn.dispatcher.scheduler.loop import DispatcherLoop
 from cairn.server import db
 from cairn.server.app import app
-from cairn.server.models import ProjectDetail, ProjectSummary, Settings
+from cairn.server.models import AuditEvent, ProjectDetail, ProjectSummary, Settings
+from support.mock_driver import install_mock_pi_driver
+
+
+@pytest.fixture(autouse=True)
+def _mock_pi_driver(monkeypatch):
+    install_mock_pi_driver(monkeypatch)
+    monkeypatch.setenv("CAIRN_SAFETY_TOKEN", "test-safety-token")
 
 
 class InProcessClient:
@@ -48,6 +55,22 @@ class InProcessClient:
         response = self.http.get(f"/projects/{project_id}/export?format=yaml")
         response.raise_for_status()
         return response.text
+
+    def list_audit_events(self, project_id: str, **filters) -> list[AuditEvent]:
+        response = self.http.get(
+            f"/projects/{project_id}/audit",
+            params={key: value for key, value in filters.items() if value is not None},
+        )
+        response.raise_for_status()
+        return TypeAdapter(list[AuditEvent]).validate_python(response.json()["items"])
+
+    def backfill_audit_event(self, payload: dict[str, Any], token: str) -> ApiResult:
+        response = self.http.post(
+            "/internal/safety/events",
+            json=payload,
+            headers={"X-Cairn-Safety-Token": token},
+        )
+        return ApiResult(response.status_code, response.json(), response.text)
 
     def heartbeat(self, project_id: str, intent_id: str, worker: str) -> ApiResult:
         return self._post(f"/projects/{project_id}/intents/{intent_id}/heartbeat", {"worker": worker})
@@ -227,15 +250,20 @@ def _config(
                 "network_mode": "host",
                 "completed_action": "stop",
             },
+            "safety": {"endpoint": "http://127.0.0.1:8000/internal/safety"},
             "workers": [
                 {
                     "name": "mock-worker",
-                    "type": "mock",
+                    "type": "pi",
                     "task_types": task_types or ["bootstrap", "reason", "explore"],
                     "max_running": 1,
                     "priority": 0,
-                    "env": {
-                        "MOCK_HEALTHCHECK": healthcheck or _phase("ok"),
+                        "env": {
+                            "PI_MODEL": "test-model",
+                            "PI_BASE_URL": "http://model.invalid/v1",
+                            "PI_API_KEY": "test-key",
+                            "PI_PROVIDER_API": "openai-completions",
+                            "MOCK_HEALTHCHECK": healthcheck or _phase("ok"),
                         "MOCK_BOOTSTRAP": bootstrap,
                         "MOCK_REASON": reason,
                         "MOCK_EXPLORE_EXECUTE": explore,
@@ -438,12 +466,16 @@ def _failover_config() -> DispatchConfig:
     def worker(name: str, priority: int, healthcheck: str) -> dict:
         return {
             "name": name,
-            "type": "mock",
+            "type": "pi",
             "task_types": ["bootstrap", "reason", "explore"],
             "max_running": 1,
             "priority": priority,
-            "env": {
-                "MOCK_HEALTHCHECK": healthcheck,
+                "env": {
+                    "PI_MODEL": "test-model",
+                    "PI_BASE_URL": "http://model.invalid/v1",
+                    "PI_API_KEY": "test-key",
+                    "PI_PROVIDER_API": "openai-completions",
+                    "MOCK_HEALTHCHECK": healthcheck,
                 "MOCK_BOOTSTRAP": _phase("complete"),
                 "MOCK_REASON": _phase("complete", zero_outcomes=["intent"]),
                 "MOCK_EXPLORE_EXECUTE": _phase("fact"),
@@ -468,6 +500,7 @@ def _failover_config() -> DispatchConfig:
                 "explore": {"timeout": 2, "conclude_timeout": 2},
             },
             "container": {"image": "unused", "network_mode": "host", "completed_action": "stop"},
+            "safety": {"endpoint": "http://127.0.0.1:8000/internal/safety"},
             "workers": [
                 worker("bad", 0, _phase("fail", zero_outcomes=["ok"])),
                 worker("good", 1, _phase("ok")),

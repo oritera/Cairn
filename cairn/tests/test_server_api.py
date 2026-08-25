@@ -30,6 +30,50 @@ def _create_project(client: TestClient) -> str:
     return response.json()["project"]["id"]
 
 
+def test_audit_response_exposes_ui_correlation_and_payload_fields(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setenv("CAIRN_SAFETY_TOKEN", "test-safety-token")
+    project_id = _create_project(client)
+    body = {
+        "schema_version": 1,
+        "event_id": "decision-1",
+        "action_id": "action-1",
+        "run_id": "run-1",
+        "project_id": project_id,
+        "intent_id": None,
+        "worker": "pi-worker",
+        "phase": "reason_execute",
+        "event_type": "ACTION_DECISION",
+        "tool_name": "bash",
+        "decision": "block",
+        "rule_id": "destructive_delete",
+        "reason": "blocked before execution",
+        "payload": {
+            "proposal": {"tool_name": "bash", "input": {"command": "rm -rf /srv/data"}},
+            "decision": {"target": "/srv/data"},
+            "assistant": {"text": "[V1][BRANCH_CLOSED]"},
+        },
+    }
+    created = client.post(
+        "/internal/safety/events",
+        json=body,
+        headers={"X-Cairn-Safety-Token": "test-safety-token"},
+    )
+    assert created.status_code == 201
+
+    item = client.get(f"/projects/{project_id}/audit").json()["items"][0]
+
+    assert item["event_id"] == "decision-1"
+    assert item["action_id"] == "action-1"
+    assert item["run_id"] == "run-1"
+    assert item["worker"] == "pi-worker"
+    assert item["phase"] == "reason_execute"
+    assert item["tool_name"] == "bash"
+    assert item["decision"] == "block"
+    assert item["payload"]["proposal"]["input"]["command"] == "rm -rf /srv/data"
+    assert len(item["payload_sha256"]) == 64
+    assert item["truncated"] is False
+
+
 def test_project_workflow_create_conclude_complete_and_reopen(client: TestClient) -> None:
     project_id = _create_project(client)
 

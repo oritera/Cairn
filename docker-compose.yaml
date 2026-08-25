@@ -9,6 +9,8 @@ services:
       - "8000:8000"
     volumes:
       - ./datas/cairn/:/root/.local/share/cairn/
+    environment:
+      CAIRN_SAFETY_TOKEN: "${CAIRN_SAFETY_TOKEN:?set CAIRN_SAFETY_TOKEN}"
     healthcheck:
       test:
         - "CMD"
@@ -30,6 +32,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dispatch.yaml:/cairn/dispatch.yaml
+    environment:
+      CAIRN_SAFETY_TOKEN: "${CAIRN_SAFETY_TOKEN:?set CAIRN_SAFETY_TOKEN}"
     depends_on:
       cairn-server:
         condition: service_healthy

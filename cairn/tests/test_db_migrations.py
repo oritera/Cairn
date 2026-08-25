@@ -5,6 +5,30 @@ import sqlite3
 from cairn.server import db
 
 
+def test_configure_creates_append_only_audit_schema(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "audit.db"
+    monkeypatch.setattr(db, "_db_path", None)
+
+    db.configure(path)
+
+    with db.get_conn() as conn:
+        table = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'audit_events'"
+        ).fetchone()
+        indexes = {
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'audit_events'"
+            ).fetchall()
+        }
+    assert table is not None
+    assert {
+        "idx_audit_project_created",
+        "idx_audit_intent_created",
+        "idx_audit_action",
+    }.issubset(indexes)
+
+
 def test_configure_adds_bootstrap_enabled_to_legacy_projects_table(tmp_path, monkeypatch) -> None:
     path = tmp_path / "legacy.db"
     with sqlite3.connect(path) as conn:
