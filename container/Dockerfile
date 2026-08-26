@@ -10,7 +10,7 @@ RUN useradd -m -s /bin/bash kali && \
 USER kali
 
 RUN sudo apt update && \
-    sudo apt install -y bsdextrautils npm jq iputils-ping sshpass ncat rlwrap \
+    sudo apt install -y bsdextrautils cmake npm jq iputils-ping sshpass ncat rlwrap \
     bloodyad coercer enum4linux-ng pwncat chisel-common-binaries \
     dirsearch yq krb5-user gitleaks naabu nikto netexec adb && \
     sudo apt clean && \
