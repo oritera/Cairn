@@ -13,7 +13,11 @@ on:
       - ".github/workflows/build-container-ghcr.yml"
 
 permissions:
+  contents: read
   packages: write
+
+env:
+  WORKER_IMAGE: ghcr.io/theearthwormsplitsvertically/cairn-worker-container
 
 jobs:
   test:
@@ -68,6 +72,6 @@ jobs:
           context: ./container
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/cairn-worker-container:latest
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/cairn-worker-container:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/cairn-worker-container:buildcache,mode=max
+          tags: ${{ env.WORKER_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.WORKER_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.WORKER_IMAGE }}:buildcache,mode=max
