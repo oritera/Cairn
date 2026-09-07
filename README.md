@@ -6,7 +6,7 @@
 ### More Than Just AI Penetration Testing — Towards General State-Space Search
 
 <p>
-  <a href="https://chainreactors.ai" target="_blank" rel="noopener noreferrer">
+  <a href="https://wiki.chainreactors.red" target="_blank" rel="noopener noreferrer">
     <img src="./README/chainreactors.png" alt="ChainReactors" height="55" />
   </a>
   <a href="https://zc.tencent.com/hackathon" target="_blank" rel="noopener noreferrer">
@@ -225,4 +225,4 @@ This project is licensed under **GNU AGPLv3** for personal and educational use.
 
 **Contributions**: By submitting a Pull Request, you agree that your contributions may be used under both the AGPL-3.0 and the project's commercial license.
 
-### Cairn by ChainReactors
+**Cairn by [ChainReactors](https://wiki.chainreactors.red)**
