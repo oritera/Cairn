@@ -6,6 +6,9 @@
 ### More Than Just AI Penetration Testing — Towards General State-Space Search
 
 <p>
+  <a href="https://chainreactors.ai" target="_blank" rel="noopener noreferrer">
+    <img src="./README/chainreactors.png" alt="ChainReactors" height="55" />
+  </a>
   <a href="https://zc.tencent.com/hackathon" target="_blank" rel="noopener noreferrer">
     <img src="./README/tencent.png" alt="Tencent" height="55" />
   </a>
@@ -14,7 +17,9 @@
   </a>
 </p>
 
-Cairn is a general-purpose problem-solving engine. <br/>It defines no roles, no workflows. Given an origin and a goal, it searches for a path through an unknown state space. <br/>AI Penetration Testing is one such problem — and a proven one.
+Cairn is an AI-native engine for exploring and solving problems in unknown state spaces. <br/>It defines no roles and no workflows. Given an origin and a goal, it searches for a path through an unknown state space. <br/>AI penetration testing is its first proven domain — not its boundary.
+
+Cairn 是一个用于探索和解决未知状态空间问题的 AI Native 引擎。它不预设角色与工作流；给定起点与目标，即在未知状态空间中搜索路径。AI 渗透测试是它首个得到验证的应用场景，而非能力边界。
 
 <p>
   <a href="https://discord.gg/nDSy4NZVP" target="_blank" rel="noopener noreferrer">
@@ -216,6 +221,8 @@ The developers and contributors of this project do not endorse or accept respons
 ## ⚖️ License
 This project is licensed under **GNU AGPLv3** for personal and educational use.
 
-**Commercial Use**: If you wish to use this project in a commercial or proprietary environment without the AGPL-3.0 open-source obligations, **please contact me to obtain a commercial license.**
+**Commercial Use**: If you wish to use this project in a commercial or proprietary environment without the AGPL-3.0 open-source obligations, please contact [business@chainreactors.ai](mailto:business@chainreactors.ai) for commercial licensing or partnership inquiries.
 
 **Contributions**: By submitting a Pull Request, you agree that your contributions may be used under both the AGPL-3.0 and the project's commercial license.
+
+### Cairn by ChainReactors
