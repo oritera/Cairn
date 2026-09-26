@@ -120,6 +120,14 @@ def get_claimable_open_intent_or_404(
         raise HTTPException(409, f"Intent is currently claimed by {row['worker']}")
     return row
 
+def get_claimed_open_intent_or_404(
+    conn: sqlite3.Connection, project_id: str, intent_id: str, worker: str
+) -> sqlite3.Row:
+    row = get_claimable_open_intent_or_404(conn, project_id, intent_id, worker)
+    if row["worker"] != worker:
+        raise HTTPException(409, "Intent is not claimed by this worker")
+    return row
+
 
 def get_releasable_open_intent_or_404(
     conn: sqlite3.Connection, project_id: str, intent_id: str, worker: str

@@ -12,6 +12,7 @@ from cairn.server.models import (
 from cairn.server.services import (
     check_project_active,
     get_claimable_open_intent_or_404,
+    get_claimed_open_intent_or_404,
     get_releasable_open_intent_or_404,
     intent_to_model,
     next_fact_id,
@@ -122,7 +123,7 @@ def release(project_id: str, intent_id: str, body: HeartbeatRequest):
 def conclude(project_id: str, intent_id: str, body: ConcludeRequest):
     with get_conn() as conn:
         check_project_active(conn, project_id)
-        get_claimable_open_intent_or_404(conn, project_id, intent_id, body.worker)
+        get_claimed_open_intent_or_404(conn, project_id, intent_id, body.worker)
 
         now = utcnow()
         fid = next_fact_id(conn, project_id)

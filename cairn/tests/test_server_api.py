@@ -162,6 +162,42 @@ def test_expired_intent_and_reason_leases_can_be_reclaimed(client: TestClient) -
     assert response.json()["reason"]["worker"] == "worker-b"
 
 
+def test_expired_intent_lease_cannot_conclude_without_reclaim(
+    client: TestClient,
+) -> None:
+    project_id = _create_project(client)
+    claimed = client.post(
+        f"/projects/{project_id}/intents",
+        json={
+            "from": ["origin"],
+            "description": "work",
+            "creator": "worker-a",
+            "worker": "worker-a",
+        },
+    )
+    assert claimed.status_code == 201
+    assert claimed.json()["worker"] == "worker-a"
+
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE intents SET last_heartbeat_at = '2000-01-01T00:00:00Z' "
+            "WHERE project_id = ? AND id = 'i001'",
+            (project_id,),
+        )
+
+    response = client.post(
+        f"/projects/{project_id}/intents/i001/conclude",
+        json={"worker": "worker-a", "description": "stale result"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Intent is not claimed by this worker"
+    detail = client.get(f"/projects/{project_id}").json()
+    assert [fact["id"] for fact in detail["facts"]] == ["origin", "goal"]
+    assert [
+        (intent["id"], intent["to"], intent["worker"]) for intent in detail["intents"]
+    ] == [("i001", None, None)]
+
 def test_live_reason_lease_rejects_competing_worker(client: TestClient) -> None:
     project_id = _create_project(client)
     assert client.post(
