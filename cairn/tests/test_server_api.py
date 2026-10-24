@@ -6,12 +6,14 @@ import pytest
 from cairn.server import db
 from cairn.server.app import app
 
+from conftest import TEST_AUTH_TOKEN, configure_test_server
+
 
 @pytest.fixture
 def client(tmp_path, monkeypatch) -> TestClient:
-    monkeypatch.setattr(db, "_db_path", None)
-    db.configure(tmp_path / "cairn.db")
+    configure_test_server(tmp_path, monkeypatch)
     with TestClient(app) as test_client:
+        test_client.headers["Authorization"] = f"Bearer {TEST_AUTH_TOKEN}"
         yield test_client
 
 

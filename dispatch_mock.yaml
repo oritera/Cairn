@@ -1,4 +1,6 @@
 server: "http://127.0.0.1:8000"
+# Token printed by `cairn serve` on first start (kept in ~/.local/share/cairn/auth_token).
+# server_token: "xxx"
 
 runtime:
   interval: 3

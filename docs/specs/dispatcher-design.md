@@ -865,6 +865,7 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 | 字段 | 必填 | 含义 |
 | --- | --- | --- |
 | `server` | 是 | Cairn Server 的 base URL |
+| `server_token` | 否 | Cairn Server 的认证 token（即服务端的 `CAIRN_AUTH_TOKEN`）。服务端未以 `--no-auth` 启动时必须提供；环境变量 `CAIRN_SERVER_TOKEN` 优先于此字段。token 错误时 dispatcher 启动即报错退出，不会反复重试 |
 
 ### `runtime.*`
 
@@ -943,6 +944,7 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 
 ```yaml
 server: "http://127.0.0.1:8000"
+server_token: "<token printed by `cairn serve`>"  # or set CAIRN_SERVER_TOKEN in the environment
 
 runtime:
   max_workers: 5  # total running tasks

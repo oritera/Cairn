@@ -150,6 +150,20 @@ Create your local dispatcher configuration and fill in your LLM endpoints and AP
 ```bash
 cp dispatch.example.yaml dispatch.yaml
 ```
+
+### Authentication
+
+The management console and the API share one secret. Every request except the console shell, its static assets, `GET /health` and the `/auth/*` endpoints is answered with `401` unless it carries `Authorization: Bearer <token>` (what the dispatcher sends) or the session cookie the console sets once you sign in with the token.
+
+The server resolves the token at startup, in this order:
+
+1. `--auth-token` / `CAIRN_AUTH_TOKEN`
+2. the token file (`--auth-token-file` / `CAIRN_AUTH_TOKEN_FILE`, default `auth_token` next to the database, i.e. `~/.local/share/cairn/auth_token`)
+3. otherwise a random token is generated, written to that file, and printed once in the startup log
+
+Give the dispatcher the same value as `server_token` in `dispatch.yaml` or as the `CAIRN_SERVER_TOKEN` environment variable (the variable wins). A dispatcher with a wrong token stops immediately with an explanation instead of retrying forever.
+
+Authentication only switches off when you ask for it (`--no-auth` / `CAIRN_NO_AUTH=1`); reserve that for isolated, trusted networks. The token travels in the clear over plain HTTP, so expose a remote server through a TLS-terminating reverse proxy. The session cookie is marked `Secure` automatically when the proxy sends `X-Forwarded-Proto: https`.
  
 ### Docker Compose (recommended)
  
@@ -158,12 +172,18 @@ Pull the base image used to build Cairn:
 ```bash
 docker pull ghcr.io/astral-sh/uv:python3.13-trixie
 ```
+
+Create `.env` with the shared token; compose passes it to both containers and refuses to start without it:
+
+```bash
+cp .env.example .env   # then set CAIRN_AUTH_TOKEN to a long random value
+```
  
 ```bash
 docker compose up --build
 ```
  
-This starts `cairn-server` on port `8000` and `cairn-dispatcher` once the server passes its health check. The dispatcher mounts `dispatch.yaml` from the project root and connects to Docker via the host socket. Data is persisted to `./datas/cairn/`.
+This starts `cairn-server` on port `8000` and `cairn-dispatcher` once the server passes its health check. The dispatcher mounts `dispatch.yaml` from the project root and connects to Docker via the host socket. Data is persisted to `./datas/cairn/`. Open `http://<host>:8000` and sign in with the token from `.env`.
  
 ### Manual
  
@@ -177,6 +197,8 @@ uv run --project cairn cairn dispatch --config dispatch.yaml
 # Run startup health checks only
 uv run --project cairn cairn dispatch --config dispatch.yaml --startup-healthcheck-only
 ```
+
+On first start `cairn serve` prints the token it generated and stores it in `~/.local/share/cairn/auth_token` (pass `--auth-token` to choose your own). Sign in to the console with it and set it as `server_token` in `dispatch.yaml` before starting the dispatcher.
 
 ### Local mode (no Docker)
 
@@ -192,7 +214,7 @@ uv run --project cairn cairn serve
 uv run --project cairn cairn dispatch --config dispatch.yaml
 ```
 
-Local mode is selected by `runtime.execution: local` (see `dispatch.local.example.yaml`). On startup the dispatcher checks each configured worker CLI is installed and runnable, and reminds you they must already be logged in. Each project gets an isolated working directory under `local.workspace_root` (default: the dispatcher's current directory). Run the dispatcher directly on the host — not inside Docker — since the agents run with your user's permissions and no sandbox.
+Local mode is selected by `runtime.execution: local` (see `dispatch.local.example.yaml`); set `server_token` there to the token `cairn serve` printed. On startup the dispatcher checks each configured worker CLI is installed and runnable, and reminds you they must already be logged in. Each project gets an isolated working directory under `local.workspace_root` (default: the dispatcher's current directory). Run the dispatcher directly on the host — not inside Docker — since the agents run with your user's permissions and no sandbox.
 
 ### Tests
 
