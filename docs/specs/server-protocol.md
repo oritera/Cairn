@@ -174,6 +174,49 @@ reason_timeout  # 单位秒，超过此时间无心跳则 Project.reason 清空�
 
 ---
 
+## 认证
+
+服务端的所有接口默认都需要凭证，只有控制台页面 `/`、静态资源 `/static/*`、存活探针 `GET /health` 以及 `/auth/*` 本身例外。未携带有效凭证的请求返回 `401`，响应头带 `WWW-Authenticate: Bearer`，Body 为 `{"detail": "Authentication required"}`。
+
+Token 在服务端启动时确定：优先使用 `--auth-token` / `CAIRN_AUTH_TOKEN`，否则读取数据库旁的 `auth_token` 文件（首次启动自动生成并打印到日志）。只有显式传入 `--no-auth` / `CAIRN_NO_AUTH=1` 才会关闭认证。
+
+两种凭证形式：
+
+- **Bearer**：请求头 `Authorization: Bearer <token>`。Dispatcher 与其他 API 消费者使用。
+- **会话 Cookie**：浏览器控制台通过 `POST /auth/login` 换取 `cairn_session` Cookie（HttpOnly、SameSite=Strict，HTTPS 下自动加 Secure，有效期 7 天）。Cookie 的值是由 token 派生的 HMAC，无法反推出 token；轮换 token 会使所有会话失效。
+
+#### GET /auth/status
+
+返回认证是否开启，以及当前请求是否已通过认证。无需凭证。
+
+```json
+{ "auth_required": true, "authenticated": false }
+```
+
+#### POST /auth/login
+
+Body：
+
+```json
+{ "token": "<token>" }
+```
+
+成功返回 `204` 并设置 `cairn_session` Cookie；token 不正确返回 `401`。
+
+#### POST /auth/logout
+
+清除 `cairn_session` Cookie，返回 `204`。
+
+#### GET /health
+
+无需凭证的存活探针，仅确认进程存活且数据库可打开，不返回任何项目数据：
+
+```json
+{ "status": "ok" }
+```
+
+---
+
 ## 接口列表
 
 ### 全局设置

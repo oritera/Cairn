@@ -7,6 +7,10 @@ services:
     container_name: cairn-server
     ports:
       - "8000:8000"
+    environment:
+      # Shared secret for the console and the API. Set it in .env (see .env.example);
+      # compose refuses to start without it so the console is never exposed unprotected.
+      CAIRN_AUTH_TOKEN: ${CAIRN_AUTH_TOKEN:?Set CAIRN_AUTH_TOKEN in .env (copy .env.example)}
     volumes:
       - ./datas/cairn/:/root/.local/share/cairn/
     healthcheck:
@@ -14,7 +18,7 @@ services:
         - "CMD"
         - "python"
         - "-c"
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/projects', timeout=5)"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
       interval: 10s
       timeout: 5s
       retries: 12
@@ -27,6 +31,9 @@ services:
       dockerfile: Dockerfile
     image: cairn-app
     container_name: cairn-dispatcher
+    environment:
+      # The dispatcher authenticates to the server with the same token.
+      CAIRN_SERVER_TOKEN: ${CAIRN_AUTH_TOKEN:?Set CAIRN_AUTH_TOKEN in .env (copy .env.example)}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dispatch.yaml:/cairn/dispatch.yaml

@@ -14,6 +14,10 @@
 #   environments you are authorized to operate in.
 
 server: "http://127.0.0.1:8000"
+# Auth token of the Cairn server. `cairn serve` prints the token it generates on first start
+# and keeps it in ~/.local/share/cairn/auth_token. The CAIRN_SERVER_TOKEN environment
+# variable overrides this value.
+server_token: "paste-the-server-token-here"
 
 runtime:
   execution: local            # run workers as host processes instead of per-project containers

@@ -4,8 +4,9 @@ import json
 
 import pytest
 from pydantic import ValidationError
+import yaml
 
-from cairn.dispatcher.config import DispatchConfig, WorkerConfig, validate_prompt_resources
+from cairn.dispatcher.config import SERVER_TOKEN_ENV, DispatchConfig, WorkerConfig, validate_prompt_resources
 from cairn.dispatcher.workers.adapters.codex import CodexDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
 
@@ -133,3 +134,22 @@ def test_codex_driver_execute_argv_passes_model_endpoint_and_prompt() -> None:
     assert "gpt-test" in argv
     assert 'model_providers.cairn.base_url="http://api/v1"' in argv
     assert argv[-2:] == ["--", "prompt"]
+
+
+def test_dispatch_config_normalizes_server_token_and_prefers_environment(tmp_path, monkeypatch) -> None:
+    payload = make_config().model_dump()
+    assert DispatchConfig.model_validate(payload).server_token is None
+    payload["server_token"] = "  from-yaml  "
+    assert DispatchConfig.model_validate(payload).server_token == "from-yaml"
+    payload["server_token"] = "   "
+    assert DispatchConfig.model_validate(payload).server_token is None
+
+    config_path = tmp_path / "dispatch.yaml"
+    config_path.write_text(
+        yaml.safe_dump({**make_config().model_dump(), "server_token": "from-yaml"}),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv(SERVER_TOKEN_ENV, raising=False)
+    assert DispatchConfig.load(config_path).server_token == "from-yaml"
+    monkeypatch.setenv(SERVER_TOKEN_ENV, "from-env")
+    assert DispatchConfig.load(config_path).server_token == "from-env"

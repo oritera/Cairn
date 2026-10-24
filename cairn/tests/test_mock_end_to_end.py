@@ -16,9 +16,10 @@ from cairn.dispatcher.models import ReasonCheckpoint
 from cairn.dispatcher.protocol.client import ApiResult
 from cairn.dispatcher.runtime.process import ProcessResult
 from cairn.dispatcher.scheduler.loop import DispatcherLoop
-from cairn.server import db
 from cairn.server.app import app
 from cairn.server.models import ProjectDetail, ProjectSummary, Settings
+
+from conftest import TEST_AUTH_TOKEN, configure_test_server
 
 
 class InProcessClient:
@@ -176,9 +177,9 @@ class LocalContainerManager:
 
 @pytest.fixture
 def http_client(tmp_path, monkeypatch) -> TestClient:
-    monkeypatch.setattr(db, "_db_path", None)
-    db.configure(tmp_path / "cairn.db")
+    configure_test_server(tmp_path, monkeypatch)
     with TestClient(app) as client:
+        client.headers["Authorization"] = f"Bearer {TEST_AUTH_TOKEN}"
         yield client
 
 

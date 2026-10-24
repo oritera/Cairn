@@ -1,5 +1,8 @@
 # Cairn server API endpoint.
 server: "http://cairn-server:8000"
+# Auth token of the Cairn server (CAIRN_AUTH_TOKEN on the server side). With docker compose
+# it is injected from .env as CAIRN_SERVER_TOKEN, which overrides this value.
+# server_token: "xxx"
 
 # Shared environment variables merged into every worker.
 common_env:

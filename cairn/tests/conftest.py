@@ -6,7 +6,20 @@ from cairn.dispatcher.config import DispatchConfig
 from cairn.dispatcher.protocol.client import ApiResult
 from cairn.dispatcher.workers.base import DriverResult
 from cairn.dispatcher.workers.health import HealthResult
+from cairn.server import auth, db
 from cairn.server.models import Fact, Hint, Intent, ProjectDetail, ProjectMeta
+
+TEST_AUTH_TOKEN = "test-auth-token"
+
+
+def configure_test_server(tmp_path, monkeypatch, *, token: str | None = TEST_AUTH_TOKEN) -> None:
+    """Point the server at a fresh database and a known auth token (None disables auth)."""
+    for name in (auth.TOKEN_ENV, auth.TOKEN_FILE_ENV, auth.NO_AUTH_ENV):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(db, "_db_path", None)
+    db.configure(tmp_path / "cairn.db")
+    monkeypatch.setattr(auth, "_state", None)
+    auth.configure(token=token, disabled=token is None)
 
 
 def make_config() -> DispatchConfig:

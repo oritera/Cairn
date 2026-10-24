@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 import json
+import os
 from importlib import resources
 from pathlib import Path
 from typing import Any, Literal
@@ -16,6 +17,10 @@ CompletedAction = Literal["remove", "stop"]
 WorkerHealthcheckMode = Literal["startup_and_task", "startup_only", "disabled"]
 ExecutionMode = Literal["container", "local"]
 LocalCompletedAction = Literal["keep", "remove"]
+
+# Overrides `server_token` from dispatch.yaml so deployments can inject the Cairn server's
+# auth token without editing the mounted config file.
+SERVER_TOKEN_ENV = "CAIRN_SERVER_TOKEN"
 
 WORKER_ENV_KEYS: dict[WorkerType, tuple[str, ...]] = {
     "claudecode": (
@@ -208,6 +213,9 @@ class DispatchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     server: str
+    # Auth token of the Cairn server (its CAIRN_AUTH_TOKEN). Required unless the server
+    # runs with --no-auth. CAIRN_SERVER_TOKEN in the environment takes precedence.
+    server_token: str | None = None
     runtime: RuntimeConfig
     tasks: TasksConfig
     container: ContainerConfig | None = None
@@ -245,6 +253,13 @@ class DispatchConfig(BaseModel):
         merged["workers"] = merged_workers
         return merged
 
+    @field_validator("server_token")
+    @classmethod
+    def normalize_server_token(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
     @model_validator(mode="after")
     def validate_workers(self) -> "DispatchConfig":
         names = [worker.name for worker in self.workers]
@@ -274,6 +289,9 @@ class DispatchConfig(BaseModel):
     @classmethod
     def load(cls, path: Path) -> "DispatchConfig":
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        env_token = os.environ.get(SERVER_TOKEN_ENV, "").strip()
+        if env_token and isinstance(data, dict):
+            data["server_token"] = env_token
         config = cls.model_validate(data)
         validate_prompt_resources(config.runtime.prompt_group)
         return config

@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import click
@@ -5,7 +6,9 @@ import uvicorn
 
 from cairn.dispatcher.logging import configure_logging
 from cairn.dispatcher.scheduler.loop import DispatcherLoop
-from cairn.server import db
+from cairn.server import auth, db
+
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
 @click.group()
@@ -23,11 +26,61 @@ def main():
     show_default=True,
     help="SQLite database path",
 )
+@click.option(
+    "--auth-token",
+    envvar=auth.TOKEN_ENV,
+    default=None,
+    help=(
+        "Shared secret required by the console and the API. Defaults to the token stored in "
+        "--auth-token-file, which is generated on first start."
+    ),
+)
+@click.option(
+    "--auth-token-file",
+    envvar=auth.TOKEN_FILE_ENV,
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "File the auth token is read from, and written to when it has to be generated. "
+        "Defaults to auth_token next to the database."
+    ),
+)
+@click.option(
+    "--no-auth",
+    envvar=auth.NO_AUTH_ENV,
+    is_flag=True,
+    default=False,
+    help="Disable authentication entirely. Only for isolated, fully trusted networks.",
+)
 @click.option("--log-level", default="info", show_default=True, help="Uvicorn log level")
 @click.option("--access-log/--no-access-log", default=True, show_default=True, help="Enable Uvicorn access log")
-def serve(host: str, port: int, db_path: str, log_level: str, access_log: bool):
+def serve(
+    host: str,
+    port: int,
+    db_path: str,
+    auth_token: str | None,
+    auth_token_file: Path | None,
+    no_auth: bool,
+    log_level: str,
+    access_log: bool,
+):
     """Start the Cairn API server."""
+    if no_auth and auth_token:
+        raise click.UsageError("--no-auth cannot be combined with --auth-token")
+
+    # Uvicorn only configures its own loggers; give the server's startup messages (where the
+    # generated auth token is announced) somewhere to go.
+    logging.basicConfig(level=log_level.upper(), format="%(levelname)s:     %(message)s")
+
     db.configure(Path(db_path))
+    auth.configure(token=auth_token, token_file=auth_token_file, disabled=no_auth)
+    if no_auth and host not in LOOPBACK_HOSTS:
+        logging.getLogger("cairn.server").warning(
+            "serving an UNAUTHENTICATED console on %s:%s; anyone who can reach it controls every project",
+            host,
+            port,
+        )
+
     from cairn.server.app import app
 
     uvicorn.run(

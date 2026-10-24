@@ -29,6 +29,15 @@ UNHEALTHY_RETRY_AFTER_SECONDS = 5
 REJECTED_RETRY_AFTER_SECONDS = 5
 BOOTSTRAP_INTENT_DESCRIPTION = "bootstrap"
 BOOTSTRAP_INTENT_CREATOR = "dispatcher.bootstrap"
+SERVER_UNAUTHORIZED_MESSAGE = (
+    "Cairn server rejected the dispatcher's credentials (HTTP 401). Set server_token in "
+    "dispatch.yaml, or the CAIRN_SERVER_TOKEN environment variable, to the server's auth token."
+)
+
+
+def server_rejected_credentials(exc: requests.RequestException) -> bool:
+    response = getattr(exc, "response", None)
+    return response is not None and response.status_code == 401
 
 
 @dataclass(slots=True)
@@ -44,7 +53,7 @@ class DispatcherLoop:
     def __init__(self, config_path: Path):
         self.config_path = config_path
         self.config = DispatchConfig.load(config_path)
-        self.client = CairnClient(self.config.server)
+        self.client = CairnClient(self.config.server, token=self.config.server_token)
         if self.config.runtime.execution == "local":
             self.container_manager = LocalBackend(self.config.local or LocalConfig())
         else:
@@ -94,6 +103,9 @@ class DispatcherLoop:
                     self._queue_container_cleanups(summaries)
                     self._dispatch_available(summaries)
                 except requests.RequestException as exc:
+                    if server_rejected_credentials(exc):
+                        # A wrong token never fixes itself; stop instead of retrying forever.
+                        raise RuntimeError(SERVER_UNAUTHORIZED_MESSAGE) from exc
                     if once:
                         raise
                     LOG.warning(
