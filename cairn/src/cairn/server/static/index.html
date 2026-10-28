@@ -486,10 +486,16 @@
     <!-- Graph -->
     <div class="flex-1 relative min-w-0">
       <div class="absolute top-3 left-3 z-10 flex items-center gap-1.5">
-        <button @click="fitGraph()" class="h-7 w-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 text-slate-500 hover:text-slate-700 hover:bg-white transition inline-flex items-center justify-center" title="Fit graph" aria-label="Fit graph">
+        <div class="h-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 flex items-center p-0.5 text-xs">
+          <button @click="switchGraphView('facts')" class="px-2.5 h-6 rounded-md transition font-medium"
+            :class="graphView === 'facts' ? 'bg-brand-500 text-white' : 'text-slate-500 hover:text-slate-700'">Facts</button>
+          <button @click="switchGraphView('topology')" class="px-2.5 h-6 rounded-md transition font-medium"
+            :class="graphView === 'topology' ? 'bg-brand-500 text-white' : 'text-slate-500 hover:text-slate-700'">Topology</button>
+        </div>
+        <button x-show="graphView === 'facts'" @click="fitGraph()" class="h-7 w-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 text-slate-500 hover:text-slate-700 hover:bg-white transition inline-flex items-center justify-center" title="Fit graph" aria-label="Fit graph">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         </button>
-        <select x-model="layoutMode" @change="applySelectedLayout()"
+        <select x-show="graphView === 'facts'" x-model="layoutMode" @change="applySelectedLayout()"
           class="h-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 px-2.5 text-xs text-slate-600 hover:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 transition">
           <option value="dagre_tb">Dagre ↓</option>
           <option value="dagre_lr">Dagre →</option>
@@ -566,7 +572,144 @@
         </div>
       </div>
 
-      <div id="cy" class="relative z-0 flex-1 h-full"></div>
+      <div id="cy" x-show="graphView === 'facts'" class="relative z-0 flex-1 h-full"></div>
+
+      <!-- Topology view -->
+      <div x-show="graphView === 'topology'" class="absolute inset-0 z-0">
+        <div id="cyTopo" class="w-full h-full"></div>
+
+        <!-- Topology toolbar (top-left, under the Facts/Topology toggle) -->
+        <div class="absolute top-12 left-3 z-10 flex flex-col items-start gap-1.5">
+          <button @click="refreshTopology()" :disabled="topo.loading"
+            class="px-3 py-1.5 bg-white/90 backdrop-blur border border-brand-200 text-brand-600 rounded-lg shadow-sm text-xs font-medium hover:bg-brand-50 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" :class="topo.loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4v5h5M20 20v-5h-5"/><path d="M20 9a8 8 0 0 0-14.3-3.3L4 9M4 15a8 8 0 0 0 14.3 3.3L20 15"/></svg>
+            <span x-text="topo.loading ? 'Analyzing…' : (topo.exists ? 'Refresh' : 'Generate map')"></span>
+          </button>
+
+          <!-- Model settings (gear + dropdown) -->
+          <div class="relative" @keydown.escape.window="topoModelOpen = false">
+            <button @click="topoModelOpen = !topoModelOpen" :disabled="topo.loading"
+              class="h-[30px] px-2 bg-white/90 backdrop-blur border border-slate-200/60 text-slate-500 hover:text-slate-700 hover:bg-white rounded-lg shadow-sm text-xs transition inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              :title="`Extractor model: ${currentTopoModelLabel()}`" aria-label="Model settings">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M10.3 3.3a1.1 1.1 0 0 1 3.4 0l.1.9a7.5 7.5 0 0 1 1.9 1.1l.9-.4a1.1 1.1 0 0 1 1.5.5l.8 1.4a1.1 1.1 0 0 1-.3 1.5l-.7.5a7.5 7.5 0 0 1 0 2.2l.7.5a1.1 1.1 0 0 1 .3 1.5l-.8 1.4a1.1 1.1 0 0 1-1.5.5l-.9-.4a7.5 7.5 0 0 1-1.9 1.1l-.1.9a1.1 1.1 0 0 1-3.4 0l-.1-.9a7.5 7.5 0 0 1-1.9-1.1l-.9.4a1.1 1.1 0 0 1-1.5-.5l-.8-1.4a1.1 1.1 0 0 1 .3-1.5l.7-.5a7.5 7.5 0 0 1 0-2.2l-.7-.5a1.1 1.1 0 0 1-.3-1.5l.8-1.4a1.1 1.1 0 0 1 1.5-.5l.9.4a7.5 7.5 0 0 1 1.9-1.1z"/><circle cx="12" cy="12" r="2.6"/></svg>
+              <span class="hidden sm:inline max-w-[9rem] truncate" x-text="currentTopoModelLabel()"></span>
+              <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div x-show="topoModelOpen" x-transition @click.outside="topoModelOpen = false"
+              class="absolute left-0 mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-20" style="display:none">
+              <div class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Extractor model</div>
+              <template x-for="m in topoModels" :key="m.id">
+                <button @click="selectTopoModel(m.id)" :disabled="!m.available"
+                  class="w-full text-left px-2 py-1.5 rounded-lg transition flex items-start gap-2 disabled:opacity-45 disabled:cursor-not-allowed hover:bg-slate-50"
+                  :class="m.id === topoModel ? 'bg-brand-50' : ''">
+                  <span class="mt-0.5 shrink-0 w-3.5 h-3.5 rounded-full border flex items-center justify-center"
+                    :class="m.id === topoModel ? 'border-brand-500' : 'border-slate-300'">
+                    <span x-show="m.id === topoModel" class="w-2 h-2 rounded-full bg-brand-500"></span>
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="flex items-center gap-1.5">
+                      <span class="text-xs font-medium"
+                        :class="m.recommended ? 'text-emerald-600' : (m.available ? 'text-slate-700' : 'text-slate-400')"
+                        x-text="m.label"></span>
+                      <span x-show="m.recommended" class="text-[9px] font-semibold uppercase tracking-wide text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-px">Recommended</span>
+                      <span x-show="m.discouraged" class="text-[9px] font-semibold uppercase tracking-wide text-rose-500 bg-rose-50 border border-rose-200 rounded px-1 py-px">Avoid</span>
+                    </span>
+                    <span class="block text-[10px] text-slate-400 leading-snug mt-0.5"
+                      x-text="m.available ? m.note : (m.unavailable_reason || 'Unavailable')"></span>
+                  </span>
+                </button>
+              </template>
+              <div x-show="topoModels.length === 0" class="px-2 py-2 text-[11px] text-slate-400">No extractor CLI found on the host.</div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap max-w-[22rem]">
+            <template x-if="topo.exists && topo.generated_at">
+              <span class="text-[11px] text-slate-400 bg-white/80 rounded-md px-2 py-1 shadow-sm" x-text="`${formatTime(topo.generated_at)}`"></span>
+            </template>
+            <template x-if="topo.stale && !topo.error">
+              <span class="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 shadow-sm" x-text="`${topo.live_facts - topo.facts_count} new facts — refresh`"></span>
+            </template>
+            <template x-if="topo.error && topo.exists">
+              <span class="text-[11px] text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-2 py-1 shadow-sm" x-text="`Refresh failed: ${topo.error}`"></span>
+            </template>
+          </div>
+        </div>
+
+        <!-- Empty / loading / error state -->
+        <template x-if="!topo.exists && !topo.loading">
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-6 py-8 text-center shadow-sm pointer-events-auto max-w-xs">
+              <p class="text-sm text-slate-500" x-text="topo.error ? 'Extraction failed' : 'No network map yet'"></p>
+              <p class="text-xs text-slate-400 mt-1" x-text="topo.error || 'Click Generate map to build a topology from the facts.'"></p>
+            </div>
+          </div>
+        </template>
+        <template x-if="topo.loading">
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="rounded-2xl border border-slate-200 bg-white/90 px-6 py-5 text-center shadow-md">
+              <svg class="w-6 h-6 mx-auto text-brand-500 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
+              <p class="text-xs text-slate-500 mt-2">Reading facts & building map…</p>
+            </div>
+          </div>
+        </template>
+
+        <!-- Legend (bottom left) -->
+        <template x-if="topo.exists">
+          <div class="absolute bottom-3 left-3 z-10 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 px-3 py-2 text-[10px] text-slate-500 space-y-1">
+            <div class="font-semibold text-slate-600 mb-0.5">Access</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded" style="background:#dc2626"></span>root / NT SYSTEM</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded" style="background:#f59e0b"></span>admin</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded" style="background:#eab308"></span>user shell</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded" style="background:#94a3b8"></span>scanned only</div>
+            <div class="pt-1 mt-1 border-t border-slate-100 flex items-center gap-1.5"><span class="inline-block w-5 border-t-2 border-dashed" style="border-color:#94a3b8"></span>visibility</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-5 border-t-2" style="border-color:#6366f1"></span>pivot</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-5 border-t-2" style="border-color:#10b981"></span>cred works</div>
+          </div>
+        </template>
+
+        <!-- Host detail card (bottom right) -->
+        <template x-if="topoSelected">
+          <div class="absolute bottom-3 right-3 z-10 w-72 max-h-[60%] overflow-y-auto bg-white rounded-xl shadow-lg border border-slate-200 p-3.5 text-xs">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="font-semibold text-slate-700 break-words" x-text="topoSelected.name || topoSelected.id"></div>
+                <div class="text-slate-400 break-words" x-text="topoSelected.id"></div>
+              </div>
+              <button @click="topoSelected = null" class="text-slate-300 hover:text-slate-500 shrink-0">✕</button>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" x-text="topoSelected.zone"></span>
+              <span class="px-1.5 py-0.5 rounded text-white" :style="`background:${accessColor(topoSelected.access)}`" x-text="'access: ' + topoSelected.access"></span>
+            </div>
+            <template x-if="topoSelected.ports && topoSelected.ports.length">
+              <div class="mt-2">
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ports</div>
+                <div class="mt-0.5 flex flex-wrap gap-1">
+                  <template x-for="p in topoSelected.ports" :key="p.port">
+                    <span class="px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100" x-text="p.port + (p.service ? '/' + p.service : '')"></span>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <template x-if="topoSelected.creds_found && topoSelected.creds_found.length">
+              <div class="mt-2">
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Creds found</div>
+                <template x-for="(c,i) in topoSelected.creds_found" :key="i"><div class="text-slate-600 break-words font-mono text-[11px]" x-text="c"></div></template>
+              </div>
+            </template>
+            <template x-if="topoSelected.creds_work && topoSelected.creds_work.length">
+              <div class="mt-2">
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-emerald-500">Creds that work</div>
+                <template x-for="(c,i) in topoSelected.creds_work" :key="i"><div class="text-emerald-700 break-words font-mono text-[11px]" x-text="c"></div></template>
+              </div>
+            </template>
+            <template x-if="topoSelected.notes">
+              <p class="mt-2 text-slate-500 leading-relaxed whitespace-pre-wrap break-words" x-text="topoSelected.notes"></p>
+            </template>
+          </div>
+        </template>
+      </div>
     </div>
 
     <div @pointerdown.prevent="startPanelResize($event)" class="w-2 shrink-0 cursor-col-resize group flex items-stretch justify-center touch-none relative z-20">
@@ -1080,6 +1223,13 @@ function cairnApp() {
     pollTimer: null,
     cy: null,
     sideTab: 'detail',
+    graphView: 'facts',
+    cyTopo: null,
+    topoSelected: null,
+    topo: { exists: false, loading: false, error: null, data: null, generated_at: null, facts_count: 0, live_facts: 0, stale: false },
+    topoModels: [],
+    topoModel: null,
+    topoModelOpen: false,
     selectedNode: null,
     selectedFacts: [],
     selectedTimelineEntryId: null,
@@ -2084,6 +2234,9 @@ function cairnApp() {
       this.selectedNode = null;
       this.selectedFacts = [];
       this.selectedTimelineEntryId = null;
+      this.graphView = 'facts';
+      this.topoSelected = null;
+      this.topo = { exists: false, loading: false, error: null, data: null, generated_at: null, facts_count: 0, live_facts: 0, stale: false };
       await this.loadProject(id);
       this.view = 'graph';
       if (location.hash !== `#/projects/${id}`) location.hash = `/projects/${id}`;
@@ -2095,6 +2248,7 @@ function cairnApp() {
         }
         this.teardownAutoFit();
         if (this.cy) { this.cy.destroy(); this.cy = null; }
+        if (this.cyTopo) { this.cyTopo.destroy(); this.cyTopo = null; }
         this.initGraph();
       });
     },
@@ -2201,6 +2355,142 @@ function cairnApp() {
       rawCy.on('tap', e => { if (e.target === rawCy) self.clearSelection(); });
       this.pulseActive();
       this.setupAutoFit();
+    },
+
+    // ---- Topology view ----
+    accessColor(level) {
+      return ({ root: '#dc2626', system: '#dc2626', admin: '#f59e0b', user: '#eab308' })[level] || '#94a3b8';
+    },
+
+    switchGraphView(view) {
+      this.graphView = view;
+      if (view === 'topology') {
+        if (this.topo.data === null) this.loadTopology();
+        if (this.topoModels.length === 0) this.loadTopoModels();
+        this.$nextTick(() => {
+          this.initTopoGraph();
+          if (this.cyTopo) { this.cyTopo.resize(); this.cyTopo.fit(undefined, 40); }
+        });
+      } else {
+        this.$nextTick(() => { if (this.cy) { this.cy.resize(); this.fitGraph(); } });
+      }
+    },
+
+    async loadTopology() {
+      const pid = this.project?.project?.id;
+      if (!pid) return;
+      try {
+        const r = await fetch(`/projects/${pid}/topology`);
+        const j = await r.json();
+        this.topo = { ...this.topo, ...j, loading: false, error: null };
+        if (j.exists) this.$nextTick(() => this.renderTopo());
+      } catch (e) { this.topo.error = String(e); }
+    },
+
+    async loadTopoModels() {
+      try {
+        const r = await fetch('/topology/models');
+        const j = await r.json();
+        this.topoModels = j.models || [];
+        // restore a valid saved choice, else fall back to the recommended default
+        let saved = null;
+        try { saved = localStorage.getItem('cairn.topoModel'); } catch (e) {}
+        const ok = m => m && m.available;
+        const savedModel = this.topoModels.find(m => m.id === saved);
+        if (ok(savedModel)) this.topoModel = saved;
+        else this.topoModel = j.default || (this.topoModels.find(ok) || {}).id || null;
+      } catch (e) { /* leave topoModel null -> backend auto-picks */ }
+    },
+
+    selectTopoModel(id) {
+      const m = this.topoModels.find(x => x.id === id);
+      if (!m || !m.available) return;
+      this.topoModel = id;
+      this.topoModelOpen = false;
+      try { localStorage.setItem('cairn.topoModel', id); } catch (e) {}
+    },
+
+    currentTopoModelLabel() {
+      const m = this.topoModels.find(x => x.id === this.topoModel);
+      return m ? m.label : 'Auto';
+    },
+
+    async refreshTopology() {
+      const pid = this.project?.project?.id;
+      if (!pid || this.topo.loading) return;
+      this.topoModelOpen = false;
+      this.topo.loading = true; this.topo.error = null;
+      try {
+        const qs = this.topoModel ? `?model=${encodeURIComponent(this.topoModel)}` : '';
+        const r = await fetch(`/projects/${pid}/topology/refresh${qs}`, { method: 'POST' });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${r.status}`);
+        }
+        const j = await r.json();
+        this.topo = { ...this.topo, ...j, loading: false, error: null };
+        this.$nextTick(() => this.renderTopo());
+      } catch (e) {
+        this.topo.loading = false;
+        this.topo.error = String(e.message || e);
+      }
+    },
+
+    buildTopoElements() {
+      const data = this.topo.data || { hosts: [], edges: [] };
+      const ids = new Set((data.hosts || []).map(h => h.id));
+      const nodes = (data.hosts || []).map(h => ({
+        data: {
+          id: h.id,
+          label: (h.name && h.name !== h.id) ? `${h.name}\n${h.id}` : h.id,
+          access: h.access || 'none',
+          zone: h.zone || 'internal',
+          host: h,
+        },
+      }));
+      const edges = (data.edges || [])
+        .filter(e => ids.has(e.from) && ids.has(e.to))
+        .map((e, i) => ({ data: { id: `te${i}`, source: e.from, target: e.to, etype: e.type || 'visibility', label: e.label || '' } }));
+      return { nodes, edges };
+    },
+
+    topoStyles() {
+      const common = { 'text-valign': 'center', 'text-halign': 'center', 'font-family': '-apple-system,BlinkMacSystemFont,Inter,sans-serif' };
+      return [
+        { selector: 'node', style: { ...common, shape: 'round-rectangle', label: 'data(label)', color: '#fff', 'font-size': '10px', 'font-weight': 'bold', 'text-wrap': 'wrap', 'text-max-width': '120px', width: 'label', height: 'label', padding: '10px', 'border-width': 0, 'background-color': ele => this.accessColor(ele.data('access')) } },
+        { selector: 'node[zone="attacker"]', style: { shape: 'diamond', 'background-color': '#312e81' } },
+        { selector: 'node[zone="ics"]', style: { 'border-width': 3, 'border-color': '#f43f5e', 'border-style': 'double' } },
+        { selector: 'node.topo-focus', style: { 'border-width': 3, 'border-color': '#312e81', 'border-opacity': 0.9, 'z-index': 1000 } },
+
+        { selector: 'edge', style: { width: 2, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle', 'arrow-scale': 0.9, label: 'data(label)', 'font-size': '8px', color: '#64748b', 'text-rotation': 'autorotate', 'text-margin-y': -8, 'text-background-color': '#f8fafc', 'text-background-opacity': 0.9, 'text-background-padding': '2px', 'text-max-width': '90px', 'text-wrap': 'ellipsis' } },
+        { selector: 'edge[etype="visibility"]', style: { 'line-color': '#94a3b8', 'line-style': 'dashed', 'target-arrow-color': '#94a3b8' } },
+        { selector: 'edge[etype="pivot"]', style: { 'line-color': '#6366f1', width: 3, 'target-arrow-color': '#6366f1' } },
+        { selector: 'edge[etype="cred-works"]', style: { 'line-color': '#10b981', width: 2.5, 'target-arrow-color': '#10b981' } },
+      ];
+    },
+
+    initTopoGraph() {
+      const container = document.getElementById('cyTopo');
+      if (!container) return;
+      if (this.cyTopo) return;
+      this.cyTopo = cytoscape({
+        container,
+        elements: [],
+        style: this.topoStyles(),
+        minZoom: 0.15, maxZoom: 3.5,
+      });
+      const self = this;
+      this.cyTopo.on('tap', 'node', e => { self.topoSelected = e.target.data('host'); self.cyTopo.nodes().removeClass('topo-focus'); e.target.addClass('topo-focus'); });
+      this.cyTopo.on('tap', e => { if (e.target === self.cyTopo) self.topoSelected = null; });
+      if (this.topo.data) this.renderTopo();
+    },
+
+    renderTopo() {
+      if (!this.cyTopo) { this.initTopoGraph(); if (!this.cyTopo) return; }
+      const { nodes, edges } = this.buildTopoElements();
+      this.cyTopo.elements().remove();
+      this.cyTopo.add([...nodes, ...edges]);
+      this.cyTopo.layout({ name: 'dagre', rankDir: 'LR', nodeSep: 45, rankSep: 90, padding: 40, fit: true, animate: true, animationDuration: 350 }).run();
     },
 
     graphStyles() {
