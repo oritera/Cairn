@@ -1,6 +1,6 @@
 # Local execution example — workers run directly on the dispatcher host and reuse the
-# machine's already-configured claude / codex / pi CLIs. No API keys, base URLs or models
-# are configured here; each CLI uses its own host configuration and credentials.
+# machine's already-configured claude / codex / pi / coddy CLIs. No API keys, base URLs or
+# models are configured here; each CLI uses its own host configuration and credentials.
 #
 # Usage:
 #   cp dispatch.local.example.yaml dispatch.yaml
@@ -69,3 +69,14 @@ workers:
   #   task_types: [reason]
   #   max_running: 1
   #   priority: 2
+
+  # Coddy is local mode only. Tasks run as `coddy -no-stdin -ephemeral
+  # -permission-mode bypass -p <prompt>`, so coddy keeps its own model/provider settings.
+  # CODDY_MODEL is optional and must be a model id already configured in coddy's config.yaml.
+  # - name: "local-coddy"
+  #   type: "coddy"
+  #   task_types: [bootstrap, reason, explore]
+  #   max_running: 1
+  #   priority: 3
+  #   env:
+  #     CODDY_MODEL: "llama64080/local64080"

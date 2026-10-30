@@ -108,7 +108,7 @@ System architecture:
 
 Workers can also run directly on the dispatcher host instead of in per-project containers — **local mode**, no Docker required. See [Local mode](#local-mode-no-docker) below.
 
-Supported worker backends: **Claude Code**, **Codex**, and **Pi**.
+Supported worker backends: **Claude Code**, **Codex**, **Pi**, and **Coddy** (local mode only).
 
 ## Results
 
@@ -180,7 +180,7 @@ uv run --project cairn cairn dispatch --config dispatch.yaml --startup-healthche
 
 ### Local mode (no Docker)
 
-Instead of one container per project, workers can run directly on the dispatcher host, reusing the machine's already-configured `claude` / `codex` / `pi` CLIs — no Docker, and no API keys in the config.
+Instead of one container per project, workers can run directly on the dispatcher host, reusing the machine's already-configured `claude` / `codex` / `pi` / `coddy` CLIs — no Docker, and no API keys in the config.
 
 ```bash
 cp dispatch.local.example.yaml dispatch.yaml

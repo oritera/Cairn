@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig, validate_prompt_resources
+from cairn.dispatcher.workers.adapters.coddy import CoddyDriver
 from cairn.dispatcher.workers.adapters.codex import CodexDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
 
@@ -133,3 +134,90 @@ def test_codex_driver_execute_argv_passes_model_endpoint_and_prompt() -> None:
     assert "gpt-test" in argv
     assert 'model_providers.cairn.base_url="http://api/v1"' in argv
     assert argv[-2:] == ["--", "prompt"]
+
+
+def test_coddy_driver_builds_headless_one_shot_argv() -> None:
+    worker = WorkerConfig.model_validate(
+        {
+            "name": "coddy",
+            "type": "coddy",
+            "task_types": ["bootstrap", "reason", "explore"],
+            "max_running": 1,
+            "priority": 0,
+        }
+    )
+
+    argv = CoddyDriver().build_execute(worker, "prompt", None).argv
+
+    # -no-stdin keeps an inherited stdin from blocking the one-shot run, -permission-mode
+    # bypass lets the agent use tools without a TTY, -ephemeral leaves no session behind.
+    assert argv == [
+        "coddy",
+        "-no-stdin",
+        "-ephemeral",
+        "-permission-mode",
+        "bypass",
+        "-p",
+        "prompt",
+    ]
+
+
+def test_coddy_driver_passes_model_override_and_reports_local_binary() -> None:
+    worker = WorkerConfig.model_validate(
+        {
+            "name": "coddy",
+            "type": "coddy",
+            "task_types": ["reason"],
+            "max_running": 1,
+            "priority": 0,
+            "env": {"CODDY_MODEL": "llama64080/local64080"},
+        }
+    )
+    driver = CoddyDriver()
+
+    argv = driver.build_execute(worker, "prompt", None).argv
+
+    assert argv[argv.index("-model") + 1] == "llama64080/local64080"
+    assert argv[-2:] == ["-p", "prompt"]
+    assert driver.local_binary() == "coddy"
+
+
+def test_coddy_driver_has_no_conclude_phase() -> None:
+    driver = CoddyDriver()
+
+    assert driver.supports_conclude() is False
+    with pytest.raises(NotImplementedError):
+        driver.build_conclude(
+            WorkerConfig.model_validate(
+                {
+                    "name": "coddy",
+                    "type": "coddy",
+                    "task_types": ["explore"],
+                    "max_running": 1,
+                    "priority": 0,
+                }
+            ),
+            "prompt",
+            "session",
+        )
+
+
+def test_coddy_worker_is_accepted_locally_and_rejected_in_container_mode() -> None:
+    payload = make_config().model_dump()
+    payload["workers"] = [
+        {
+            "name": "coddy",
+            "type": "coddy",
+            "task_types": ["explore"],
+            "max_running": 1,
+            "priority": 0,
+            "env": {},
+        }
+    ]
+
+    payload["runtime"]["execution"] = "local"
+    assert DispatchConfig.model_validate(payload).runtime.execution == "local"
+
+    payload["runtime"]["execution"] = "container"
+    with pytest.raises(ValidationError, match="local-only"):
+        DispatchConfig.model_validate(payload)

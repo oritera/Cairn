@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 TaskType = Literal["reason", "explore", "bootstrap"]
-WorkerType = Literal["claudecode", "codex", "pi", "mock"]
+WorkerType = Literal["claudecode", "codex", "pi", "coddy", "mock"]
 CompletedAction = Literal["remove", "stop"]
 WorkerHealthcheckMode = Literal["startup_and_task", "startup_only", "disabled"]
 ExecutionMode = Literal["container", "local"]
@@ -34,8 +34,12 @@ WORKER_ENV_KEYS: dict[WorkerType, tuple[str, ...]] = {
         "PI_API_KEY",
         "PI_PROVIDER_API",
     ),
+    "coddy": (),
     "mock": (),
 }
+
+# Worker types whose CLI only exists on the dispatcher host, never in the worker container.
+LOCAL_ONLY_WORKER_TYPES: frozenset[str] = frozenset({"coddy"})
 
 DEFAULT_PROMPT_REQUIRED_TOKENS: dict[str, tuple[str, ...]] = {
     "reason.md": ("{graph_yaml}", "{fact_ids}", "{open_intents}", "{max_intents}"),
@@ -262,6 +266,11 @@ class DispatchConfig(BaseModel):
             if self.container is None:
                 raise ValueError("container config is required when runtime.execution is container")
             for worker in self.workers:
+                if worker.type in LOCAL_ONLY_WORKER_TYPES:
+                    raise ValueError(
+                        f"worker {worker.name} type {worker.type} is local-only; "
+                        "run it with runtime.execution: local or remove it"
+                    )
                 required = WORKER_ENV_KEYS[worker.type]
                 missing = [key for key in required if not worker.env.get(key)]
                 if missing:
