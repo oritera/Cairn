@@ -15,8 +15,18 @@ dependencies = [
     "requests>=2.32.3",
 ]
 
+[project.optional-dependencies]
+# Desktop app (native window + settings + Windows Credential Manager for API keys).
+desktop = [
+    "pywebview>=5.3",
+    "keyring>=25",
+]
+
 [project.scripts]
 cairn = "cairn.cli:main"
+
+[project.gui-scripts]
+cairn-desktop = "cairn.desktop.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.8.9,<0.9.0"]
@@ -26,6 +36,11 @@ build-backend = "uv_build"
 dev = [
     "httpx>=0.27",
     "pytest>=8.3",
+]
+# Packaging the desktop app into an .exe (see desktop/build.ps1).
+build = [
+    "pyinstaller>=6.11",
+    "pillow>=11",
 ]
 
 [tool.pytest.ini_options]

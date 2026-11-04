@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import PurePosixPath
+import tempfile
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from cairn.dispatcher.config import WorkerConfig
@@ -95,9 +96,13 @@ class PiDriver(WorkerDriver):
 
     def _local_argv(self, worker: WorkerConfig, prompt: str, session: str | None) -> list[str]:
         # Native pi: no models.json injection and no --provider/--model overrides, so pi uses
-        # its own host configuration. A tiny sh wrapper just ensures the session dir exists.
-        session_dir = self._session_dir(worker)
+        # its own host configuration. Local mode runs on the dispatcher host, so the session
+        # dir is created here directly (no /bin/sh wrapper, which does not exist on Windows)
+        # under the OS temp dir rather than a hard-coded /tmp.
+        session_dir = self._local_session_dir(worker)
+        Path(session_dir).mkdir(parents=True, exist_ok=True)
         pi_argv = [
+            "pi",
             "--mode",
             "json",
             "--session-dir",
@@ -113,8 +118,12 @@ class PiDriver(WorkerDriver):
         if session:
             pi_argv.extend(["--session", session])
         pi_argv.extend(["-p", prompt])
-        script = 'sdir="$1"\nshift\nmkdir -p "$sdir"\nexec pi "$@"\n'
-        return ["/bin/sh", "-lc", script, "--", session_dir, *pi_argv]
+        return pi_argv
+
+    @staticmethod
+    def _local_session_dir(worker: WorkerConfig) -> str:
+        """Host-native session dir for local mode (e.g. %TEMP%\\cairn-pi\\<worker>\\sessions)."""
+        return str(Path(tempfile.gettempdir()) / "cairn-pi" / worker.name / "sessions")
 
     def extract_session(self, session: str | None, stdout: str, stderr: str) -> str | None:
         if session:

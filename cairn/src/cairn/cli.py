@@ -1,9 +1,12 @@
+import sys
 from pathlib import Path
 
 import click
 import uvicorn
 
+from cairn.dispatcher.config import DispatchConfig
 from cairn.dispatcher.logging import configure_logging
+from cairn.dispatcher.runtime.platform_compat import attach_missing_stdio, ensure_utf8_stdio
 from cairn.dispatcher.scheduler.loop import DispatcherLoop
 from cairn.server import db
 
@@ -11,6 +14,8 @@ from cairn.server import db
 @click.group()
 def main():
     """Cairn - Fact-graph based collaborative exploration protocol."""
+    attach_missing_stdio()
+    ensure_utf8_stdio()
 
 
 @main.command()
@@ -43,9 +48,9 @@ def serve(host: str, port: int, db_path: str, log_level: str, access_log: bool):
 @click.option(
     "--config",
     "config_path",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    type=click.Path(exists=True, dir_okay=False, allow_dash=True, path_type=Path),
     required=True,
-    help="Dispatcher config path",
+    help="Dispatcher config path, or '-' to read the YAML from stdin (UTF-8)",
 )
 @click.option("--once", is_flag=True, help="Run one scheduling iteration and exit")
 @click.option(
@@ -57,7 +62,12 @@ def serve(host: str, port: int, db_path: str, log_level: str, access_log: bool):
 def dispatch(config_path: Path, once: bool, startup_healthcheck_only: bool, log_level: str):
     """Run the Cairn dispatcher."""
     configure_logging(log_level, bare=startup_healthcheck_only)
-    loop = DispatcherLoop(config_path)
+    if str(config_path) == "-":
+        # Read raw bytes: a piped stdin is decoded with the ANSI code page on Windows.
+        text = sys.stdin.buffer.read().decode("utf-8-sig")
+        loop = DispatcherLoop(config=DispatchConfig.from_yaml_text(text))
+    else:
+        loop = DispatcherLoop(config_path)
     try:
         if startup_healthcheck_only:
             loop.run_startup_healthchecks_only()

@@ -4,3 +4,7 @@ __pycache__/
 .playwright-cli/
 datas/
 dispatch.yaml
+.venv/
+*.egg-info/
+build/
+dist/

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from cairn.dispatcher.config import LocalConfig
 from cairn.dispatcher.runtime.local_process import LocalProcess
+from cairn.dispatcher.runtime.platform_compat import merge_env
 
 LOG = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class LocalBackend:
         timeout_seconds: int | None = None,
         kill_after_seconds: int = 5,
     ) -> LocalProcess:
-        merged_env = {**os.environ, **(env or {})}
+        merged_env = merge_env(os.environ, env)
         return LocalProcess(
             command,
             cwd=container_name,
@@ -54,6 +55,11 @@ class LocalBackend:
             timeout_seconds=timeout_seconds,
             term_grace_seconds=kill_after_seconds,
         )
+
+    def graph_snapshot_root(self, container_name: str) -> str:
+        """Where graph snapshots for this project are written: a native host path inside
+        the project workdir (so it is valid on Windows and is cleaned up with the project)."""
+        return str(Path(container_name) / ".cairn-prompts")
 
     def write_text_file(self, container_name: str, path: str, content: str) -> None:
         target = Path(path)
@@ -82,4 +88,6 @@ class LocalBackend:
         return []
 
     def _project_dir(self, project_id: str) -> Path:
-        return self._root / project_id.replace("/", "-")
+        # Replace path separators and characters that are illegal in Windows file names.
+        safe = "".join("-" if ch in '/\\:*?"<>|' else ch for ch in project_id)
+        return self._root / safe

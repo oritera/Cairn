@@ -4,6 +4,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig
 from cairn.dispatcher.protocol.client import CairnClient
@@ -60,10 +61,19 @@ def write_graph_snapshot_reference(
     *,
     phase: str,
 ) -> str:
-    path = f"{GRAPH_SNAPSHOT_ROOT}/{phase}-{uuid.uuid4().hex[:12]}/graph.yaml"
+    leaf = f"{phase}-{uuid.uuid4().hex[:12]}"
+    local_root = getattr(container_manager, "graph_snapshot_root", None)
+    if callable(local_root):
+        # Local mode: a native host path (e.g. C:\... on Windows) inside the project workdir.
+        path = str(Path(local_root(container_name)) / leaf / "graph.yaml")
+        location = "on this machine"
+    else:
+        # Container mode: a POSIX path inside the Linux worker container.
+        path = f"{GRAPH_SNAPSHOT_ROOT}/{leaf}/graph.yaml"
+        location = "inside the current container"
     container_manager.write_text_file(container_name, path, graph_yaml)
     return (
-        "The graph YAML snapshot is stored in this file inside the current container:\n\n"
+        f"The graph YAML snapshot is stored in this file {location}:\n\n"
         f"{path}\n\n"
         "Before using the graph, read the entire file and treat its contents as the YAML snapshot "
         "for this Graph section."

@@ -1,0 +1,48 @@
+# Windows smoke-test config: local execution with the built-in mock worker.
+# Needs no Docker, no LLM CLIs and no API keys — mock workers are tiny Python scripts run
+# on the dispatcher's own interpreter, so this exercises the full server <-> dispatcher <->
+# worker-process pipeline on Windows.
+#
+#   .\cairn.ps1 serve
+#   .\cairn.ps1 dispatch -Config dispatch.windows-mock.yaml
+
+server: "http://127.0.0.1:8000"
+
+runtime:
+  execution: local
+  worker_healthcheck: disabled
+  interval: 2
+  max_workers: 2
+  max_running_projects: 1
+  max_project_workers: 2
+  healthcheck_timeout: 5
+  prompt_group: "mock"
+
+tasks:
+  bootstrap:
+    timeout: 20
+    conclude_timeout: 10
+  reason:
+    timeout: 20
+    max_intents: 2
+  explore:
+    timeout: 20
+    conclude_timeout: 10
+
+local:
+  # workspace_root: "C:\\cairn-runs"   # default: the directory you start the dispatcher in
+  completed_action: keep
+
+workers:
+  - name: "mock-1"
+    type: "mock"
+    task_types: [bootstrap, reason, explore]
+    max_running: 2
+    priority: 0
+    # Outcomes merge over built-in defaults, so every outcome key is listed (unused ones = 0).
+    env:
+      MOCK_BOOTSTRAP: '{"delay":[1,2],"outcomes":{"complete":0,"fact":1.0,"rejected":0,"invalid_json":0,"invalid_payload":0,"command_fail":0}}'
+      MOCK_BOOTSTRAP_CONCLUDE: '{"delay":[1,2],"outcomes":{"fact":1.0,"rejected":0,"invalid_json":0,"invalid_payload":0,"command_fail":0}}'
+      MOCK_REASON: '{"delay":[1,2],"outcomes":{"complete":0.15,"intent":0.85,"noop":0,"rejected":0,"invalid_json":0,"invalid_payload":0,"command_fail":0}}'
+      MOCK_EXPLORE_EXECUTE: '{"delay":[1,2],"outcomes":{"fact":0.9,"rejected":0.1,"invalid_json":0,"invalid_payload":0,"command_fail":0}}'
+      MOCK_EXPLORE_CONCLUDE: '{"delay":[1,2],"outcomes":{"fact":1.0,"rejected":0,"invalid_json":0,"invalid_payload":0,"command_fail":0}}'

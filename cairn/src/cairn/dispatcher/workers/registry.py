@@ -5,22 +5,22 @@ from cairn.dispatcher.workers.base import WorkerDriver
 
 
 _CLAUDE = ClaudeCodeDriver()
-_MOCK = MockDriver()
 
 DRIVERS: dict[str, WorkerDriver] = {
     "claudecode": _CLAUDE,
     "codex": CodexDriver(),
     "pi": PiDriver(),
-    "mock": _MOCK,
+    "mock": MockDriver(),
 }
 
 # Local variants invoke the host CLIs in their native configuration (no cairn provider
-# injection). claudecode and mock build identical commands in both modes, so they are shared.
+# injection). claudecode builds identical commands in both modes, so it is shared; mock
+# has a local variant that runs on the dispatcher's own interpreter (portable to Windows).
 LOCAL_DRIVERS: dict[str, WorkerDriver] = {
     "claudecode": _CLAUDE,
     "codex": CodexDriver(local=True),
     "pi": PiDriver(local=True),
-    "mock": _MOCK,
+    "mock": MockDriver(local=True),
 }
 
 

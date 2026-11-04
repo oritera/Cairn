@@ -273,7 +273,15 @@ class DispatchConfig(BaseModel):
 
     @classmethod
     def load(cls, path: Path) -> "DispatchConfig":
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        return cls.from_yaml_text(path.read_text(encoding="utf-8"))
+
+    @classmethod
+    def from_yaml_text(cls, text: str) -> "DispatchConfig":
+        data = yaml.safe_load(text) or {}
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DispatchConfig":
         config = cls.model_validate(data)
         validate_prompt_resources(config.runtime.prompt_group)
         return config

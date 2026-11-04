@@ -1,11 +1,31 @@
 from __future__ import annotations
 
+import os
 import sqlite3
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-DEFAULT_DB = Path.home() / ".local" / "share" / "cairn" / "cairn.db"
+
+def _default_data_dir() -> Path:
+    """Per-user data directory: %LOCALAPPDATA%\\cairn on Windows, XDG data home elsewhere.
+    ``CAIRN_DATA_DIR`` overrides it (portable installs, isolated test runs)."""
+    override = os.environ.get("CAIRN_DATA_DIR")
+    if override:
+        return Path(override)
+    if sys.platform.startswith("win"):
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        if base:
+            return Path(base) / "cairn"
+        return Path.home() / "AppData" / "Local" / "cairn"
+    xdg = os.environ.get("XDG_DATA_HOME")
+    if xdg:
+        return Path(xdg) / "cairn"
+    return Path.home() / ".local" / "share" / "cairn"
+
+
+DEFAULT_DB = _default_data_dir() / "cairn.db"
 
 _db_path: Path | None = None
 
