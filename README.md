@@ -1,6 +1,14 @@
 # Cairn for Windows
 
-This is a Windows port of [Cairn](README-UPSTREAM.md). The server, the web UI and the dispatcher
+> **This is an unofficial Windows port of [Cairn](https://github.com/oritera/Cairn) by
+> [oritera](https://github.com/oritera).** All credit for Cairn itself (the engine, the server,
+> the web UI and the dispatcher) goes to the original authors. This fork only adds Windows
+> support and a desktop app, and is not affiliated with or endorsed by the upstream project.
+> Report Windows-specific problems here, not upstream. The original README is kept as
+> [README-UPSTREAM.md](README-UPSTREAM.md). Like the original, this port is licensed under the
+> [GNU AGPL v3](LICENSE).
+
+This port lets Cairn run on Windows. The server, the web UI and the dispatcher
 run natively on Windows 10/11. Workers run in **local mode**: each worker is an ordinary
 Windows process that uses the `claude` / `codex` / `pi` CLIs already installed on your PC.
 You don't need Docker or WSL.
