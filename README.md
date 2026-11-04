@@ -1,224 +1,217 @@
-<div align="center">
+# Cairn for Windows
 
-<img src="./README/banner.png" alt="Cairn Banner"/>
+This is a Windows port of [Cairn](README-UPSTREAM.md). The server, the web UI and the dispatcher
+run natively on Windows 10/11. Workers run in **local mode**: each worker is an ordinary
+Windows process that uses the `claude` / `codex` / `pi` CLIs already installed on your PC.
+You don't need Docker or WSL.
 
-# Cairn
-### More Than Just AI Penetration Testing — Towards General State-Space Search
+Container mode (one Linux container per project) also works if you have
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) with the WSL 2 backend.
+See [Container mode on Windows](#container-mode-on-windows).
 
-<p>
-  <a href="https://zc.tencent.com/hackathon" target="_blank" rel="noopener noreferrer">
-    <img src="./README/tencent.png" alt="Tencent" height="55" />
-  </a>
-  <a href="https://zc.tencent.com/hackathon" target="_blank" rel="noopener noreferrer">
-    <img src="./README/tch.png" alt="TCH" height="55" />
-  </a>
-  <a href="https://wiki.chainreactors.red" target="_blank" rel="noopener noreferrer">
-    <img src="./README/c.png" alt="ChainReactors" height="45" />
-  </a>
-</p>
+## Desktop app (installer)
 
-Cairn is a general-purpose problem-solving engine. <br/>It defines no roles, no workflows. Given an origin and a goal, it searches for a path through an unknown state space. <br/>AI Penetration Testing is one such problem — and a proven one.
+The easiest way to use Cairn on Windows is the desktop app: one window with the Cairn UI, a
+**Settings** window for API keys and every config value, and a proper installer.
 
-<p>
-  <a href="https://discord.gg/nDSy4NZVP" target="_blank" rel="noopener noreferrer">
-    <img src="https://img.shields.io/badge/Discord-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" />
-  </a>
-  <a href="https://x.com/le1xia0" target="_blank" rel="noopener noreferrer">
-    <img src="https://img.shields.io/badge/X-000000?style=flat-square&logo=x&logoColor=white" alt="X" />
-  </a>
-</p>
+**Download:** get `Cairn-Setup-<version>.exe` from the repository's [Releases](../../releases) page (tagged versions, plus a rolling `windows-latest` pre-release built from `main`), or from the artifacts of the *Build Windows Installer* workflow run under *Actions*.
 
-</div>
+**Install:** run `Cairn-Setup-<version>.exe`. It installs for your user only (no admin
+rights needed) into `%LOCALAPPDATA%\Programs\Cairn`, adds a Start menu entry (and, if you tick
+the box, a desktop shortcut), and registers an uninstaller in *Settings → Apps*.
 
-<p align="center">
-  <a href="https://www.bilibili.com/video/BV1a8R5BhEVi/" target="_blank" rel="noopener noreferrer">
-    <img src="./README/cairn.png" alt="Cairn runtime screenshot" width="900" />
-  </a>
-</p>
+**First launch:** the Settings window opens with a welcome note. Check the projects folder and
+your worker, then click **Save & start**. With Claude Code installed and logged in, the
+defaults work as they are.
 
-## What is Cairn?
+What the app does for you:
 
-Penetration testing is fundamentally a **directed search through a near-infinite state space**:
+- It runs the Cairn server inside the app (on `127.0.0.1`, port 8000 or the next free port)
+  and shows the UI in a native window (Microsoft Edge WebView2).
+- It starts, stops and restarts the dispatcher for you. The window title shows its state:
+  *running*, *stopped*, or *stopped unexpectedly*, and if it stops unexpectedly the app shows
+  the last log lines and offers to open Settings.
+- **API keys are stored in Windows Credential Manager** (under “Cairn”), never in a file. Any
+  environment variable whose name contains `KEY`, `TOKEN`, `SECRET` or `PASSWORD` is treated
+  as a secret: the field is masked, it shows “✓ Saved” once stored, and it is never sent
+  back to the window. Keys reach the dispatcher only in memory (over stdin).
+- Settings are checked before they are saved. Invalid settings are not written, and the
+  window lists what to fix.
+- **Test** checks each worker: it confirms the CLI is installed (and shows its version), and
+  if API settings are filled in, it calls the API to check the key.
 
-- **Origin**: known (target IP, target system)
-- **Goal**: defined (get a shell, capture the flag)
-- **Path**: unknown
+| Menu | Items |
+|---|---|
+| **Cairn** | Settings… · Import dispatch.yaml… (moves its keys into Credential Manager) · Open projects folder · Open data folder · Quit |
+| **Dispatcher** | Start · Stop · Restart · View dispatcher log · View app log |
+| **View** | Reload · Open in browser |
+| **Help** | About Cairn |
 
-This structure is not unique to penetration testing. Vulnerability research, mathematical proof, CTF challenges — any problem with a clear starting point, a clear success condition, and an unknown path in between shares the same shape.
+Settings tabs: **General** (execution mode, projects folder, port, autostart, log level) ·
+**Workers & API keys** (add/remove workers; per type: Claude Code, Codex, Pi, or Mock for a
+no-LLM demo) · **Performance** (concurrency, task timeouts, health checks) ·
+**Environment** (variables for all workers, e.g. a proxy) · **Container mode** (image,
+network, capabilities).
 
-Cairn is built for this class of problems. Penetration testing is the first domain it has been validated on.
+Only one copy of the app runs at a time. Closing the window stops the dispatcher and any agent
+processes it started.
 
-The engine is built on a **Blackboard Architecture** with an explicit fact-intent graph. Three primitives are all it needs:
+**Uninstall** from *Settings → Apps → Cairn*. The uninstaller asks whether to also delete
+Cairn's data (database, settings, logs and saved API keys). Your projects folder is never
+deleted.
 
-| Concept | Meaning |
-|---------|---------|
-| **Fact** | A confirmed, objective finding written to the board |
-| **Intent** | A declared direction of exploration, not yet executed |
-| **Hint** | Human judgment injected at any time; absorbed by agents on the next read |
+**Where things are:** settings in `%LOCALAPPDATA%\cairn\desktop\settings.json`, logs in
+`%LOCALAPPDATA%\cairn\logs\` (`desktop.log`, `dispatcher.log`), and the database is shared
+with the command-line tools.
 
-The graph grows from `origin` toward `goal`. Every new Fact is a stepping stone; every Intent is a step into the unknown.
+### Building the app and installer
 
-Agent Workers run an OODA loop — Observe the full graph, Orient to the current state, Decide on next intents, Act to explore — and write their findings back as new Facts. Workers have no fixed roles. Tasks are generated at runtime from the graph's current state, not from predefined job descriptions.
-
-Agents coordinate exclusively through the shared board (Stigmergy). No direct communication. No information silos.
-
-## Cairn in Action
-
-https://github.com/user-attachments/assets/e557b1ac-dda4-41cb-87dd-9d56dbf05133
-
-
-## How It Works
-
-Three task types, all executed by the same Worker:
-
-| Task | What it does | Output |
-|------|-------------|--------|
-| **Bootstrap** | At project start, attempts to solve the problem directly | Fact + possible Complete |
-| **Reason** | Reads the full graph: is the goal met? What should be explored next? | Complete / new Intents / no-op |
-| **Explore** | Claims one Intent, executes the exploration, reports findings | One Fact |
-
-System architecture:
-
-```
-          ┌──────────────────────────────────┐
-          │           Cairn Server           │
-          │    Facts + Intents + Hints       │
-          └─────────────────┬────────────────┘
-                            │
-                     Read / Write API
-                            │
-          ┌─────────────────┴────────────────┐
-          │             Dispatcher           │
-          │   Schedules tasks, manages       │
-          │   containers, writes protocol    │
-          └──────────┬───────────────┬───────┘
-                     │               │
-     ┌───────────────┴──┐     ┌──────┴──────────────┐
-     │  Worker Container│     │  Worker Container   │
-     │   (Project A)    │     │   (Project B)       │
-     │  ┌────┐  ┌────┐  │     │  ┌────┐  ┌────┐     │
-     │  │ W. │  │ W. │  │     │  │ W. │  │ W. │     │
-     │  └────┘  └────┘  │     │  └────┘  └────┘     │
-     └──────────────────┘     └─────────────────────┘
+```powershell
+.\desktop\build.ps1             # deps → icon → tests → Cairn.exe (PyInstaller) → installer (Inno Setup)
+.\desktop\build.ps1 -SkipTests
 ```
 
-**Cairn Server** maintains graph consistency only.
+The build produces `build\dist\Cairn\Cairn.exe` and `dist\Cairn-Setup-<version>.exe`. The
+installer step needs Inno Setup (`winget install JRSoftware.InnoSetup`). Without it, the build
+stops after `Cairn.exe`.
 
-**Cairn Dispatcher** reads the graph, schedules tasks, spins up and tears down worker containers, and is the sole writer to the protocol. Each project gets its own Worker Container; multiple Agent Workers run concurrently inside it. Agent Workers only receive a prompt and return structured output.
+CI builds the same installer on `windows-latest` (`.github/workflows/build-windows-installer.yml`) on every push to `main` and on `v*` tags; push a tag such as `v0.1.0` to publish a release with the installer attached.
 
-Workers can also run directly on the dispatcher host instead of in per-project containers — **local mode**, no Docker required. See [Local mode](#local-mode-no-docker) below.
+To run the app from source: `uv run --project cairn --python 3.13 --extra desktop python -m cairn.desktop`.
 
-Supported worker backends: **Claude Code**, **Codex**, and **Pi**.
+Developer options (environment variables): `CAIRN_DATA_DIR` (use another data folder, e.g. a
+portable or test profile), `CAIRN_KEYRING_SERVICE` (use a different Credential Manager name),
+`CAIRN_WEBVIEW_DEBUG_PORT` (open the DevTools protocol on that port).
 
-## Results
+## Quick start (command line)
 
-**Tencent Cloud Hackathon · AI Penetration Testing Challenge · 2nd Edition**
+Open PowerShell in this folder:
 
-610 teams · 1,345 participants · top universities and security firms across China
-
-| Metric | Value |
-|--------|-------|
-| Problems solved | **54 / 54 — only team to AK** |
-| Final ranking | 3rd |
-
-> The system had never been tested before the competition. The full pipeline came online for the first time at 4 AM on race day. No training, no tuning, no domain-specific tooling. Zero MCP tools, zero RAG, zero predefined agent roles.
-
-## Further Reading
-
-- <a href="https://mp.weixin.qq.com/s/DlpEH7bVr0xi0VawPJs3XA" target="_blank" rel="noopener noreferrer">The Strongest AI Penetration Testing Agent: Postmortem of the Only Team to Achieve AK at the TCH Tencent Cloud Hackathon Intelligent Penetration Testing Challenge (2nd Edition)</a>
-- <a href="https://mp.weixin.qq.com/s/2rEqFLvkxvYWM3gW170C2w" target="_blank" rel="noopener noreferrer">The Pathless Path: Cairn AI from Penetration Testing to General Problem Solving</a>
-
-## Getting Started
-
-**Prerequisites**
- 
-- macOS, Linux, or Windows 10/11 — **Windows users: see [README-WINDOWS.md](README-WINDOWS.md)** for the native Windows setup (`.\cairn.ps1 setup`)
-- Python ≥ 3.12
-- Docker (container execution only — not needed for local mode)
-
-
-### Pull required images
- 
-Both setup methods require the worker container image:
- 
-```bash
-docker pull --platform=linux/amd64 ghcr.io/oritera/cairn-worker-container:latest
+```powershell
+.\cairn.ps1 setup        # installs uv + a private Python 3.13 + dependencies, creates dispatch.yaml
+notepad dispatch.yaml    # check workspace_root and which workers are enabled
+.\cairn.ps1 start        # opens the server and the dispatcher in two windows, plus the UI
 ```
 
-Create your local dispatcher configuration and fill in your LLM endpoints and API keys:
+The UI is at http://127.0.0.1:8000/. Create a project there with an origin and a goal.
+The dispatcher picks it up automatically.
 
-```bash
-cp dispatch.example.yaml dispatch.yaml
-```
- 
-### Docker Compose (recommended)
- 
-Pull the base image used to build Cairn:
- 
-```bash
-docker pull ghcr.io/astral-sh/uv:python3.13-trixie
-```
- 
-```bash
-docker compose up --build
-```
- 
-This starts `cairn-server` on port `8000` and `cairn-dispatcher` once the server passes its health check. The dispatcher mounts `dispatch.yaml` from the project root and connects to Docker via the host socket. Data is persisted to `./datas/cairn/`.
- 
-### Manual
- 
-```bash
-# Start the server
-uv run --project cairn cairn serve
- 
-# Run the dispatcher
-uv run --project cairn cairn dispatch --config dispatch.yaml
- 
-# Run startup health checks only
-uv run --project cairn cairn dispatch --config dispatch.yaml --startup-healthcheck-only
+From `cmd.exe`, or if your execution policy blocks `.ps1` files, use `.\cairn.cmd` instead
+(`.\cairn.cmd setup`, `.\cairn.cmd start`, ...). It runs the same script with
+`-ExecutionPolicy Bypass` for that process only and doesn't change any machine settings.
+Keep the `.\` prefix: some locked-down machines set `NoDefaultCurrentDirectoryInExePath`, and
+then cmd won't find a bare `cairn.cmd` in the current folder.
+
+### Try it without any LLM
+
+`dispatch.windows-mock.yaml` uses the built-in mock worker. It needs no CLI, no account and
+no API key, so you can use it to check the whole pipeline on a new machine:
+
+```powershell
+.\cairn.ps1 start -Config dispatch.windows-mock.yaml
 ```
 
-### Local mode (no Docker)
+Create a project in the UI. Within a few seconds you'll see facts and intents appear and the
+project completes.
 
-Instead of one container per project, workers can run directly on the dispatcher host, reusing the machine's already-configured `claude` / `codex` / `pi` CLIs — no Docker, and no API keys in the config.
+## Prerequisites
 
-```bash
-cp dispatch.local.example.yaml dispatch.yaml
+| Need | Notes |
+|---|---|
+| Windows 10 or 11 | Tested with Windows PowerShell 5.1. PowerShell 7 also works. |
+| Python (any version) | Only used to install `uv`. `uv` then downloads its own Python 3.13, so a too-new system Python (e.g. 3.15, which has no wheels for some dependencies yet) doesn't matter. You can also skip Python and run `winget install astral-sh.uv`. |
+| A worker CLI, logged in | e.g. Claude Code: `claude -p "hello"` must work in a normal PowerShell window. Native installs (`claude.exe`) and npm installs (`codex.cmd`, `pi.cmd`) both work. |
+| Node.js | Only needed for npm-installed CLIs, which already require it. |
 
-# Start the server
-uv run --project cairn cairn serve
+## Launcher commands
 
-# Run the dispatcher on the same host, where the CLIs are installed and logged in
-uv run --project cairn cairn dispatch --config dispatch.yaml
-```
+| Command | What it does |
+|---|---|
+| `.\cairn.ps1 setup` | Installs `uv` if missing, syncs dependencies, copies `dispatch.windows.example.yaml` to `dispatch.yaml`. |
+| `.\cairn.ps1 start [-Config file]` | Starts the server, waits for it, starts the dispatcher, opens the UI. |
+| `.\cairn.ps1 serve [-BindHost h] [-Port n]` | Server only (default `127.0.0.1:8000`). |
+| `.\cairn.ps1 dispatch [-Config file]` | Dispatcher only (default `dispatch.yaml`). |
+| `.\cairn.ps1 check [-Config file]` | Checks that the configured CLIs are installed and runnable, then exits. |
+| `.\cairn.ps1 test [-- pytest args]` | Runs the test suite, e.g. `.\cairn.ps1 test -- -k platform -q`. |
 
-Local mode is selected by `runtime.execution: local` (see `dispatch.local.example.yaml`). On startup the dispatcher checks each configured worker CLI is installed and runnable, and reminds you they must already be logged in. Each project gets an isolated working directory under `local.workspace_root` (default: the dispatcher's current directory). Run the dispatcher directly on the host — not inside Docker — since the agents run with your user's permissions and no sandbox.
+Arguments after `--` are passed to the underlying command unchanged, e.g.
+`.\cairn.ps1 serve -- --db-path D:/cairn/cairn.db`. This works the same way from
+PowerShell, `powershell -File` and `.\cairn.cmd`.
 
-### Tests
+You can also use the upstream commands directly, e.g.
+`uv run --project cairn --python 3.13 cairn serve`, or `python -m cairn ...` from inside the venv.
 
-Run the fast regression suite without Docker or live model endpoints:
+## Where things go
 
-```bash
-uv run --project cairn --group dev pytest
-```
+| What | Location |
+|---|---|
+| Database | `%LOCALAPPDATA%\cairn\cairn.db` (upstream uses `~/.local/share/cairn` on Linux). Override with `cairn serve --db-path`. |
+| Project workspaces | `<workspace_root>\<project_id>\`. Set `workspace_root` in `dispatch.yaml`; the example uses `C:/cairn-runs`. |
+| Graph snapshots given to agents | `<project workspace>\.cairn-prompts\...` |
+| pi session files (local mode) | `%TEMP%\cairn-pi\<worker>\sessions` |
 
-## Disclaimer
+In YAML, write Windows paths with forward slashes (`C:/cairn-runs`) or doubled backslashes
+(`"C:\\cairn-runs"`).
 
-Cairn is a general-purpose problem-solving engine. Although it supports penetration testing, CTF solving, security assessment, and vulnerability research workflows, it is intended to be used only in environments where you have explicit authorization to operate.
+## What changed compared to upstream
 
-You are solely responsible for how you use this project. Do not use Cairn against systems, networks, applications, or data without clear prior permission from the owner or operator. Unauthorized security testing, exploitation, or data access may be illegal and may cause harm.
+The fork changes only what was POSIX-specific. Linux and macOS behaviour is the same as upstream.
 
-The developers and contributors of this project do not endorse or accept responsibility for any misuse, abuse, damage, loss, or legal consequences arising from its use. By using this project, you agree to ensure that your activities comply with all applicable laws, regulations, contractual obligations, and professional or organizational policies in your jurisdiction.
+| Area | Upstream (Linux) | Windows port |
+|---|---|---|
+| Stopping a worker (timeout/cancel) | `start_new_session` + `os.killpg` with `SIGTERM` then `SIGKILL` | New process group + `taskkill /T` (graceful), then `taskkill /T /F`. Kills the whole process tree. See `runtime/platform_compat.py`. |
+| Launching CLIs | Bare name (`claude`) | Resolved through `PATHEXT`. npm `.cmd` shims are unwrapped to `node <cli>.js` so `cmd.exe` doesn't cut multi-line prompts at the first newline or mangle `& \| % ^ < > "`. |
+| Worker environment | `{**os.environ, **env}` | Case-insensitive merge, so a configured `https_proxy` reliably overrides a host `HTTPS_PROXY`. |
+| Graph snapshot path (local mode) | `/tmp/cairn-prompts/...` (not an absolute path on Windows, so every local task failed) | Inside the project workspace (native path, removed together with the project). |
+| pi worker (local mode) | `/bin/sh -lc` wrapper, `/tmp/cairn-pi` | Runs `pi` directly; session dir created in Python under `%TEMP%`. |
+| Mock worker (local mode) | `python3` (on Windows usually only a Microsoft Store stub) | The dispatcher's own interpreter. |
+| Database location | `~/.local/share/cairn` | `%LOCALAPPDATA%\cairn` (XDG on Linux/macOS). |
+| Project folder names | Replaces `/` only | Also replaces `\ : * ? " < > \|`. |
+| CLI probe at startup | Runs bare `claude --help` | Runs the resolved path, without opening a console window. |
+| Entry point | `cairn` script | Also `python -m cairn`. |
+| Log output when redirected (file, pipe, service) | ANSI code page (cp1252): non-Latin text becomes `已...` escapes, and `—` becomes a byte that isn't valid UTF-8 | UTF-8. An interactive console is unchanged. |
 
-## Star History
+Container mode is unchanged: those commands run inside the Linux worker image, where the
+POSIX paths and `/bin/sh` are correct.
 
-<a href="https://www.star-history.com/#oritera/Cairn&Date" target="_blank" rel="noopener noreferrer">
-  <img src="https://api.star-history.com/svg?repos=oritera/Cairn&type=Date" alt="Star History Chart" />
-</a>
+Tests: `cairn/tests/test_platform_compat.py` covers the Windows behaviour, including a real
+round trip of a multi-line prompt full of shell metacharacters through an npm-style shim.
+The existing local-execution tests now use Python children instead of `sh`/`sleep`, so the
+whole suite passes on Windows without Git Bash.
 
-## ⚖️ License
-This project is licensed under **GNU AGPLv3** for personal and educational use.
+## Container mode on Windows
 
-**Commercial Use**: If you wish to use this project in a commercial or proprietary environment without the AGPL-3.0 open-source obligations, **please contact me to obtain a commercial license.**
+1. Install Docker Desktop with the WSL 2 backend and switch it to Linux containers.
+2. `docker pull --platform=linux/amd64 ghcr.io/oritera/cairn-worker-container:latest`
+3. `copy dispatch.example.yaml dispatch.yaml` and fill in endpoints and keys.
+4. Either:
+   - run everything in Docker: `docker compose up --build`. Docker Desktop maps the
+     `/var/run/docker.sock` mount in `docker-compose.yaml` to its engine. Or:
+   - run the dispatcher natively: `.\cairn.ps1 start`. The Docker SDK connects through
+     Docker Desktop's named pipe (`npipe:////./pipe/docker_engine`) automatically.
 
-**Contributions**: By submitting a Pull Request, you agree that your contributions may be used under both the AGPL-3.0 and the project's commercial license.
+`network_mode: host` behaves differently under Docker Desktop than on a Linux host: the
+container gets the network of the Docker VM, not of your PC. If workers need to reach
+services on your PC, use `host.docker.internal`.
+
+## Troubleshooting
+
+- **`uv not found`**: run `.\cairn.ps1 setup`, or `winget install astral-sh.uv`.
+- **`Microsoft Visual C++ 14.0 is required`** when installing with plain `pip`: your system
+  Python is too new for the prebuilt wheels. Use the launcher (it pins Python 3.13), or
+  `uv sync --project cairn --python 3.13`.
+- **`[-] claude not found on PATH`**: open a *new* PowerShell window after installing the CLI
+  and check that `where.exe claude` finds it. The dispatcher inherits PATH from the window
+  you start it in.
+- **Red `NativeCommandError` text in Windows PowerShell 5.1**: this is how 5.1 shows
+  anything a program writes to stderr. Cairn logs to stderr, so these lines are normal log
+  output, not errors.
+- **Slow first `setup`**: `cairn/pyproject.toml` (inherited from upstream) uses the Aliyun
+  PyPI mirror. It works worldwide but may be slower outside China.
+
+## Safety
+
+Local mode runs AI agents with **your Windows user's permissions and no sandbox**. They can
+read and write files and run commands. Give them a dedicated `workspace_root`, and only use
+Cairn on systems and targets you are authorized to work on. See the
+[Disclaimer](README-UPSTREAM.md#disclaimer).
