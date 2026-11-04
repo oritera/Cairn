@@ -14,7 +14,9 @@ See [Container mode on Windows](#container-mode-on-windows).
 The easiest way to use Cairn on Windows is the desktop app: one window with the Cairn UI, a
 **Settings** window for API keys and every config value, and a proper installer.
 
-**Install:** run `dist\Cairn-Setup-<version>.exe`. It installs for your user only (no admin
+**Download:** get `Cairn-Setup-<version>.exe` from the repository's [Releases](../../releases) page (tagged versions, plus a rolling `windows-latest` pre-release built from `main`), or from the artifacts of the *Build Windows Installer* workflow run under *Actions*.
+
+**Install:** run `Cairn-Setup-<version>.exe`. It installs for your user only (no admin
 rights needed) into `%LOCALAPPDATA%\Programs\Cairn`, adds a Start menu entry (and, if you tick
 the box, a desktop shortcut), and registers an uninstaller in *Settings → Apps*.
 
@@ -72,6 +74,8 @@ with the command-line tools.
 The build produces `build\dist\Cairn\Cairn.exe` and `dist\Cairn-Setup-<version>.exe`. The
 installer step needs Inno Setup (`winget install JRSoftware.InnoSetup`). Without it, the build
 stops after `Cairn.exe`.
+
+CI builds the same installer on `windows-latest` (`.github/workflows/build-windows-installer.yml`) on every push to `main` and on `v*` tags; push a tag such as `v0.1.0` to publish a release with the installer attached.
 
 To run the app from source: `uv run --project cairn --python 3.13 --extra desktop python -m cairn.desktop`.
 
