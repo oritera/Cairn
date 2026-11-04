@@ -31,7 +31,7 @@ function Get-Uv {
     }
     throw "uv not found. Run '.\cairn.ps1 setup' or 'winget install astral-sh.uv'."
 }
-$uv = Get-Uv
+$uv = @(Get-Uv)  # @() keeps a one-element result an array (PowerShell unrolls it on return)
 function Uv { param([string[]]$UvArgs) $exe = $uv[0]; $pre = @(); if ($uv.Count -gt 1) { $pre = $uv[1..($uv.Count - 1)] }; & $exe @pre @UvArgs; if ($LASTEXITCODE -ne 0) { throw "uv $($UvArgs -join ' ') failed" } }
 
 $version = (Select-String -Path 'cairn\src\cairn\__init__.py' -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
