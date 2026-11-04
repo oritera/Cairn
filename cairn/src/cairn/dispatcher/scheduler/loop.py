@@ -41,9 +41,15 @@ class WorkerSelection:
 
 
 class DispatcherLoop:
-    def __init__(self, config_path: Path):
+    def __init__(self, config_path: Path | None = None, *, config: DispatchConfig | None = None):
+        # Either a YAML path, or an already-validated config (e.g. read from stdin by
+        # `cairn dispatch --config -`, which the desktop app uses so API keys never touch disk).
+        if config is None:
+            if config_path is None:
+                raise ValueError("DispatcherLoop needs config_path or config")
+            config = DispatchConfig.load(config_path)
         self.config_path = config_path
-        self.config = DispatchConfig.load(config_path)
+        self.config = config
         self.client = CairnClient(self.config.server)
         if self.config.runtime.execution == "local":
             self.container_manager = LocalBackend(self.config.local or LocalConfig())
@@ -178,11 +184,14 @@ class DispatcherLoop:
         if path is None:
             return None, False
         try:
+            # Run the resolved path: on Windows a bare `claude` will not launch `claude.cmd`.
             result = subprocess.run(
-                [binary, "--help"],
+                [path, "--help"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
                 timeout=15,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except (OSError, subprocess.SubprocessError):
             return path, False

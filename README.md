@@ -132,7 +132,7 @@ Supported worker backends: **Claude Code**, **Codex**, and **Pi**.
 
 **Prerequisites**
  
-- macOS or Linux
+- macOS, Linux, or Windows 10/11 — **Windows users: see [README-WINDOWS.md](README-WINDOWS.md)** for the native Windows setup (`.\cairn.ps1 setup`)
 - Python ≥ 3.12
 - Docker (container execution only — not needed for local mode)
 

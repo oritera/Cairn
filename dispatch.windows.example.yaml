@@ -1,0 +1,67 @@
+# Windows dispatcher config — local execution (no Docker).
+#
+# Workers run as ordinary Windows processes and reuse the CLIs already installed and
+# logged in on this machine (claude / codex / pi). No API keys are configured here.
+#
+#   copy dispatch.windows.example.yaml dispatch.yaml     (or: .\cairn.ps1 setup)
+#   .\cairn.ps1 start                                    (server + dispatcher + UI)
+#
+# Notes for Windows:
+# - Each CLI must run from a normal PowerShell window (e.g. `claude -p "hi"` works).
+#   npm-installed CLIs (codex.cmd, pi.cmd) are fine: Cairn launches their node script
+#   directly, so multi-line prompts are not mangled by cmd.exe.
+# - Agents run with your user's permissions and no sandbox. Point workspace_root at a
+#   dedicated folder and only use Cairn on systems you are authorized to work on.
+# - Use forward slashes or doubled backslashes in YAML paths: "C:/cairn-runs" or "C:\\cairn-runs".
+
+server: "http://127.0.0.1:8000"
+
+runtime:
+  execution: local
+  worker_healthcheck: disabled   # no base_url to probe; startup checks the CLIs are on PATH
+  max_workers: 3                 # all workers share this PC — size to the machine
+  max_running_projects: 2
+  max_project_workers: 2
+  interval: 3
+  healthcheck_timeout: 15
+  prompt_group: "default"
+
+tasks:
+  bootstrap:
+    timeout: 120
+    conclude_timeout: 30
+  reason:
+    timeout: 45
+  explore:
+    timeout: 600
+    conclude_timeout: 120
+
+local:
+  # Each project gets <workspace_root>\<project_id>\. Default: the folder you start in.
+  workspace_root: "C:/cairn-runs"
+  completed_action: keep         # keep | remove
+
+# Extra environment variables for every worker process (merged over your environment),
+# e.g. an outbound proxy:
+# common_env:
+#   HTTPS_PROXY: "http://127.0.0.1:7897"
+#   HTTP_PROXY: "http://127.0.0.1:7897"
+
+workers:
+  - name: "local-claude"
+    type: "claudecode"
+    task_types: [bootstrap, reason, explore]
+    max_running: 1
+    priority: 0
+
+  # - name: "local-codex"
+  #   type: "codex"
+  #   task_types: [explore]
+  #   max_running: 1
+  #   priority: 1
+
+  # - name: "local-pi"
+  #   type: "pi"
+  #   task_types: [reason]
+  #   max_running: 1
+  #   priority: 2

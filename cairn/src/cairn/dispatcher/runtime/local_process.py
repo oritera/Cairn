@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import logging
-import os
-import signal
 import subprocess
 import threading
 from contextlib import suppress
 
+from cairn.dispatcher.runtime.platform_compat import (
+    popen_creation_kwargs,
+    resolve_executable,
+    terminate_tree,
+)
 from cairn.dispatcher.runtime.process import ProcessResult
 
 LOG = logging.getLogger(__name__)
@@ -21,8 +24,9 @@ class LocalProcess:
 
     Mirrors the container ManagedProcess surface (start/communicate/kill/cancel) but
     executes on the dispatcher host: its own process group so children are killed as a
-    group, a Python-enforced timeout instead of the ``timeout`` coreutil, and a
-    SIGTERM -> grace -> SIGKILL shutdown so the CLI can flush its session before dying.
+    group, a Python-enforced timeout instead of the ``timeout`` coreutil, and a graceful ->
+    grace -> forced shutdown so the CLI can flush its session before dying. Process-group
+    handling is delegated to ``platform_compat`` (POSIX signals / Windows taskkill /T).
     """
 
     def __init__(
@@ -49,7 +53,7 @@ class LocalProcess:
 
     def start(self) -> None:
         self._process = subprocess.Popen(
-            self.command,
+            resolve_executable(self.command),
             cwd=self._cwd,
             env=self.env,
             stdout=subprocess.PIPE,
@@ -57,7 +61,7 @@ class LocalProcess:
             text=True,
             encoding="utf-8",
             errors="replace",
-            start_new_session=True,
+            **popen_creation_kwargs(),
         )
         self._stdout_thread = threading.Thread(
             target=self._drain, args=(self._process.stdout, self._stdout_chunks), daemon=True
@@ -107,21 +111,7 @@ class LocalProcess:
             process = self._process
             if process is None or process.poll() is not None:
                 return
-            self._signal_group(process, signal.SIGTERM)
-            try:
-                process.wait(timeout=self._term_grace)
-                return
-            except subprocess.TimeoutExpired:
-                pass
-            self._signal_group(process, signal.SIGKILL)
-
-    @staticmethod
-    def _signal_group(process: subprocess.Popen[str], sig: int) -> None:
-        try:
-            os.killpg(os.getpgid(process.pid), sig)
-        except (ProcessLookupError, PermissionError):
-            with suppress(ProcessLookupError, PermissionError, ValueError):
-                process.send_signal(sig)
+            terminate_tree(process, self._term_grace)
 
     @staticmethod
     def _drain(pipe, sink: list[str]) -> None:

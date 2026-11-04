@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -21,6 +22,37 @@ from conftest import FakeClient, make_config, make_intent, make_project
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+IS_WINDOWS = sys.platform.startswith("win")
+PY = sys.executable
+SLEEP_30 = [PY, "-c", "import time; time.sleep(30)"]
+
+
+def _pid_alive(pid: int) -> bool:
+    """Cross-platform liveness probe. (On Windows os.kill(pid, 0) would *terminate* the
+    process, so query it via OpenProcess/GetExitCodeProcess instead.)"""
+    if IS_WINDOWS:
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 # --------------------------------------------------------------------------- LocalProcess
@@ -28,7 +60,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def test_local_process_captures_stdout_and_exit_code() -> None:
     process = LocalProcess(
-        ["python3", "-c", "import sys; print('hello'); sys.exit(3)"],
+        [PY, "-c", "import sys; print('hello'); sys.exit(3)"],
         cwd=os.getcwd(),
         env=dict(os.environ),
         timeout_seconds=10,
@@ -43,7 +75,7 @@ def test_local_process_captures_stdout_and_exit_code() -> None:
 
 def test_local_process_inherits_cwd(tmp_path: Path) -> None:
     process = LocalProcess(
-        ["python3", "-c", "import os; print(os.getcwd())"],
+        [PY, "-c", "import os; print(os.getcwd())"],
         cwd=str(tmp_path),
         env=dict(os.environ),
         timeout_seconds=10,
@@ -56,7 +88,7 @@ def test_local_process_inherits_cwd(tmp_path: Path) -> None:
 
 def test_local_process_times_out_and_kills_within_grace() -> None:
     process = LocalProcess(
-        ["sh", "-c", "sleep 30"],
+        SLEEP_30,
         cwd=os.getcwd(),
         env=dict(os.environ),
         timeout_seconds=1,
@@ -73,9 +105,16 @@ def test_local_process_times_out_and_kills_within_grace() -> None:
 
 def test_local_process_kill_terminates_child_process_group(tmp_path: Path) -> None:
     pid_file = tmp_path / "child.pid"
-    script = f"sleep 30 & echo $! > {pid_file}; wait"
+    # Parent spawns a long-lived grandchild, records its pid, then waits on it. Killing the
+    # parent's process group / tree must take the grandchild down too.
+    script = (
+        "import pathlib, subprocess, sys\n"
+        "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
+        "pathlib.Path(sys.argv[1]).write_text(str(child.pid))\n"
+        "child.wait()\n"
+    )
     process = LocalProcess(
-        ["sh", "-c", script],
+        [PY, "-c", script, str(pid_file)],
         cwd=str(tmp_path),
         env=dict(os.environ),
         timeout_seconds=1,
@@ -88,9 +127,7 @@ def test_local_process_kill_terminates_child_process_group(tmp_path: Path) -> No
     child_pid = int(pid_file.read_text().strip())
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
-        try:
-            os.kill(child_pid, 0)
-        except ProcessLookupError:
+        if not _pid_alive(child_pid):
             break
         time.sleep(0.1)
     else:
@@ -99,7 +136,7 @@ def test_local_process_kill_terminates_child_process_group(tmp_path: Path) -> No
 
 def test_local_process_cancel_records_reason() -> None:
     process = LocalProcess(
-        ["sh", "-c", "sleep 30"],
+        SLEEP_30,
         cwd=os.getcwd(),
         env=dict(os.environ),
         timeout_seconds=30,
@@ -133,7 +170,7 @@ def test_local_backend_merges_host_env_with_worker_env(tmp_path: Path, monkeypat
     process = backend.build_exec_process(
         handle,
         {"CAIRN_WORKER_VAR": "worker"},
-        ["sh", "-c", 'printf "%s-%s" "$CAIRN_HOST_VAR" "$CAIRN_WORKER_VAR"'],
+        [PY, "-c", "import os,sys; sys.stdout.write(os.environ['CAIRN_HOST_VAR'] + '-' + os.environ['CAIRN_WORKER_VAR'])"],
         timeout_seconds=10,
     )
     process.start()
@@ -162,7 +199,7 @@ def test_local_common_env_reaches_worker_subprocess(tmp_path: Path, monkeypatch)
     process = backend.build_exec_process(
         handle,
         dict(worker.env),
-        ["sh", "-c", 'printf "%s|%s|%s" "$https_proxy" "$http_proxy" "$all_proxy"'],
+        [PY, "-c", "import os,sys; sys.stdout.write('|'.join(os.environ[k] for k in ('https_proxy','http_proxy','all_proxy')))"],
         timeout_seconds=10,
     )
     process.start()
@@ -334,8 +371,9 @@ def test_pi_local_driver_omits_models_json_and_provider() -> None:
     worker = _bare_worker("pi")
     argv = PiDriver(local=True).build_execute(worker, "PROMPT", None).argv
 
-    assert argv[0] == "/bin/sh"
-    assert "exec pi" in argv[2]
+    # Local pi is launched directly (no /bin/sh wrapper, which does not exist on Windows).
+    assert argv[0] == "pi"
+    assert "/bin/sh" not in argv
     assert "--provider" not in argv
     assert "--model" not in argv
     assert argv[-2:] == ["-p", "PROMPT"]
@@ -345,9 +383,15 @@ def test_get_driver_selects_local_or_container_variant() -> None:
     assert get_driver("codex", "local").local is True
     assert get_driver("codex").local is False
     assert get_driver("pi", "local").local is True
-    # claudecode and mock are shared instances across both modes
+    # claudecode is a shared instance across both modes
     assert get_driver("claudecode", "local") is get_driver("claudecode")
-    assert get_driver("mock", "local") is get_driver("mock")
+    # mock has a local variant that runs on the dispatcher's own interpreter
+    assert get_driver("mock", "local").local is True
+    assert get_driver("mock").local is False
+    assert get_driver("mock", "local").build_execute(
+        _bare_worker("mock"), "{}", "s"
+    ).argv[0] == sys.executable
+    assert get_driver("mock").build_execute(_bare_worker("mock"), "{}", "s").argv[0] == "python3"
 
 
 # --------------------------------------------------------------------------- end to end
@@ -379,12 +423,21 @@ def _local_config_for_worker(name: str, worker_type: str) -> DispatchConfig:
     )
 
 
-def _install_fake_cli(tmp_path: Path, monkeypatch, name: str, body: str) -> None:
+def _install_fake_cli(tmp_path: Path, monkeypatch, name: str, output: str) -> None:
+    """Put a fake CLI named ``name`` on PATH that prints ``output`` (a single JSON line).
+
+    Windows gets a ``name.cmd`` batch file (found via PATHEXT); POSIX gets an executable
+    ``#!/bin/sh`` script. ``output`` must not contain cmd metacharacters (& | < > ^ %).
+    """
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
-    script = bin_dir / name
-    script.write_text(f"#!/bin/sh\n{body}\n")
-    script.chmod(0o755)
+    if IS_WINDOWS:
+        script = bin_dir / f"{name}.cmd"
+        script.write_text(f"@echo off\r\necho {output}\r\n", encoding="ascii")
+    else:
+        script = bin_dir / name
+        script.write_text(f"#!/bin/sh\ncat <<'CAIRN_EOF'\n{output}\nCAIRN_EOF\n")
+        script.chmod(0o755)
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
 
 
@@ -395,9 +448,8 @@ def test_explore_runs_real_local_cli_end_to_end(tmp_path: Path, monkeypatch) -> 
         tmp_path,
         monkeypatch,
         "claude",
-        "echo '{\"accepted\":true,\"data\":{\"description\":\"local fake fact\"}}'",
+        '{"accepted":true,"data":{"description":"local fake fact"}}',
     )
-    monkeypatch.setattr(common, "GRAPH_SNAPSHOT_ROOT", str(tmp_path / "prompts"))
 
     config = _local_config_for_worker("test-worker", "claudecode")
     backend = LocalBackend(LocalConfig(workspace_root=str(tmp_path / "work")))
@@ -418,9 +470,9 @@ def test_explore_runs_real_local_cli_end_to_end(tmp_path: Path, monkeypatch) -> 
 
     assert outcome == "success"
     assert client.concluded == [("proj_001", "i001", "test-worker", "local fake fact")]
-    # graph snapshot was materialised on the host under the patched root
-    snapshot_root = tmp_path / "prompts"
-    assert any(p.name == "graph.yaml" for p in snapshot_root.rglob("*"))
+    # graph snapshot was materialised on the host, inside the project's own workdir
+    snapshots = [p for p in (tmp_path / "work").rglob("graph.yaml") if ".cairn-prompts" in p.parts]
+    assert snapshots
 
 
 def test_explore_local_cli_rejection_releases_intent(tmp_path: Path, monkeypatch) -> None:
@@ -428,9 +480,8 @@ def test_explore_local_cli_rejection_releases_intent(tmp_path: Path, monkeypatch
         tmp_path,
         monkeypatch,
         "claude",
-        "echo '{\"accepted\":false,\"reason\":\"policy_refusal\"}'",
+        '{"accepted":false,"reason":"policy_refusal"}',
     )
-    monkeypatch.setattr(common, "GRAPH_SNAPSHOT_ROOT", str(tmp_path / "prompts"))
 
     config = _local_config_for_worker("test-worker", "claudecode")
     backend = LocalBackend(LocalConfig(workspace_root=str(tmp_path / "work")))

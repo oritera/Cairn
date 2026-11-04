@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cairn Settings</title>
+<style>
+  :root {
+    --bg: #f8fafc; --panel: #ffffff; --panel-2: #f1f5f9; --border: #e2e8f0; --border-strong: #cbd5e1;
+    --text: #0f172a; --muted: #64748b; --accent: #2563eb; --accent-text: #ffffff; --accent-soft: #dbeafe;
+    --ok: #15803d; --ok-soft: #dcfce7; --warn: #b45309; --warn-soft: #fef3c7; --err: #b91c1c; --err-soft: #fee2e2;
+    --shadow: 0 1px 2px rgb(15 23 42 / .06), 0 1px 3px rgb(15 23 42 / .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1120; --panel: #111827; --panel-2: #1e293b; --border: #1f2a3c; --border-strong: #334155;
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6; --accent-text: #ffffff; --accent-soft: #1e3a8a;
+      --ok: #4ade80; --ok-soft: #14532d; --warn: #fbbf24; --warn-soft: #422006; --err: #f87171; --err-soft: #450a0a;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text);
+         display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 200px 1fr; grid-template-areas: "nav header" "nav main" "nav footer"; }
+  nav { grid-area: nav; background: var(--panel); border-right: 1px solid var(--border); padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
+  nav .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 18px; font-weight: 600; font-size: 15px; }
+  nav button { all: unset; cursor: pointer; padding: 8px 12px; border-radius: 8px; color: var(--muted); font-weight: 500; }
+  nav button:hover { background: var(--panel-2); color: var(--text); }
+  nav button.active { background: var(--accent-soft); color: var(--text); }
+  nav button:focus-visible { outline: 2px solid var(--accent); }
+  nav .spacer { flex: 1; }
+  nav .version { color: var(--muted); font-size: 12px; padding: 0 12px; }
+  header { grid-area: header; padding: 20px 28px 0; }
+  header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  main { grid-area: main; overflow: auto; padding: 16px 28px 28px; }
+  footer { grid-area: footer; display: flex; align-items: center; gap: 10px; padding: 12px 28px; border-top: 1px solid var(--border); background: var(--panel); }
+  footer .grow { flex: 1; }
+  section.tab { display: none; max-width: 860px; }
+  section.tab.active { display: block; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .card h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  .card > p.hint { margin: 0 0 14px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px 18px; }
+  .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .field.wide { grid-column: 1 / -1; }
+  label { font-weight: 500; font-size: 13px; }
+  .help { color: var(--muted); font-size: 12px; }
+  input[type=text], input[type=number], input[type=password], select {
+    font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px 10px; width: 100%; min-width: 0; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  input:disabled { opacity: .6; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row > input { flex: 1; }
+  .checks { display: flex; gap: 16px; flex-wrap: wrap; padding-top: 4px; }
+  .checks label { font-weight: 400; display: flex; gap: 6px; align-items: center; }
+  .switch { display: flex; gap: 10px; align-items: center; font-weight: 400; }
+  button.btn { font: inherit; font-weight: 500; border-radius: 8px; padding: 7px 14px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); cursor: pointer; white-space: nowrap; }
+  button.btn:hover { background: var(--panel-2); }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button.btn.primary:hover { filter: brightness(1.08); }
+  button.btn.danger { color: var(--err); }
+  button.btn.small { padding: 4px 10px; font-size: 13px; }
+  button.btn:disabled { opacity: .5; cursor: default; }
+  button.link { all: unset; cursor: pointer; color: var(--accent); font-size: 12px; }
+  button.link:hover { text-decoration: underline; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 500; background: var(--panel-2); color: var(--muted); }
+  .chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .chip.running { background: var(--ok-soft); color: var(--ok); }
+  .chip.failed { background: var(--err-soft); color: var(--err); }
+  .chip.stopping { background: var(--warn-soft); color: var(--warn); }
+  .banner { border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid; }
+  .banner.info { background: var(--accent-soft); border-color: transparent; }
+  .banner.error { background: var(--err-soft); border-color: transparent; color: var(--err); }
+  .banner.error ul { margin: 6px 0 0; padding-left: 18px; }
+  .banner.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+  .worker { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; background: var(--panel); box-shadow: var(--shadow); }
+  .worker-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .worker-head .title { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .worker-head .type { color: var(--muted); font-size: 13px; }
+  .worker-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; }
+  .subhead { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0; }
+  .note { font-size: 12.5px; color: var(--muted); background: var(--panel-2); border-radius: 8px; padding: 8px 12px; }
+  .saved-tag { font-size: 11px; font-weight: 600; color: var(--ok); }
+  .remove-tag { font-size: 11px; font-weight: 600; color: var(--err); }
+  .env-table { display: flex; flex-direction: column; gap: 8px; }
+  .env-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(160px, 1.4fr) auto; gap: 8px; align-items: center; }
+  .result { white-space: pre-wrap; font: 12.5px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; border-radius: 8px; padding: 10px 12px; margin: 0; }
+  .result.ok { background: var(--ok-soft); color: var(--ok); }
+  .result.err { background: var(--err-soft); color: var(--err); }
+  .result.busy { background: var(--panel-2); color: var(--muted); }
+  .empty { text-align: center; color: var(--muted); padding: 30px; border: 1px dashed var(--border-strong); border-radius: 12px; margin-bottom: 14px; }
+  .toast { position: fixed; bottom: 76px; right: 28px; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; opacity: 0; transform: translateY(6px); transition: .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: none; }
+  .modal-bg { position: fixed; inset: 0; background: rgb(2 6 23 / .45); display: none; align-items: center; justify-content: center; }
+  .modal-bg.show { display: flex; }
+  .modal { background: var(--panel); border-radius: 14px; padding: 22px 24px; width: min(460px, 90vw); box-shadow: 0 20px 50px rgb(0 0 0 / .3); }
+  .modal h3 { margin: 0 0 8px; font-size: 16px; }
+  .modal p { margin: 0 0 18px; color: var(--muted); }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; }
+  code { font: 12.5px ui-monospace, "Cascadia Mono", Consolas, monospace; background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+  .loading { padding: 40px; color: var(--muted); }
+</style>
+</head>
+<body>
+<nav aria-label="Settings sections">
+  <div class="brand">
+    <svg width="24" height="24" viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M23.2 29.98 42.3 21.05M23.2 34.02 42.3 42.95" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><circle cx="18" cy="32" r="4.75" stroke="currentColor" stroke-width="3.5"/><circle cx="47" cy="18" r="4.75" stroke="currentColor" stroke-width="3.5"/><circle cx="47" cy="46" r="4.75" stroke="currentColor" stroke-width="3.5"/></svg>
+    Cairn Settings
+  </div>
+  <button data-tab="general" class="active">General</button>
+  <button data-tab="workers">Workers &amp; API keys</button>
+  <button data-tab="performance">Performance</button>
+  <button data-tab="environment">Environment</button>
+  <button data-tab="container">Container mode</button>
+  <div class="spacer"></div>
+  <div class="version" id="version"></div>
+</nav>
+
+<header>
+  <h1 id="tab-title">General</h1>
+  <p id="tab-desc"></p>
+</header>
+
+<main id="main">
+  <div class="loading" id="loading">Loading settings…</div>
+  <div id="banners"></div>
+
+  <section class="tab active" id="tab-general">
+    <div class="card">
+      <h2>How agents run</h2>
+      <p class="hint">Local mode runs the agent CLIs installed on this PC. Container mode runs each project in a Linux container (needs Docker Desktop).</p>
+      <div class="grid">
+        <div class="field">
+          <label for="execution">Execution mode</label>
+          <select id="execution">
+            <option value="local">Local (this PC)</option>
+            <option value="container">Container (Docker)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="completed_action">When a project completes</label>
+          <select id="completed_action">
+            <option value="keep">Keep its working folder</option>
+            <option value="remove">Delete its working folder</option>
+          </select>
+        </div>
+        <div class="field wide">
+          <label for="workspace_root">Projects folder</label>
+          <div class="row">
+            <input type="text" id="workspace_root" spellcheck="false">
+            <button class="btn" id="browse">Browse…</button>
+            <button class="btn" id="open_workspace" title="Open in Explorer">Open</button>
+          </div>
+          <span class="help">Each project gets its own subfolder here. Agents can read and write inside it.</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>App</h2>
+      <p class="hint">Changing the server port takes effect the next time Cairn starts.</p>
+      <div class="grid">
+        <div class="field">
+          <label for="port">Server port</label>
+          <input type="number" id="port" min="1024" max="65535">
+          <span class="help">Local only (127.0.0.1). A free port is used if this one is taken.</span>
+        </div>
+        <div class="field">
+          <label for="log_level">Dispatcher log level</label>
+          <select id="log_level"><option>INFO</option><option>DEBUG</option><option>WARNING</option><option>ERROR</option></select>
+        </div>
+        <div class="field wide">
+          <label class="switch"><input type="checkbox" id="autostart"> Start the dispatcher automatically when Cairn opens</label>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Files</h2>
+      <p class="hint">API keys are stored in Windows Credential Manager (under “Cairn”), not in these files.</p>
+      <div class="row">
+        <button class="btn" data-open="data">Open data folder</button>
+        <button class="btn" data-open="logs">Open logs folder</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-workers">
+    <div id="workers"></div>
+    <div class="row">
+      <select id="new_type" aria-label="Type of worker to add" style="width:auto"></select>
+      <button class="btn" id="add_worker">Add worker</button>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-performance">
+    <div class="card">
+      <h2>Concurrency</h2>
+      <p class="hint">In local mode all workers share this PC, so keep these modest.</p>
+      <div class="grid">
+        <div class="field"><label for="max_workers">Max workers (total)</label><input type="number" id="max_workers" min="1"></div>
+        <div class="field"><label for="max_running_projects">Max running projects</label><input type="number" id="max_running_projects" min="1"></div>
+        <div class="field"><label for="max_project_workers">Max workers per project</label><input type="number" id="max_project_workers" min="1"></div>
+        <div class="field"><label for="interval">Scheduler interval (s)</label><input type="number" id="interval" min="1"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Task timeouts (seconds)</h2>
+      <p class="hint">Bootstrap tries to solve a project directly; Reason plans next steps; Explore carries one step out. “Conclude” is the extra time an agent gets to summarise after the main timeout.</p>
+      <div class="grid">
+        <div class="field"><label for="bootstrap_timeout">Bootstrap</label><input type="number" id="bootstrap_timeout" min="1"></div>
+        <div class="field"><label for="bootstrap_conclude">Bootstrap conclude</label><input type="number" id="bootstrap_conclude" min="1"></div>
+        <div class="field"><label for="reason_timeout">Reason</label><input type="number" id="reason_timeout" min="1"></div>
+        <div class="field"><label for="reason_max_intents">Max new intents per reason step</label><input type="number" id="reason_max_intents" min="1"></div>
+        <div class="field"><label for="explore_timeout">Explore</label><input type="number" id="explore_timeout" min="1"></div>
+        <div class="field"><label for="explore_conclude">Explore conclude</label><input type="number" id="explore_conclude" min="1"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Health checks</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="worker_healthcheck">Worker health checks</label>
+          <select id="worker_healthcheck">
+            <option value="startup_only">At startup</option>
+            <option value="startup_and_task">At startup and before every task</option>
+            <option value="disabled">Off</option>
+          </select>
+          <span class="help">Local mode always checks that the CLIs are installed at startup.</span>
+        </div>
+        <div class="field"><label for="healthcheck_timeout">Health-check timeout (s)</label><input type="number" id="healthcheck_timeout" min="1"></div>
+        <div class="field">
+          <label for="prompt_group">Prompt set</label>
+          <select id="prompt_group"><option value="default">default</option><option value="mock">mock (for mock workers)</option></select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-environment">
+    <div class="card">
+      <h2>Environment for all workers</h2>
+      <p class="hint">Added to every worker's environment, for example an outbound proxy (<code>HTTPS_PROXY</code>). Worker-specific values win. Names containing KEY, TOKEN, SECRET or PASSWORD are stored in Credential Manager.</p>
+      <div class="env-table" id="common_env"></div>
+      <div style="margin-top:10px"><button class="btn small" id="add_common">Add variable</button></div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-container">
+    <div class="card">
+      <h2>Container mode</h2>
+      <p class="hint">Only used when the execution mode is “Container”. Requires Docker Desktop (WSL 2, Linux containers) and API settings for every worker.</p>
+      <div class="grid">
+        <div class="field wide"><label for="image">Worker image</label><input type="text" id="image" spellcheck="false"></div>
+        <div class="field"><label for="network_mode">Network mode</label><input type="text" id="network_mode" spellcheck="false"><span class="help">Under Docker Desktop, “host” is the Docker VM's network.</span></div>
+        <div class="field">
+          <label for="container_completed">Finished containers</label>
+          <select id="container_completed"><option value="stop">Stop (keep for inspection)</option><option value="remove">Remove</option></select>
+        </div>
+        <div class="field wide"><label for="cap_add">Extra Linux capabilities</label><input type="text" id="cap_add" placeholder="e.g. NET_RAW NET_ADMIN" spellcheck="false"><span class="help">Space-separated. Only add what tasks truly need.</span></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span class="chip" id="status">Dispatcher …</span>
+  <button class="btn small" id="dispatcher_toggle">Start</button>
+  <span class="grow"></span>
+  <button class="btn" id="close">Close</button>
+  <button class="btn primary" id="save">Save</button>
+</footer>
+
+<div class="toast" id="toast" role="status"></div>
+<div class="modal-bg" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal_title">
+  <div class="modal">
+    <h3 id="modal_title"></h3>
+    <p id="modal_text"></p>
+    <div class="actions"><button class="btn" id="modal_no"></button><button class="btn primary" id="modal_yes"></button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const TABS = {
+  general: ["General", "Where projects live and how the app behaves."],
+  workers: ["Workers & API keys", "The AI agents that do the work. Keys are saved in Windows Credential Manager."],
+  performance: ["Performance", "Concurrency limits and time budgets for each kind of task."],
+  environment: ["Environment", "Variables passed to every worker process."],
+  container: ["Container mode", "Settings for running workers in Docker containers."],
+};
+let META = null, STATE = null, workers = [], commonEnv = [], dirty = false;
+const $ = (id) => document.getElementById(id);
+
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "value") el.value = v;
+    else if (k === "checked") el.checked = !!v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  return el;
+}
+const isSecret = (key) => /(API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)/i.test(key || "");
+const markDirty = () => { dirty = true; };
+let toastTimer;
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600); }
+function ask(title, text, yes, no) {
+  return new Promise((resolve) => {
+    $("modal_title").textContent = title; $("modal_text").textContent = text;
+    $("modal_yes").textContent = yes; $("modal_no").textContent = no;
+    const done = (v) => { $("modal").classList.remove("show"); resolve(v); };
+    $("modal_yes").onclick = () => done(true); $("modal_no").onclick = () => done(false);
+    $("modal").classList.add("show"); $("modal_yes").focus();
+  });
+}
+
+// ---------------------------------------------------------------- tabs
+function showTab(name) {
+  document.querySelectorAll("nav button[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll("section.tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + name));
+  $("tab-title").textContent = TABS[name][0]; $("tab-desc").textContent = TABS[name][1];
+}
+document.querySelectorAll("nav button[data-tab]").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+// ---------------------------------------------------------------- env rows
+// A row: {key, value, secret, saved, action: keep|set|clear}
+function envRow(row, list, rerender, opts = {}) {
+  const secret = isSecret(row.key);
+  // Re-render only when the name is committed (blur/Enter) so typing keeps focus.
+  const keyInput = h("input", { type: "text", value: row.key, placeholder: "NAME", spellcheck: "false", "aria-label": "Variable name",
+    oninput: (e) => { row.key = e.target.value.trim(); markDirty(); },
+    onchange: () => { if (isSecret(row.key) !== secret) { row.value = ""; row.action = "keep"; row.saved = false; rerender(); } } });
+  const valueInput = secretInput(row);
+  const remove = h("button", { class: "btn small danger", title: "Remove variable", "aria-label": "Remove variable",
+    onclick: () => { list.splice(list.indexOf(row), 1); rerender(); markDirty(); } }, "✕");
+  return h("div", { class: "env-row" }, keyInput, valueInput, remove);
+}
+
+function secretInput(row, placeholder = "") {
+  if (!isSecret(row.key)) {
+    return h("input", { type: "text", value: row.value || "", placeholder, spellcheck: "false", "aria-label": row.key || "Value",
+      oninput: (e) => { row.value = e.target.value; markDirty(); } });
+  }
+  const wrap = h("div", { class: "field" });
+  const render = () => {
+    wrap.replaceChildren();
+    const clearing = row.action === "clear";
+    const input = h("input", { type: "password", value: row.action === "set" ? row.value || "" : "", autocomplete: "off", "aria-label": row.key,
+      placeholder: clearing ? "Will be removed when you save" : row.saved ? "Saved — leave empty to keep" : (placeholder || "Not set"),
+      disabled: clearing,
+      oninput: (e) => { row.value = e.target.value; row.action = e.target.value ? "set" : "keep"; markDirty(); } });
+    const line = h("div", { class: "row" }, input);
+    wrap.append(line);
+    if (row.saved) {
+      const tag = clearing
+        ? h("span", { class: "remove-tag" }, "Will be removed · ", h("button", { class: "link", onclick: () => { row.action = "keep"; render(); } }, "undo"))
+        : h("span", { class: "saved-tag" }, "✓ Saved in Credential Manager · ", h("button", { class: "link", onclick: () => { row.action = "clear"; row.value = ""; render(); markDirty(); } }, "remove"));
+      wrap.append(tag);
+    }
+  };
+  render();
+  return wrap;
+}
+
+// ---------------------------------------------------------------- workers
+function workerFields(w) { return (META.worker_types[w.type] || { fields: [] }).fields; }
+function rowFor(w, key) {
+  let row = w.env.find(r => r.key === key);
+  if (!row) { row = { key, value: "", secret: isSecret(key), saved: false, action: "keep" }; w.env.push(row); }
+  return row;
+}
+
+function renderWorkers() {
+  const box = $("workers"); box.replaceChildren();
+  if (!workers.length) box.append(h("div", { class: "empty" }, "No workers yet. Add one below — Cairn needs at least one."));
+  const execution = $("execution").value;
+  workers.forEach((w) => box.append(renderWorker(w, execution)));
+}
+
+function renderWorker(w, execution) {
+  const spec = META.worker_types[w.type] || { label: w.type, fields: [], local_note: "" };
+  const fieldKeys = new Set(spec.fields.map(f => f.key));
+  const result = h("pre", { class: "result", hidden: true });
+  const titleEl = h("span", { class: "title" }, w.name || "(unnamed worker)");
+  const head = h("div", { class: "worker-head" },
+    titleEl, h("span", { class: "type" }, spec.label),
+    h("button", { class: "btn small", onclick: () => testWorker(w, result) }, "Test"),
+    h("button", { class: "btn small danger", onclick: () => { workers.splice(workers.indexOf(w), 1); renderWorkers(); markDirty(); } }, "Remove"));
+
+  const basics = h("div", { class: "grid" },
+    h("div", { class: "field" }, h("label", {}, "Name"),
+      h("input", { type: "text", value: w.name, spellcheck: "false", oninput: (e) => { w.name = e.target.value.trim(); titleEl.textContent = w.name || "(unnamed worker)"; markDirty(); } })),
+    h("div", { class: "field" }, h("label", {}, "Type"),
+      h("select", { onchange: (e) => { w.type = e.target.value; w.env = w.env.filter(r => !r.key || !Object.values(META.worker_types).some(t => t.fields.some(f => f.key === r.key)) ); renderWorkers(); markDirty(); } },
+        Object.entries(META.worker_types).map(([t, s]) => h("option", { value: t, selected: t === w.type }, s.label)))),
+    h("div", { class: "field" }, h("label", {}, "Max running at once"),
+      h("input", { type: "number", min: 1, value: w.max_running, oninput: (e) => { w.max_running = e.target.value; markDirty(); } })),
+    h("div", { class: "field" }, h("label", {}, "Priority"),
+      h("input", { type: "number", min: 0, value: w.priority, oninput: (e) => { w.priority = e.target.value; markDirty(); } }),
+      h("span", { class: "help" }, "Lower numbers are preferred.")),
+    h("div", { class: "field wide" }, h("label", {}, "Used for"),
+      h("div", { class: "checks" }, META.task_types.map(t => h("label", {},
+        h("input", { type: "checkbox", checked: w.task_types.includes(t), onchange: (e) => {
+          w.task_types = e.target.checked ? [...new Set([...w.task_types, t])] : w.task_types.filter(x => x !== t); markDirty(); } }),
+        t[0].toUpperCase() + t.slice(1))))));
+
+  const body = h("div", { class: "worker-body" }, basics);
+
+  if (execution === "local" && spec.binary) {
+    const path = META.cli[w.type];
+    body.append(h("div", { class: "note" }, path ? `✓ ${spec.binary} CLI found: ${path}` : `✗ ${spec.binary} CLI not found on PATH — install it, then restart Cairn.`));
+  }
+
+  if (spec.fields.length) {
+    const grid = h("div", { class: "grid" });
+    spec.fields.forEach(f => {
+      const row = rowFor(w, f.key);
+      let control;
+      if (f.choices) {
+        control = h("select", { onchange: (e) => { row.value = e.target.value; markDirty(); } },
+          h("option", { value: "" }, "—"), f.choices.map(c => h("option", { value: c, selected: row.value === c }, c)));
+      } else control = secretInput(row, f.placeholder);
+      grid.append(h("div", { class: "field" }, h("label", {}, f.label, " ", h("code", {}, f.key)), control));
+    });
+    body.append(h("div", {}, h("p", { class: "subhead" }, "API connection"),
+      h("div", { class: "note", style: "margin:6px 0 12px" }, execution === "local" ? spec.local_note : "Required in container mode."), grid));
+  } else if (spec.local_note) {
+    body.append(h("div", { class: "note" }, spec.local_note));
+  }
+
+  const extras = w.env.filter(r => !fieldKeys.has(r.key));
+  const table = h("div", { class: "env-table" });
+  const rerender = () => renderWorkers();
+  extras.forEach(r => table.append(envRow(r, w.env, rerender)));
+  body.append(h("div", {}, h("p", { class: "subhead", style: "margin-bottom:8px" }, "Additional environment variables"), table,
+    h("div", { style: "margin-top:8px" }, h("button", { class: "btn small", onclick: () => { w.env.push({ key: "", value: "", action: "keep", saved: false }); renderWorkers(); } }, "Add variable"))));
+  body.append(result);
+  return h("div", { class: "worker" }, head, body);
+}
+
+function workerPayload(w) {
+  return {
+    original_name: w.original_name, name: w.name, type: w.type, task_types: w.task_types,
+    max_running: w.max_running, priority: w.priority,
+    env: w.env.filter(r => r.key).map(r => ({ key: r.key, value: r.value || "", action: r.action || "keep" })),
+  };
+}
+
+async function testWorker(w, el) {
+  el.hidden = false; el.className = "result busy"; el.textContent = "Testing…";
+  const res = await pywebview.api.test_worker(workerPayload(w), $("execution").value);
+  el.className = "result " + (res.ok ? "ok" : "err"); el.textContent = res.message;
+}
+
+// ---------------------------------------------------------------- common env
+function renderCommon() {
+  const box = $("common_env"); box.replaceChildren();
+  if (!commonEnv.length) box.append(h("div", { class: "help" }, "No variables."));
+  commonEnv.forEach(r => box.append(envRow(r, commonEnv, renderCommon)));
+}
+
+// ---------------------------------------------------------------- load / collect
+const num = (id) => $(id).value;
+function load(state) {
+  STATE = state; META = state.meta;
+  const s = state.settings, d = s.dispatch, r = d.runtime, t = d.tasks;
+  $("version").textContent = "Cairn " + META.version;
+  $("execution").value = r.execution; $("completed_action").value = d.local.completed_action;
+  $("workspace_root").value = d.local.workspace_root || META.default_workspace;
+  $("port").value = s.desktop.port; $("log_level").value = s.desktop.log_level; $("autostart").checked = s.desktop.autostart_dispatcher;
+  for (const k of ["max_workers", "max_running_projects", "max_project_workers", "interval", "healthcheck_timeout"]) $(k).value = r[k];
+  $("worker_healthcheck").value = r.worker_healthcheck; $("prompt_group").value = r.prompt_group;
+  $("bootstrap_timeout").value = t.bootstrap.timeout; $("bootstrap_conclude").value = t.bootstrap.conclude_timeout;
+  $("reason_timeout").value = t.reason.timeout; $("reason_max_intents").value = t.reason.max_intents;
+  $("explore_timeout").value = t.explore.timeout; $("explore_conclude").value = t.explore.conclude_timeout;
+  $("image").value = d.container.image; $("network_mode").value = d.container.network_mode;
+  $("container_completed").value = d.container.completed_action; $("cap_add").value = (d.container.cap_add || []).join(" ");
+  workers = d.workers.map(w => ({ ...w, original_name: w.name, env: w.env.map(e => ({ ...e, action: "keep" })) }));
+  commonEnv = d.common_env.map(e => ({ ...e, action: "keep" }));
+  $("new_type").replaceChildren(...Object.entries(META.worker_types).map(([k, v]) => h("option", { value: k }, v.label)));
+  renderWorkers(); renderCommon(); setStatus(state.status);
+  $("banners").replaceChildren();
+  if (META.first_run) $("banners").append(h("div", { class: "banner info" },
+    h("strong", {}, "Welcome to Cairn. "), "Check the projects folder and your worker below, then click ", h("strong", {}, "Save & start"), ". With Claude Code installed and logged in, the defaults work as they are."));
+  $("save").textContent = META.first_run ? "Save & start" : "Save";
+  dirty = false;
+}
+
+function collect() {
+  const d = STATE.settings.dispatch;
+  return {
+    desktop: { port: num("port"), log_level: $("log_level").value, autostart_dispatcher: $("autostart").checked },
+    dispatch: {
+      runtime: { ...d.runtime, execution: $("execution").value, worker_healthcheck: $("worker_healthcheck").value, prompt_group: $("prompt_group").value,
+        max_workers: num("max_workers"), max_running_projects: num("max_running_projects"), max_project_workers: num("max_project_workers"),
+        interval: num("interval"), healthcheck_timeout: num("healthcheck_timeout") },
+      tasks: {
+        bootstrap: { timeout: num("bootstrap_timeout"), conclude_timeout: num("bootstrap_conclude") },
+        reason: { timeout: num("reason_timeout"), max_intents: num("reason_max_intents") },
+        explore: { timeout: num("explore_timeout"), conclude_timeout: num("explore_conclude") },
+      },
+      local: { workspace_root: $("workspace_root").value, completed_action: $("completed_action").value },
+      container: { image: $("image").value.trim(), network_mode: $("network_mode").value.trim(), completed_action: $("container_completed").value, cap_add: $("cap_add").value },
+      common_env: commonEnv.filter(r => r.key).map(r => ({ key: r.key, value: r.value || "", action: r.action || "keep" })),
+      workers: workers.map(workerPayload),
+    },
+  };
+}
+
+// ---------------------------------------------------------------- status
+function setStatus(st) {
+  const chip = $("status"); chip.className = "chip " + st.state; chip.textContent = st.text + (st.state === "failed" && st.returncode !== null ? ` (exit ${st.returncode})` : "");
+  const btn = $("dispatcher_toggle");
+  btn.textContent = st.state === "running" ? "Stop" : "Start"; btn.disabled = st.state === "stopping";
+}
+async function pollStatus() { try { setStatus(await pywebview.api.status()); } catch (e) {} }
+
+// ---------------------------------------------------------------- actions
+async function save() {
+  const first = META.first_run;
+  $("save").disabled = true;
+  try {
+    const res = await pywebview.api.save(collect());
+    if (!res.ok) {
+      $("banners").replaceChildren(h("div", { class: "banner error", role: "alert" }, h("strong", {}, "Not saved — please fix:"),
+        h("ul", {}, res.errors.map(e => h("li", {}, e)))));
+      $("main").scrollTop = 0; return;
+    }
+    load(res.state);
+    toast("Settings saved");
+    if (res.port_changed) $("banners").append(h("div", { class: "banner info" }, "The new server port is used the next time Cairn starts."));
+    if (first) { setStatus(await pywebview.api.start_dispatcher()); toast("Saved — dispatcher starting"); }
+    else if (res.dispatcher_running && await ask("Restart the dispatcher?", "The new settings apply after a restart. Agent tasks that are running now will be interrupted.", "Restart now", "Later")) {
+      setStatus(await pywebview.api.restart_dispatcher()); toast("Dispatcher restarted");
+    }
+  } finally { $("save").disabled = false; }
+}
+
+async function toggleDispatcher() {
+  const btn = $("dispatcher_toggle"); btn.disabled = true;
+  try {
+    if (btn.textContent === "Stop") {
+      if (!await ask("Stop the dispatcher?", "Agent tasks that are running now will be interrupted.", "Stop", "Cancel")) return;
+      setStatus(await pywebview.api.stop_dispatcher());
+    } else {
+      if (dirty && await ask("Save changes first?", "You have unsaved changes. The dispatcher starts with the last saved settings.", "Save & start", "Start anyway")) { await save(); }
+      setStatus(await pywebview.api.start_dispatcher());
+    }
+  } finally { btn.disabled = false; }
+}
+
+async function closeWindow() {
+  if (dirty && !await ask("Discard changes?", "You have unsaved changes.", "Discard", "Keep editing")) return;
+  pywebview.api.close();
+}
+
+function wire() {
+  $("save").addEventListener("click", save);
+  $("close").addEventListener("click", closeWindow);
+  $("dispatcher_toggle").addEventListener("click", toggleDispatcher);
+  $("execution").addEventListener("change", () => { renderWorkers(); markDirty(); });
+  $("browse").addEventListener("click", async () => { const p = await pywebview.api.browse_folder($("workspace_root").value); if (p) { $("workspace_root").value = p; markDirty(); } });
+  $("open_workspace").addEventListener("click", () => pywebview.api.open_path($("workspace_root").value));
+  document.querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", () => pywebview.api.open_folder(b.dataset.open)));
+  $("add_worker").addEventListener("click", () => {
+    const type = $("new_type").value; let n = 1; const base = type === "claudecode" ? "claude" : type;
+    while (workers.some(w => w.name === `${base}-${n}`)) n++;
+    workers.push({ name: `${base}-${n}`, original_name: `${base}-${n}`, type, task_types: [...META.task_types], max_running: 1, priority: workers.length, env: [] });
+    renderWorkers(); markDirty();
+    $("workers").lastElementChild?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  $("add_common").addEventListener("click", () => { commonEnv.push({ key: "", value: "", action: "keep" }); renderCommon(); });
+  document.querySelectorAll("main input, main select").forEach(el => el.addEventListener("input", markDirty));
+  document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); save(); } if (e.key === "Escape" && $("modal").classList.contains("show")) $("modal_no").click(); });
+}
+
+async function init() {
+  wire(); showTab("general");
+  const state = await pywebview.api.get_state();
+  $("loading").remove(); load(state);
+  if (META.first_run) showTab("general");
+  setInterval(pollStatus, 2000);
+}
+if (window.pywebview && window.pywebview.api) init(); else window.addEventListener("pywebviewready", init);
+</script>
+</body>
+</html>
