@@ -18,7 +18,7 @@ NUMS = tuple(int(x) for x in (VERSION.split(".") + ["0", "0", "0"])[:4])
 datas = collect_data_files("cairn", includes=["**/*.html", "**/*.js", "**/*.css", "**/*.svg", "**/*.md",
                                                "**/*.ico", "**/*.png"])
 datas += collect_data_files("webview")
-datas += [(str(ROOT / "README-WINDOWS.md"), "."), (str(ROOT / "LICENSE"), ".")]
+datas += [(str(ROOT / "README.md"), "."), (str(ROOT / "LICENSE"), ".")]
 
 hiddenimports = (
     collect_submodules("cairn")
