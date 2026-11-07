@@ -87,6 +87,7 @@ class ProjectSummary(ProjectMeta):
     working_intent_count: int
     unclaimed_intent_count: int
     hint_count: int
+    hint_digest: str = ""
 
 
 class ProjectDetail(BaseModel):
@@ -130,6 +131,18 @@ class CreateHintRequest(BaseModel):
     creator: str
 
     @field_validator("content", "creator")
+    @classmethod
+    def validate_non_empty_text(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("must not be empty")
+        return text
+
+
+class UpdateHintRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
     @classmethod
     def validate_non_empty_text(cls, value: str) -> str:
         text = value.strip()

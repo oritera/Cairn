@@ -471,6 +471,7 @@ class DispatcherLoop:
             intent_id=None,
             fact_count=len(project.facts),
             hint_count=len(project.hints),
+            hint_digest=self._compute_hint_digest(project),
             open_intent_count=self._project_open_intent_count(project),
             started_at=time.monotonic(),
         )
@@ -757,6 +758,10 @@ class DispatcherLoop:
         LOG.info("created bootstrap intent project=%s intent=%s", project_id, intent.id)
         return intent
 
+    @staticmethod
+    def _compute_hint_digest(project: ProjectDetail) -> str:
+        return ";".join(f"{h.id}:{len(h.content)}" for h in project.hints)
+
     def _reason_trigger(self, project: ProjectDetail) -> str | None:
         open_intent_count = self._project_open_intent_count(project)
         checkpoint = self.reason_checkpoints.get(project.project.id)
@@ -765,7 +770,8 @@ class DispatcherLoop:
         changes: list[str] = []
         if len(project.facts) > checkpoint.fact_count:
             changes.append(f"facts:{checkpoint.fact_count}->{len(project.facts)}")
-        if len(project.hints) > checkpoint.hint_count:
+        current_digest = self._compute_hint_digest(project)
+        if len(project.hints) != checkpoint.hint_count or current_digest != checkpoint.hint_digest:
             changes.append(f"hints:{checkpoint.hint_count}->{len(project.hints)}")
         if checkpoint.open_intent_count > 0 and open_intent_count == 0:
             changes.append(f"open_intents:{checkpoint.open_intent_count}->0")
@@ -822,10 +828,12 @@ class DispatcherLoop:
                 if outcome == "success" and task.task_type == "reason":
                     assert task.fact_count is not None
                     assert task.hint_count is not None
+                    assert task.hint_digest is not None
                     assert task.open_intent_count is not None
                     self.reason_checkpoints[task.project_id] = ReasonCheckpoint(
                         fact_count=task.fact_count,
                         hint_count=task.hint_count,
+                        hint_digest=task.hint_digest,
                         open_intent_count=task.open_intent_count,
                     )
                     LOG.debug(
@@ -924,6 +932,7 @@ class DispatcherLoop:
             self.reason_checkpoints[summary.id] = ReasonCheckpoint(
                 fact_count=summary.fact_count,
                 hint_count=summary.hint_count,
+                hint_digest=summary.hint_digest,
                 open_intent_count=open_intent_count,
             )
             LOG.debug(

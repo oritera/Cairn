@@ -1138,21 +1138,43 @@
           </div>
         </template>
         <template x-for="h in project.hints" :key="h.id">
-          <button type="button" @click="openHintTimelineEntry(h.id)"
-            class="w-full text-left rounded-2xl border border-amber-200/80 bg-white shadow-sm overflow-hidden transition hover:bg-amber-50/40">
+          <div class="w-full text-left rounded-2xl border border-amber-200/80 bg-white shadow-sm overflow-hidden transition hover:bg-amber-50/40">
             <div class="px-4 py-3 border-b border-amber-100 bg-amber-50/80">
               <div class="flex items-center justify-between gap-3 text-[11px]">
-                <div class="flex items-center gap-2 min-w-0">
+                <div class="flex items-center gap-2 min-w-0 cursor-pointer" @click="openHintTimelineEntry(h.id)">
                   <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
-                  <span class="font-medium text-amber-800 truncate" x-text="h.creator"></span>
+                  <span class="font-medium text-amber-800 truncate" x-text="h.id + ' · ' + h.creator"></span>
                 </div>
-                <span class="text-amber-600/80 shrink-0 tabular-nums" x-text="formatTime(h.created_at)"></span>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="text-amber-600/80 tabular-nums" x-text="formatTime(h.created_at)"></span>
+                  <button type="button" @click.stop="startEditHint(h)" title="Edit"
+                    class="p-1 rounded hover:bg-amber-200/60 text-amber-500 hover:text-amber-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button type="button" @click.stop="deleteHint(h.id)" title="Delete"
+                    class="p-1 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                  </button>
+                </div>
               </div>
             </div>
-            <div class="p-4">
-              <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="h.content"></p>
-            </div>
-          </button>
+            <template x-if="editingHint && editingHint.id === h.id">
+              <div class="p-4 space-y-2">
+                <textarea x-model="editingHint.content" rows="5"
+                  class="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400 transition"></textarea>
+                <div class="flex gap-2 justify-end">
+                  <button @click="editingHint = null" class="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 transition">Cancel</button>
+                  <button @click="saveEditHint()" :disabled="!editingHint.content.trim()"
+                    class="px-3 py-1.5 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition disabled:opacity-40">Save</button>
+                </div>
+              </div>
+            </template>
+            <template x-if="!editingHint || editingHint.id !== h.id">
+              <div class="p-4 cursor-pointer" @click="openHintTimelineEntry(h.id)">
+                <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="h.content"></p>
+              </div>
+            </template>
+          </div>
         </template>
       </div>
 
@@ -1681,6 +1703,7 @@ function cairnApp() {
     concludeForm: { description: '', intentId: '' },
     completeForm: { description: '' },
     hintForm: { content: '' },
+    editingHint: null,
     reopenForm: { projectId: '', projectTitle: '', description: '' },
     renameForm: { projectId: '', originalTitle: '', title: '' },
     localPrefs: { actor_name: 'Human', layout_mode: 'dagre_tb' },
@@ -4278,6 +4301,30 @@ function cairnApp() {
         await this.loadProject(this.selectedProjectId);
         this.sideTab = 'hints';
         this.showToast('Hint added');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    startEditHint(h) {
+      this.editingHint = { id: h.id, content: h.content };
+    },
+
+    async saveEditHint() {
+      if (!this.editingHint || !this.editingHint.content.trim()) return;
+      try {
+        await this.api('PUT', `/projects/${this.selectedProjectId}/hints/${this.editingHint.id}`, { content: this.editingHint.content });
+        this.editingHint = null;
+        await this.loadProject(this.selectedProjectId);
+        this.showToast('Hint updated');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async deleteHint(hintId) {
+      if (!confirm(`Delete hint ${hintId}?`)) return;
+      try {
+        await this.api('DELETE', `/projects/${this.selectedProjectId}/hints/${hintId}`);
+        await this.loadProjects();
+        await this.loadProject(this.selectedProjectId);
+        this.showToast('Hint deleted');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 

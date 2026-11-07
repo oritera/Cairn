@@ -52,7 +52,8 @@ def list_projects():
                 (SELECT COUNT(*) FROM intents WHERE project_id = p.id) AS intent_count,
                 (SELECT COUNT(*) FROM intents WHERE project_id = p.id AND concluded_at IS NULL AND worker IS NOT NULL) AS working_intent_count,
                 (SELECT COUNT(*) FROM intents WHERE project_id = p.id AND concluded_at IS NULL AND worker IS NULL) AS unclaimed_intent_count,
-                (SELECT COUNT(*) FROM hints WHERE project_id = p.id) AS hint_count
+                (SELECT COUNT(*) FROM hints WHERE project_id = p.id) AS hint_count,
+                COALESCE((SELECT GROUP_CONCAT(id || ':' || LENGTH(content), ';') FROM hints WHERE project_id = p.id ORDER BY id), '') AS hint_digest
             FROM projects p
             ORDER BY p.created_at
         """).fetchall()
@@ -69,6 +70,7 @@ def list_projects():
                 working_intent_count=row["working_intent_count"],
                 unclaimed_intent_count=row["unclaimed_intent_count"],
                 hint_count=row["hint_count"],
+                hint_digest=row["hint_digest"],
             )
             for row in rows
         ]
