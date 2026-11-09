@@ -327,8 +327,7 @@ def _guard_refusals(text: str) -> None:
 # --------------------------------------------------------------------------- #
 def _run_claude(exe: str, model: str | None, prompt: str) -> str:
     # Pure text->JSON transform: disable all tools so the model answers directly.
-    cmd = [exe, "-p", "--tools", "", "--max-turns", "1",
-           "--output-format", "text", "--max-tokens", str(_MAX_TOKENS)]
+    cmd = [exe, "-p", "--tools", "", "--max-turns", "1", "--output-format", "text"]
     if model:
         cmd += ["--model", model]
     proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=TIMEOUT_S)
