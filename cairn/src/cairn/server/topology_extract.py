@@ -36,7 +36,7 @@ from pathlib import Path
 TIMEOUT_S = int(os.environ.get("CAIRN_TOPO_TIMEOUT", "300"))
 # Generous output budget: "thinking" models (e.g. GLM) spend part of it on
 # reasoning tokens, so a small cap leaves nothing for the JSON itself.
-_MAX_TOKENS = int(os.environ.get("CAIRN_TOPO_MAX_TOKENS", "16384"))
+_MAX_TOKENS = int(os.environ.get("CAIRN_TOPO_MAX_TOKENS", "32768"))
 
 # Host-CLI extractor options. `cli` must be on PATH for the option to be usable.
 _MODELS: list[dict] = [
@@ -327,7 +327,8 @@ def _guard_refusals(text: str) -> None:
 # --------------------------------------------------------------------------- #
 def _run_claude(exe: str, model: str | None, prompt: str) -> str:
     # Pure text->JSON transform: disable all tools so the model answers directly.
-    cmd = [exe, "-p", "--tools", "", "--max-turns", "1"]
+    cmd = [exe, "-p", "--tools", "", "--max-turns", "1",
+           "--output-format", "text", "--max-tokens", str(_MAX_TOKENS)]
     if model:
         cmd += ["--model", model]
     proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=TIMEOUT_S)
