@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -268,3 +269,37 @@ def get_dashboard():
         "telemetry": telemetry,
         "supervisor": supervisor,
     }
+
+
+_TMP_CLEANUP_DIRS = ["cairn-prompts"]
+
+
+@router.post("/dashboard/cleanup-tmp")
+def cleanup_tmp():
+    """Remove known temp garbage directories from /tmp."""
+    freed_mb = 0.0
+    removed: list[str] = []
+    errors: list[str] = []
+    for name in _TMP_CLEANUP_DIRS:
+        target = Path("/tmp") / name
+        if not target.exists():
+            continue
+        try:
+            size = sum(f.stat().st_size for f in target.rglob("*") if f.is_file())
+            shutil.rmtree(target)
+            freed_mb += size / 1024**2
+            removed.append(name)
+        except OSError as exc:
+            try:
+                for f in target.rglob("*"):
+                    if f.is_file():
+                        try:
+                            sz = f.stat().st_size
+                            f.unlink()
+                            freed_mb += sz / 1024**2
+                        except OSError:
+                            pass
+                removed.append(f"{name} (partial)")
+            except OSError:
+                errors.append(f"{name}: {exc}")
+    return {"freed_mb": round(freed_mb, 1), "removed": removed, "errors": errors}

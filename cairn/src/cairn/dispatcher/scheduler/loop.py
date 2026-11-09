@@ -1112,6 +1112,12 @@ class DispatcherLoop:
             host["disk_total_gb"] = round(usage.total / 1024**3, 1)
         except OSError:
             pass
+        try:
+            tmp_usage = shutil.disk_usage("/tmp")
+            host["tmp_free_mb"] = round(tmp_usage.free / 1024**2, 1)
+            host["tmp_total_mb"] = round(tmp_usage.total / 1024**2, 1)
+        except OSError:
+            pass
         return host
 
     def _collect_container_stats(self) -> list[dict]:

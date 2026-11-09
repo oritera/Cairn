@@ -698,6 +698,19 @@
                         <span class="font-mono text-slate-700" x-text="(dash.data.telemetry.snapshot.host.disk_total_gb-dash.data.telemetry.snapshot.host.disk_free_gb).toFixed(1)+' / '+dash.data.telemetry.snapshot.host.disk_total_gb.toFixed(1)+' GB'"></span></div>
                       <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-slate-300" :style="`width:${dashPct(dash.data.telemetry.snapshot.host.disk_total_gb-dash.data.telemetry.snapshot.host.disk_free_gb,dash.data.telemetry.snapshot.host.disk_total_gb)}%`"></div></div>
                     </div>
+                    <template x-if="dash.data.telemetry.snapshot.host.tmp_total_mb">
+                    <div>
+                      <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-500 flex items-center gap-1">/tmp
+                          <button type="button" @click="cleanupTmp()" title="Clean /tmp/cairn-prompts"
+                            class="p-0.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 transition">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                          </button>
+                        </span>
+                        <span class="font-mono text-slate-700" x-text="(dash.data.telemetry.snapshot.host.tmp_total_mb-dash.data.telemetry.snapshot.host.tmp_free_mb).toFixed(0)+' / '+dash.data.telemetry.snapshot.host.tmp_total_mb.toFixed(0)+' MB'"></span></div>
+                      <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full" :class="dashPct(dash.data.telemetry.snapshot.host.tmp_total_mb-dash.data.telemetry.snapshot.host.tmp_free_mb,dash.data.telemetry.snapshot.host.tmp_total_mb)>85?'bg-red-400':'bg-amber-400'" :style="`width:${dashPct(dash.data.telemetry.snapshot.host.tmp_total_mb-dash.data.telemetry.snapshot.host.tmp_free_mb,dash.data.telemetry.snapshot.host.tmp_total_mb)}%`"></div></div>
+                    </div>
+                    </template>
                     <div class="flex items-center justify-between text-xs">
                       <span class="text-slate-500">CPU load (1m)</span>
                       <span class="font-mono text-slate-700" x-text="dash.data.telemetry.snapshot.host.cpu_load1"></span>
@@ -4325,6 +4338,15 @@ function cairnApp() {
         await this.loadProjects();
         await this.loadProject(this.selectedProjectId);
         this.showToast('Hint deleted');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async cleanupTmp() {
+      if (!confirm('Clean /tmp dispatcher garbage (cairn-prompts)?')) return;
+      try {
+        const r = await this.api('POST', '/dashboard/cleanup-tmp');
+        const msg = r.removed.length ? `Freed ${r.freed_mb} MB (${r.removed.join(', ')})` : 'Nothing to clean';
+        this.showToast(msg);
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 
