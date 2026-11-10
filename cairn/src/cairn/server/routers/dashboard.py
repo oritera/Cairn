@@ -232,7 +232,7 @@ def _activity_feed(conn, now: datetime, limit: int = 10) -> dict:
                 "project_title": p["title"],
                 "kind": "explore",
                 "id": ir["id"],
-                "description": (ir["description"] or "")[:300],
+                "description": ir["description"] or "",
                 "worker": ir["worker"],
                 "elapsed_s": _age_seconds(ir["created_at"], now),
             })
@@ -259,7 +259,7 @@ def _activity_feed(conn, now: datetime, limit: int = 10) -> dict:
             "id": f["id"],
             "project": f["project_id"],
             "project_title": f["project_title"],
-            "description": (f["description"] or "")[:300],
+            "description": f["description"] or "",
         })
     recent_intents = []
     for i in conn.execute(
@@ -273,7 +273,7 @@ def _activity_feed(conn, now: datetime, limit: int = 10) -> dict:
             "id": i["id"],
             "project": i["project_id"],
             "project_title": i["project_title"],
-            "description": (i["description"] or "")[:300],
+            "description": i["description"] or "",
             "concluded_age_s": _age_seconds(i["concluded_at"], now),
         })
     return {"running": running, "recent_facts": recent_facts, "recent_intents": recent_intents}
