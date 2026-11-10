@@ -595,7 +595,7 @@
                 </span>
               </template>
             </div>
-            <div class="flex items-center gap-2" x-show="dash.data">
+            <div class="flex items-center gap-3" x-show="dash.data">
               <button @click="togglePause()" :disabled="dash.saving"
                 class="px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm border transition disabled:opacity-40 inline-flex items-center gap-1.5"
                 :class="dash.data.settings.paused ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600' : 'bg-white border-amber-300 text-amber-700 hover:bg-amber-50'">
@@ -603,6 +603,11 @@
                 <svg x-show="dash.data.settings.paused" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m7 4 13 8L7 20V4Z"/></svg>
                 <span x-text="dash.data.settings.paused ? 'Resume engine' : 'Pause engine'"></span>
               </button>
+              <div class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-200">
+                <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <input type="range" min="3" max="60" step="1" x-model.number="dashRefreshSec" @change="startDashPoll()" class="w-16 accent-brand-500" title="Auto-refresh interval">
+                <span class="text-[10px] font-mono text-slate-500 w-6 text-right" x-text="dashRefreshSec + 's'"></span>
+              </div>
               <button @click="loadDashboard()" class="h-[30px] w-[30px] rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 shadow-sm inline-flex items-center justify-center" title="Refresh now">
                 <svg class="w-4 h-4" :class="dash.loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4v5h5M20 20v-5h-5"/><path d="M20 9a8 8 0 0 0-14.3-3.3L4 9M4 15a8 8 0 0 0 14.3 3.3L20 15"/></svg>
               </button>
@@ -1740,6 +1745,7 @@ function cairnApp() {
     topoModelOpen: false,
     dash: { data: null, loading: false, saving: false, error: null },
     dashTimer: null,
+    dashRefreshSec: 10,
     wizard: { open: false, step: 1, loading: false, saving: false, applying: false, error: null,
               presets: [], fieldHelp: {}, thinkingLevels: [''], existingConfigs: [], saved: null, form: null },
     selectedNode: null,
@@ -2910,9 +2916,10 @@ function cairnApp() {
 
     startDashPoll() {
       this.stopDashPoll();
+      const ms = this.dashRefreshSec * 1000;
       this.dashTimer = setInterval(() => {
         if (this.graphView === 'navigation' && this.view !== 'list' && !this.dash.saving) this.loadDashboard();
-      }, 3000);
+      }, ms);
     },
 
     stopDashPoll() {
