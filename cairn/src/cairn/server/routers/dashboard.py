@@ -156,7 +156,7 @@ def _project_rows(conn, now: datetime) -> tuple:
         # running explores: claimed (worker set) + not concluded
         running = []
         for ir in conn.execute(
-            "SELECT id, worker, created_at, last_heartbeat_at FROM intents "
+            "SELECT id, description, worker, created_at, last_heartbeat_at FROM intents "
             "WHERE project_id = ? AND concluded_at IS NULL AND worker IS NOT NULL",
             (pid,),
         ).fetchall():
@@ -164,6 +164,7 @@ def _project_rows(conn, now: datetime) -> tuple:
                 {
                     "kind": "explore",
                     "id": ir["id"],
+                    "description": (ir["description"] or "")[:200],
                     "worker": ir["worker"],
                     "elapsed_s": _age_seconds(ir["created_at"], now),
                     "heartbeat_age_s": _age_seconds(ir["last_heartbeat_at"], now),
@@ -215,6 +216,69 @@ def _project_rows(conn, now: datetime) -> tuple:
     return projects, totals
 
 
+def _activity_feed(conn, now: datetime, limit: int = 10) -> dict:
+    """Running tasks with descriptions + most recent facts across all active projects."""
+    running = []
+    for p in conn.execute("SELECT id, title FROM projects WHERE status = 'active'").fetchall():
+        pid = p["id"]
+        for ir in conn.execute(
+            "SELECT id, description, worker, created_at FROM intents "
+            "WHERE project_id = ? AND concluded_at IS NULL AND worker IS NOT NULL "
+            "ORDER BY created_at DESC",
+            (pid,),
+        ).fetchall():
+            running.append({
+                "project": pid,
+                "project_title": p["title"],
+                "kind": "explore",
+                "id": ir["id"],
+                "description": (ir["description"] or "")[:300],
+                "worker": ir["worker"],
+                "elapsed_s": _age_seconds(ir["created_at"], now),
+            })
+        row = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
+        if row and row["reason_worker"]:
+            running.append({
+                "project": pid,
+                "project_title": p["title"],
+                "kind": "reason",
+                "id": None,
+                "description": row["reason_trigger"] or "planning next actions",
+                "worker": row["reason_worker"],
+                "elapsed_s": _age_seconds(row["reason_started_at"], now),
+            })
+    recent_facts = []
+    for f in conn.execute(
+        "SELECT f.id, f.project_id, f.description, p.title as project_title "
+        "FROM facts f JOIN projects p ON f.project_id = p.id "
+        "WHERE f.id NOT IN ('origin','goal') "
+        "ORDER BY CAST(REPLACE(f.id, 'f', '') AS INTEGER) DESC LIMIT ?",
+        (limit,),
+    ).fetchall():
+        recent_facts.append({
+            "id": f["id"],
+            "project": f["project_id"],
+            "project_title": f["project_title"],
+            "description": (f["description"] or "")[:300],
+        })
+    recent_intents = []
+    for i in conn.execute(
+        "SELECT i.id, i.project_id, i.description, i.concluded_at, p.title as project_title "
+        "FROM intents i JOIN projects p ON i.project_id = p.id "
+        "WHERE i.concluded_at IS NOT NULL "
+        "ORDER BY i.concluded_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall():
+        recent_intents.append({
+            "id": i["id"],
+            "project": i["project_id"],
+            "project_title": i["project_title"],
+            "description": (i["description"] or "")[:300],
+            "concluded_age_s": _age_seconds(i["concluded_at"], now),
+        })
+    return {"running": running, "recent_facts": recent_facts, "recent_intents": recent_intents}
+
+
 def _timeline(conn, now: datetime, hours: int = 1, buckets: int = 30) -> dict:
     span = hours * 3600
     created = [0] * buckets
@@ -243,6 +307,7 @@ def get_dashboard():
         settings, ceilings = _settings_and_ceilings(conn)
         projects, totals = _project_rows(conn, now)
         timeline = _timeline(conn, now)
+        activity = _activity_feed(conn, now)
     timeouts = _parse_timeouts(log_path)
     snapshot, telemetry_at = read_latest_snapshot()
     telemetry_age = _age_seconds(telemetry_at, now)
@@ -268,6 +333,7 @@ def get_dashboard():
         "timeouts": timeouts,
         "telemetry": telemetry,
         "supervisor": supervisor,
+        "activity": activity,
     }
 
 

@@ -641,6 +641,58 @@
                 </div>
               </div>
 
+              <!-- Live Activity -->
+              <template x-if="dash.data.activity">
+              <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Live Activity</div>
+
+                <!-- Running tasks -->
+                <div x-show="dash.data.activity.running.length" class="space-y-2 mb-3">
+                  <template x-for="r in dash.data.activity.running" :key="(r.id||'reason')+r.project">
+                    <div class="rounded-lg border px-3 py-2.5" :class="r.kind==='reason' ? 'border-violet-200 bg-violet-50/50' : 'border-sky-200 bg-sky-50/50'">
+                      <div class="flex items-center justify-between gap-2 mb-1">
+                        <div class="flex items-center gap-2 min-w-0">
+                          <span class="w-2 h-2 rounded-full shrink-0 animate-pulse" :class="r.kind==='reason' ? 'bg-violet-500' : 'bg-sky-500'"></span>
+                          <span class="text-xs font-semibold" :class="r.kind==='reason' ? 'text-violet-700' : 'text-sky-700'" x-text="(r.id || 'reason') + ' · ' + r.kind"></span>
+                          <span class="text-[10px] text-slate-400 font-mono" x-text="r.worker"></span>
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-500 shrink-0" x-text="r.elapsed_s != null ? Math.round(r.elapsed_s)+'s' : ''"></span>
+                      </div>
+                      <p class="text-[11px] text-slate-600 leading-relaxed line-clamp-2" x-text="r.description"></p>
+                    </div>
+                  </template>
+                </div>
+                <div x-show="!dash.data.activity.running.length" class="text-xs text-slate-400 mb-3">No tasks running.</div>
+
+                <!-- Recent facts -->
+                <div x-show="dash.data.activity.recent_facts.length">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2 pt-2 border-t border-slate-100">Recent facts</div>
+                  <div class="space-y-1.5 max-h-48 overflow-auto">
+                    <template x-for="f in dash.data.activity.recent_facts" :key="f.id+f.project">
+                      <div class="flex gap-2 text-[11px]">
+                        <span class="font-mono text-indigo-500 shrink-0 w-8" x-text="f.id"></span>
+                        <p class="text-slate-600 line-clamp-2 leading-relaxed" x-text="f.description"></p>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Recent concluded intents -->
+                <div x-show="dash.data.activity.recent_intents.length">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2 pt-2 border-t border-slate-100 mt-2">Recently concluded</div>
+                  <div class="space-y-1.5 max-h-32 overflow-auto">
+                    <template x-for="i in dash.data.activity.recent_intents" :key="i.id+i.project">
+                      <div class="flex gap-2 text-[11px]">
+                        <span class="font-mono text-emerald-500 shrink-0 w-8" x-text="i.id"></span>
+                        <p class="text-slate-500 line-clamp-1 leading-relaxed" x-text="i.description"></p>
+                        <span class="font-mono text-slate-400 shrink-0" x-text="i.concluded_age_s != null ? (i.concluded_age_s < 60 ? Math.round(i.concluded_age_s)+'s ago' : Math.round(i.concluded_age_s/60)+'m ago') : ''"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              </template>
+
               <!-- Cost (this dispatcher run) -->
               <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Cost · this dispatcher run</div>
