@@ -20,6 +20,7 @@ from cairn.dispatcher.tasks.common import (
     did_timeout,
     project_allows_conclude_fallback,
     preview,
+    record_worker_usage,
     run_worker_process,
     task_healthcheck_enabled,
     write_conclude_result,
@@ -109,6 +110,7 @@ def run_bootstrap_task(
             cancellation=cancellation,
         )
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
+        record_worker_usage(driver, worker, first)
         session = driver.extract_session(session, first.stdout, first.stderr)
         cancelled = cancel_reason(first, cancellation)
         if cancelled is not None:
@@ -304,6 +306,7 @@ def _try_conclude_fallback(
         cancellation=cancellation,
     )
     conclude_ms = int((time.perf_counter() - conclude_started) * 1000)
+    record_worker_usage(driver, worker, result)
     cancelled = cancel_reason(result, cancellation)
     if cancelled is not None:
         LOG.info(

@@ -53,6 +53,19 @@ class WorkerDriver(abc.ABC):
     def extract_response_text(self, stdout: str, stderr: str) -> str:
         return stdout
 
+    def model_id(self, worker: WorkerConfig) -> str | None:
+        """Identifier used to price this worker's usage (see cost.py). None if unknown."""
+        return None
+
+    def extract_usage(self, stdout: str, stderr: str) -> dict | None:
+        """Summed token usage for the task, or None if the driver can't report it.
+
+        Shape: {input, output, cache_read, cache_write, provider_cost}. Token counts
+        are summed across every billable model turn (each turn re-bills its context).
+        provider_cost is the worker's own cost figure if it reports one, else 0.
+        """
+        return None
+
 
 class SeedSessionDriver(WorkerDriver):
     def prepare_session(self) -> str | None:

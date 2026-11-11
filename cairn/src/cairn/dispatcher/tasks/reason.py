@@ -20,6 +20,7 @@ from cairn.dispatcher.tasks.common import (
     cancel_reason,
     did_timeout,
     preview,
+    record_worker_usage,
     run_worker_process,
     task_healthcheck_enabled,
     write_graph_snapshot_reference,
@@ -130,6 +131,7 @@ def run_reason_task(
         )
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
         total_ms = int((time.perf_counter() - task_started) * 1000)
+        record_worker_usage(driver, worker, result)
         session = driver.extract_session(session, result.stdout, result.stderr)
         cancelled = cancel_reason(result, cancellation)
         if cancelled is not None:

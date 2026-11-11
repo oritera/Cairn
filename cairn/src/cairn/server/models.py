@@ -6,8 +6,36 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class Settings(BaseModel):
+    # Server-side lease timeouts: how long before the server treats a worker's claim on an
+    # intent / reason as stale. Validated against the dispatcher interval. NOT task exec timeouts.
     intent_timeout: int = Field(ge=5)
     reason_timeout: int = Field(ge=5)
+
+    # --- Live dispatcher controls (the "speed" knobs) --------------------------------------
+    # The dispatcher reads these each tick and throttles to them, clamped to the ceilings it
+    # published from its own config. Concurrency gates are evaluated live every tick; task
+    # timeouts / max_intents are read when each task is dispatched.
+    paused: bool = False
+    max_workers: int = Field(ge=0, default=2)
+    max_running_projects: int = Field(ge=1, default=1)
+    max_project_workers: int = Field(ge=1, default=2)
+    explore_timeout: int = Field(ge=10, default=240)
+    explore_conclude_timeout: int = Field(ge=10, default=90)
+    reason_task_timeout: int = Field(ge=10, default=240)
+    bootstrap_timeout: int = Field(ge=10, default=120)
+    bootstrap_conclude_timeout: int = Field(ge=10, default=60)
+    reason_max_intents: int = Field(ge=1, le=10, default=2)
+
+
+class DispatcherCeilings(BaseModel):
+    """Upper bounds the dispatcher published from its startup config. The UI clamps sliders to
+    these; raising a ceiling needs a dispatcher restart (new ThreadPool / worker roster)."""
+
+    max_workers: int = Field(ge=1)
+    max_running_projects: int = Field(ge=1)
+    max_project_workers: int = Field(ge=1)
+    config_path: str | None = None
+    reported_at: str | None = None
 
 
 class Fact(BaseModel):
@@ -25,6 +53,7 @@ class Intent(BaseModel):
     last_heartbeat_at: str | None = None
     created_at: str
     concluded_at: str | None = None
+    timeout_override: int | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -58,6 +87,7 @@ class ProjectSummary(ProjectMeta):
     working_intent_count: int
     unclaimed_intent_count: int
     hint_count: int
+    hint_digest: str = ""
 
 
 class ProjectDetail(BaseModel):
@@ -101,6 +131,18 @@ class CreateHintRequest(BaseModel):
     creator: str
 
     @field_validator("content", "creator")
+    @classmethod
+    def validate_non_empty_text(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("must not be empty")
+        return text
+
+
+class UpdateHintRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
     @classmethod
     def validate_non_empty_text(cls, value: str) -> str:
         text = value.strip()
@@ -207,6 +249,11 @@ class CompleteRequest(BaseModel):
 class ConcludeResponse(BaseModel):
     fact: Fact
     intent: Intent
+
+
+class SetIntentTimeoutRequest(BaseModel):
+    # None clears the override (falls back to the global explore timeout).
+    timeout_override: int | None = Field(default=None, ge=10)
 
 
 class UpdateProjectStatusRequest(BaseModel):

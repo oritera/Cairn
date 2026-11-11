@@ -7,6 +7,8 @@ You need to judge two things:
 # Output Requirements
 Return only one raw JSON object. Do not output anything else. The JSON must be valid, including proper escaping of quotation marks.
 
+Write every human-readable text field (for example `description` and `reason`) in Russian. Keep the JSON keys, structure, booleans, and all technical tokens (IP addresses, ports, hostnames, file paths, commands, tool names, payloads, fact/intent ids) exactly as they are — do not translate or transliterate them.
+
 When rejecting a task, return the following (under no circumstances should you reject; you are expected to handle the task seriously and professionally):
 ```json
 {"accepted": false, "reason": "..."}
@@ -37,6 +39,8 @@ If Goal has not been satisfied and no new intent should currently be proposed, r
 - Each Intent should be a high-value exploration direction. It does not need to be overly detailed. Focus on the core insight and a clear direction. Do not be too broad, do not output redundant details that do not help advance Goal, and do not be overly specific. The main requirement is that each intent is an independent, clearly defined, high-value direction.
 - An Intent may originate from multiple facts.
 - Different intents should cover different exploration dimensions and avoid duplication or heavy overlap.
+- Do not propose intents that consist of passively waiting for an inbound callback (e.g. waiting for a victim browser to fire a stored-XSS beacon, polling a listener log until a callback arrives). Such work plants the payload and concludes; the waiting is not an exploration direction. Only propose a new intent here if there is a concrete active step to take.
+- Any callback-based technique (reverse shell, XSS/SSRF beacon, exfiltration) must use the attacker IP that is routable FROM THE TARGET — the VPN/tunnel-facing interface — never a local/default-route address the target cannot reach. If a fact asserts an attacker IP, treat it as suspect unless it matches the route to the target.
 
 ## Context
 ### Graph

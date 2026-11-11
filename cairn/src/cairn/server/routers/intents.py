@@ -8,10 +8,12 @@ from cairn.server.models import (
     Fact,
     HeartbeatRequest,
     Intent,
+    SetIntentTimeoutRequest,
 )
 from cairn.server.services import (
     check_project_active,
     get_claimable_open_intent_or_404,
+    get_intent_or_404,
     get_releasable_open_intent_or_404,
     intent_to_model,
     next_fact_id,
@@ -145,3 +147,24 @@ def conclude(project_id: str, intent_id: str, body: ConcludeRequest):
             fact=Fact(id=fid, description=body.description),
             intent=intent_to_model(conn, updated, project_id),
         )
+
+
+@router.put(
+    "/projects/{project_id}/intents/{intent_id}/timeout",
+    response_model=Intent,
+)
+def set_intent_timeout(project_id: str, intent_id: str, body: SetIntentTimeoutRequest):
+    """Set (or clear, with null) a per-intent explore timeout override. The dispatcher reads
+    it when it dispatches this intent and uses it instead of the global explore timeout —
+    lets the operator give one choking task more time without slowing every task."""
+    with get_conn() as conn:
+        get_intent_or_404(conn, project_id, intent_id)
+        conn.execute(
+            "UPDATE intents SET timeout_override = ? WHERE id = ? AND project_id = ?",
+            (body.timeout_override, intent_id, project_id),
+        )
+        row = conn.execute(
+            "SELECT * FROM intents WHERE id = ? AND project_id = ?",
+            (intent_id, project_id),
+        ).fetchone()
+        return intent_to_model(conn, row, project_id)

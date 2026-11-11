@@ -486,10 +486,21 @@
     <!-- Graph -->
     <div class="flex-1 relative min-w-0">
       <div class="absolute top-3 left-3 z-10 flex items-center gap-1.5">
-        <button @click="fitGraph()" class="h-7 w-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 text-slate-500 hover:text-slate-700 hover:bg-white transition inline-flex items-center justify-center" title="Fit graph" aria-label="Fit graph">
+        <div class="h-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 flex items-center p-0.5 text-xs">
+          <button @click="switchGraphView('facts')" class="px-2.5 h-6 rounded-md transition font-medium"
+            :class="graphView === 'facts' ? 'bg-brand-500 text-white' : 'text-slate-500 hover:text-slate-700'">Facts</button>
+          <button @click="switchGraphView('topology')" class="px-2.5 h-6 rounded-md transition font-medium"
+            :class="graphView === 'topology' ? 'bg-brand-500 text-white' : 'text-slate-500 hover:text-slate-700'">Topology</button>
+          <button @click="switchGraphView('navigation')" class="px-2.5 h-6 rounded-md transition font-medium inline-flex items-center gap-1"
+            :class="graphView === 'navigation' ? 'bg-brand-500 text-white' : 'text-slate-500 hover:text-slate-700'" title="Engine ops dashboard">
+            <span>Navigation</span>
+            <span x-show="dash.data && dash.data.settings && dash.data.settings.paused" class="w-1.5 h-1.5 rounded-full bg-amber-400" title="paused"></span>
+          </button>
+        </div>
+        <button x-show="graphView === 'facts'" @click="fitGraph()" class="h-7 w-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 text-slate-500 hover:text-slate-700 hover:bg-white transition inline-flex items-center justify-center" title="Fit graph" aria-label="Fit graph">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         </button>
-        <select x-model="layoutMode" @change="applySelectedLayout()"
+        <select x-show="graphView === 'facts'" x-model="layoutMode" @change="applySelectedLayout()"
           class="h-7 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 px-2.5 text-xs text-slate-600 hover:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 transition">
           <option value="dagre_tb">Dagre ↓</option>
           <option value="dagre_lr">Dagre →</option>
@@ -527,7 +538,7 @@
         </div>
       </template>
 
-      <div class="absolute top-3 right-3 z-10 flex flex-wrap justify-end gap-2">
+      <div x-show="graphView === 'facts'" class="absolute top-3 right-3 z-10 flex flex-wrap justify-end gap-2">
         <div class="flex gap-1.5" x-show="projectIsActive()">
           <button @click="openCreateIntent()" :disabled="!canActOnSelectedFacts()"
             class="px-3 py-1.5 bg-white/90 backdrop-blur border border-brand-200 text-brand-600 rounded-lg shadow-sm text-xs font-medium hover:bg-brand-50 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
@@ -566,7 +577,494 @@
         </div>
       </div>
 
-      <div id="cy" class="relative z-0 flex-1 h-full"></div>
+      <div id="cy" x-show="graphView === 'facts'" class="relative z-0 flex-1 h-full"></div>
+
+      <!-- Navigation / engine ops dashboard -->
+      <div x-show="graphView === 'navigation'" class="absolute inset-0 z-0 overflow-auto bg-slate-50/80 backdrop-blur-sm">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 pb-8 pt-14 space-y-4">
+
+          <!-- Header: freshness + emergency controls -->
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-semibold text-slate-700">Engine Ops</h2>
+              <template x-if="dash.data">
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                  :class="dash.data.telemetry && !dash.data.telemetry.stale ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'">
+                  <span class="w-1.5 h-1.5 rounded-full" :class="dash.data.telemetry && !dash.data.telemetry.stale ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'"></span>
+                  <span x-text="dash.data.telemetry && !dash.data.telemetry.stale ? ('live · ' + (dash.data.telemetry.age_s!=null ? dash.data.telemetry.age_s.toFixed(1)+'s' : '')) : 'dispatcher not reporting'"></span>
+                </span>
+              </template>
+            </div>
+            <div class="flex items-center gap-3" x-show="dash.data">
+              <button @click="togglePause()" :disabled="dash.saving"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm border transition disabled:opacity-40 inline-flex items-center gap-1.5"
+                :class="dash.data.settings.paused ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600' : 'bg-white border-amber-300 text-amber-700 hover:bg-amber-50'">
+                <svg x-show="!dash.data.settings.paused" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+                <svg x-show="dash.data.settings.paused" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m7 4 13 8L7 20V4Z"/></svg>
+                <span x-text="dash.data.settings.paused ? 'Resume engine' : 'Pause engine'"></span>
+              </button>
+              <div class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-200">
+                <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <input type="range" min="3" max="60" step="1" x-model.number="dashRefreshSec" @change="startDashPoll()" class="w-16 accent-brand-500" title="Auto-refresh interval">
+                <span class="text-[10px] font-mono text-slate-500 w-6 text-right" x-text="dashRefreshSec + 's'"></span>
+              </div>
+              <button @click="loadDashboard()" class="h-[30px] w-[30px] rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 shadow-sm inline-flex items-center justify-center" title="Refresh now">
+                <svg class="w-4 h-4" :class="dash.loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4v5h5M20 20v-5h-5"/><path d="M20 9a8 8 0 0 0-14.3-3.3L4 9M4 15a8 8 0 0 0 14.3 3.3L20 15"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div x-show="dash.error" class="rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2" x-text="dash.error"></div>
+          <div x-show="!dash.data && !dash.error" class="text-xs text-slate-400 py-8 text-center">Loading engine telemetry…</div>
+
+          <template x-if="dash.data">
+            <div class="space-y-4">
+
+              <!-- Paused banner -->
+              <div x-show="dash.data.settings.paused" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+                <span>Engine paused — no new tasks are dispatched. In-flight tasks finish; nothing new starts.</span>
+              </div>
+
+              <!-- Vitals -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Active projects</div>
+                  <div class="mt-1 text-xl font-semibold text-slate-800" x-text="dash.data.vitals.active"></div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Facts</div>
+                  <div class="mt-1 text-xl font-semibold text-slate-800" x-text="dash.data.vitals.facts"></div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Open intents</div>
+                  <div class="mt-1 text-xl font-semibold text-slate-800" x-text="dash.data.vitals.open_intents"></div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Running now</div>
+                  <div class="mt-1 text-xl font-semibold text-slate-800" x-text="dash.data.vitals.running"></div>
+                </div>
+              </div>
+
+              <!-- Live Activity -->
+              <template x-if="dash.data.activity">
+              <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Live Activity</div>
+
+                <!-- Running tasks -->
+                <div x-show="dash.data.activity.running.length" class="space-y-2 mb-3">
+                  <template x-for="r in dash.data.activity.running" :key="(r.id||'reason')+r.project">
+                    <div class="rounded-lg border px-3 py-2.5 cursor-pointer hover:shadow-md transition-shadow"
+                         :class="r.kind==='reason' ? 'border-violet-200 bg-violet-50/50' : 'border-sky-200 bg-sky-50/50'"
+                         @click="activityDetail = { type: 'running', kind: r.kind, id: r.id, worker: r.worker, elapsed_s: r.elapsed_s, description: r.description, project: r.project_title || r.project }">
+                      <div class="flex items-center justify-between gap-2 mb-1">
+                        <div class="flex items-center gap-2 min-w-0">
+                          <span class="w-2 h-2 rounded-full shrink-0 animate-pulse" :class="r.kind==='reason' ? 'bg-violet-500' : 'bg-sky-500'"></span>
+                          <span class="text-xs font-semibold" :class="r.kind==='reason' ? 'text-violet-700' : 'text-sky-700'" x-text="(r.id || 'reason') + ' · ' + r.kind"></span>
+                          <span class="text-[10px] text-slate-400 font-mono" x-text="r.worker"></span>
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-500 shrink-0" x-text="r.elapsed_s != null ? Math.round(r.elapsed_s)+'s' : ''"></span>
+                      </div>
+                      <p class="text-[11px] text-slate-600 leading-relaxed line-clamp-2" x-text="r.description"></p>
+                    </div>
+                  </template>
+                </div>
+                <div x-show="!dash.data.activity.running.length" class="text-xs text-slate-400 mb-3">No tasks running.</div>
+
+                <!-- Recent facts -->
+                <div x-show="dash.data.activity.recent_facts.length">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2 pt-2 border-t border-slate-100">Recent facts</div>
+                  <div class="space-y-1.5 max-h-48 overflow-auto">
+                    <template x-for="f in dash.data.activity.recent_facts" :key="f.id+f.project">
+                      <div class="flex gap-2 text-[11px] cursor-pointer hover:bg-indigo-50/50 rounded px-1 -mx-1 py-0.5 transition-colors"
+                           @click="activityDetail = { type: 'fact', id: f.id, description: f.description, project: f.project_title || f.project }">
+                        <span class="font-mono text-indigo-500 shrink-0 w-8" x-text="f.id"></span>
+                        <p class="text-slate-600 line-clamp-2 leading-relaxed" x-text="f.description"></p>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Recent concluded intents -->
+                <div x-show="dash.data.activity.recent_intents.length">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2 pt-2 border-t border-slate-100 mt-2">Recently concluded</div>
+                  <div class="space-y-1.5 max-h-32 overflow-auto">
+                    <template x-for="i in dash.data.activity.recent_intents" :key="i.id+i.project">
+                      <div class="flex gap-2 text-[11px] cursor-pointer hover:bg-emerald-50/50 rounded px-1 -mx-1 py-0.5 transition-colors"
+                           @click="activityDetail = { type: 'intent', id: i.id, description: i.description, project: i.project_title || i.project, concluded_age_s: i.concluded_age_s }">
+                        <span class="font-mono text-emerald-500 shrink-0 w-8" x-text="i.id"></span>
+                        <p class="text-slate-500 line-clamp-1 leading-relaxed" x-text="i.description"></p>
+                        <span class="font-mono text-slate-400 shrink-0" x-text="i.concluded_age_s != null ? (i.concluded_age_s < 60 ? Math.round(i.concluded_age_s)+'s ago' : Math.round(i.concluded_age_s/60)+'m ago') : ''"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              </template>
+
+              <!-- Cost (this dispatcher run) -->
+              <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Cost · this dispatcher run</div>
+                <template x-if="dashCost() && dashCost().available">
+                  <div>
+                    <div class="flex flex-wrap items-end gap-x-6 gap-y-2">
+                      <template x-for="(amt, cur) in dashCost().totals" :key="cur">
+                        <div>
+                          <div class="text-2xl font-semibold text-slate-800" x-text="fmtMoney(amt, cur)"></div>
+                          <div class="text-[10px] uppercase tracking-wider text-slate-400" x-text="cur"></div>
+                        </div>
+                      </template>
+                      <div x-show="Object.keys(dashCost().totals).length === 0" class="text-sm text-amber-600">tokens tracked, no prices set</div>
+                      <div class="ml-auto text-right text-[11px] text-slate-500">
+                        <div><span class="font-mono text-slate-700" x-text="fmtTok(dashCost().tokens.input)"></span> in · <span class="font-mono text-slate-700" x-text="fmtTok(dashCost().tokens.output)"></span> out</div>
+                        <div x-text="dashCost().tasks + ' billed calls'"></div>
+                      </div>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-slate-100 space-y-1">
+                      <template x-for="m in dashCost().by_model" :key="m.model">
+                        <div class="flex items-center justify-between gap-3 text-xs">
+                          <span class="font-mono text-slate-700 truncate" x-text="m.model"></span>
+                          <span class="flex items-center gap-3 shrink-0 font-mono text-slate-500">
+                            <span x-text="fmtTok(m.input)+' / '+fmtTok(m.output)"></span>
+                            <span class="w-24 text-right" :class="m.priced ? 'text-slate-800' : 'text-amber-500'" x-text="m.priced ? fmtMoney(m.cost, m.currency) : 'no price'"></span>
+                          </span>
+                        </div>
+                      </template>
+                    </div>
+                    <div x-show="dashCost().unpriced_models && dashCost().unpriced_models.length" class="mt-2 text-[11px] text-amber-600">
+                      No price for: <span class="font-mono" x-text="(dashCost().unpriced_models||[]).join(', ')"></span> — add a pricing row or <span class="font-mono">PI_PRICE_*</span> in the worker config.
+                    </div>
+                  </div>
+                </template>
+                <div x-show="!(dashCost() && dashCost().available)" class="text-xs text-slate-400">No billed calls yet this run (or dispatcher not reporting).</div>
+              </div>
+
+              <!-- Host resources -->
+              <template x-if="dash.data.telemetry && dash.data.telemetry.snapshot">
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Host resources</div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                    <div>
+                      <div class="flex justify-between text-xs mb-1"><span class="text-slate-500">RAM</span>
+                        <span class="font-mono text-slate-700" x-text="Math.round(dash.data.telemetry.snapshot.host.mem_used_mb)+' / '+Math.round(dash.data.telemetry.snapshot.host.mem_total_mb)+' MB'"></span></div>
+                      <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full" :class="dashPct(dash.data.telemetry.snapshot.host.mem_used_mb,dash.data.telemetry.snapshot.host.mem_total_mb)>85?'bg-red-400':'bg-brand-500'" :style="`width:${dashPct(dash.data.telemetry.snapshot.host.mem_used_mb,dash.data.telemetry.snapshot.host.mem_total_mb)}%`"></div></div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-xs mb-1"><span class="text-slate-500">Swap</span>
+                        <span class="font-mono text-slate-700" x-text="Math.round(dash.data.telemetry.snapshot.host.swap_used_mb)+' / '+Math.round(dash.data.telemetry.snapshot.host.swap_total_mb)+' MB'"></span></div>
+                      <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full" :class="dashPct(dash.data.telemetry.snapshot.host.swap_used_mb,dash.data.telemetry.snapshot.host.swap_total_mb)>50?'bg-amber-400':'bg-slate-300'" :style="`width:${dashPct(dash.data.telemetry.snapshot.host.swap_used_mb,dash.data.telemetry.snapshot.host.swap_total_mb)}%`"></div></div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-xs mb-1"><span class="text-slate-500">Disk</span>
+                        <span class="font-mono text-slate-700" x-text="(dash.data.telemetry.snapshot.host.disk_total_gb-dash.data.telemetry.snapshot.host.disk_free_gb).toFixed(1)+' / '+dash.data.telemetry.snapshot.host.disk_total_gb.toFixed(1)+' GB'"></span></div>
+                      <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-slate-300" :style="`width:${dashPct(dash.data.telemetry.snapshot.host.disk_total_gb-dash.data.telemetry.snapshot.host.disk_free_gb,dash.data.telemetry.snapshot.host.disk_total_gb)}%`"></div></div>
+                    </div>
+                    <template x-if="dash.data.telemetry.snapshot.host.tmp_total_mb">
+                    <div>
+                      <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-500 flex items-center gap-1">/tmp
+                          <button type="button" @click="cleanupTmp()" title="Clean /tmp/cairn-prompts"
+                            class="p-0.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 transition">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                          </button>
+                        </span>
+                        <span class="font-mono text-slate-700" x-text="(dash.data.telemetry.snapshot.host.tmp_total_mb-dash.data.telemetry.snapshot.host.tmp_free_mb).toFixed(0)+' / '+dash.data.telemetry.snapshot.host.tmp_total_mb.toFixed(0)+' MB'"></span></div>
+                      <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full" :class="dashPct(dash.data.telemetry.snapshot.host.tmp_total_mb-dash.data.telemetry.snapshot.host.tmp_free_mb,dash.data.telemetry.snapshot.host.tmp_total_mb)>85?'bg-red-400':'bg-amber-400'" :style="`width:${dashPct(dash.data.telemetry.snapshot.host.tmp_total_mb-dash.data.telemetry.snapshot.host.tmp_free_mb,dash.data.telemetry.snapshot.host.tmp_total_mb)}%`"></div></div>
+                    </div>
+                    </template>
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="text-slate-500">CPU load (1m)</span>
+                      <span class="font-mono text-slate-700" x-text="dash.data.telemetry.snapshot.host.cpu_load1"></span>
+                    </div>
+                  </div>
+                  <div class="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-slate-500">
+                    <span>Dispatcher RSS <b class="font-mono text-slate-700" x-text="dash.data.telemetry.snapshot.dispatcher.rss_mb+' MB'"></b></span>
+                    <span>uptime <b class="font-mono text-slate-700" x-text="Math.round(dash.data.telemetry.snapshot.dispatcher.uptime_s/60)+'m'"></b></span>
+                    <span>pid <span class="font-mono" x-text="dash.data.telemetry.snapshot.dispatcher.pid"></span></span>
+                    <template x-for="c in dash.data.telemetry.snapshot.containers" :key="c.name">
+                      <span>· <span class="font-mono" x-text="c.name.replace('cairn-dispatch-','')"></span> <b class="font-mono text-slate-700" x-text="Math.round(c.mem_mb)+'MB '+c.cpu_pct+'%'"></b></span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Live speed controls -->
+              <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Live controls <span class="text-slate-300">· applied instantly</span></div>
+                  <span x-show="dash.saving" class="text-[11px] text-brand-500">saving…</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                  <div>
+                    <div class="flex justify-between text-xs mb-1"><span class="text-slate-600">Workers (master)</span><span class="font-mono text-slate-800" x-text="dash.data.settings.max_workers"></span></div>
+                    <input type="range" min="1" :max="dash.data.ceilings.max_workers || 8" step="1" x-model.number="dash.data.settings.max_workers" @change="applySetting('max_workers')" class="w-full accent-brand-500">
+                  </div>
+                  <div>
+                    <div class="flex justify-between text-xs mb-1"><span class="text-slate-600">Projects at once</span><span class="font-mono text-slate-800" x-text="dash.data.settings.max_running_projects"></span></div>
+                    <input type="range" min="1" :max="dash.data.ceilings.max_running_projects || 8" step="1" x-model.number="dash.data.settings.max_running_projects" @change="applySetting('max_running_projects')" class="w-full accent-brand-500">
+                  </div>
+                  <div>
+                    <div class="flex justify-between text-xs mb-1"><span class="text-slate-600">Workers per project</span><span class="font-mono text-slate-800" x-text="dash.data.settings.max_project_workers"></span></div>
+                    <input type="range" min="1" :max="dash.data.ceilings.max_project_workers || 8" step="1" x-model.number="dash.data.settings.max_project_workers" @change="applySetting('max_project_workers')" class="w-full accent-brand-500">
+                  </div>
+                  <div>
+                    <div class="flex justify-between text-xs mb-1"><span class="text-slate-600">Reason max intents</span><span class="font-mono text-slate-800" x-text="dash.data.settings.reason_max_intents"></span></div>
+                    <input type="range" min="1" max="10" step="1" x-model.number="dash.data.settings.reason_max_intents" @change="applySetting('reason_max_intents')" class="w-full accent-brand-500">
+                  </div>
+                  <div>
+                    <div class="flex justify-between text-xs mb-1"><span class="text-slate-600">Explore timeout</span><span class="font-mono text-slate-800" x-text="dash.data.settings.explore_timeout+'s'"></span></div>
+                    <input type="range" min="30" max="600" step="10" x-model.number="dash.data.settings.explore_timeout" @change="applySetting('explore_timeout')" class="w-full accent-brand-500">
+                  </div>
+                  <div>
+                    <div class="flex justify-between text-xs mb-1"><span class="text-slate-600">Explore conclude timeout</span><span class="font-mono text-slate-800" x-text="dash.data.settings.explore_conclude_timeout+'s'"></span></div>
+                    <input type="range" min="15" max="300" step="5" x-model.number="dash.data.settings.explore_conclude_timeout" @change="applySetting('explore_conclude_timeout')" class="w-full accent-brand-500">
+                  </div>
+                  <div>
+                    <div class="flex justify-between text-xs mb-1"><span class="text-slate-600">Reason timeout</span><span class="font-mono text-slate-800" x-text="dash.data.settings.reason_task_timeout+'s'"></span></div>
+                    <input type="range" min="30" max="600" step="10" x-model.number="dash.data.settings.reason_task_timeout" @change="applySetting('reason_task_timeout')" class="w-full accent-brand-500">
+                  </div>
+                  <div>
+                    <div class="flex justify-between text-xs mb-1"><span class="text-slate-600">Bootstrap timeout</span><span class="font-mono text-slate-800" x-text="dash.data.settings.bootstrap_timeout+'s'"></span></div>
+                    <input type="range" min="30" max="600" step="10" x-model.number="dash.data.settings.bootstrap_timeout" @change="applySetting('bootstrap_timeout')" class="w-full accent-brand-500">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Workers + outcomes -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Workers</div>
+                  <template x-if="dash.data.telemetry && dash.data.telemetry.snapshot">
+                    <div class="space-y-2">
+                      <template x-for="w in dash.data.telemetry.snapshot.workers" :key="w.name">
+                        <div class="flex items-center justify-between text-xs">
+                          <span class="inline-flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full" :class="w.healthy ? 'bg-emerald-500' : 'bg-red-400'"></span>
+                            <span class="font-mono text-slate-700" x-text="w.name"></span>
+                          </span>
+                          <span class="font-mono text-slate-500" x-text="w.running+'/'+w.max_running"></span>
+                        </div>
+                      </template>
+                      <div x-show="dash.data.telemetry.snapshot.workers.length===0" class="text-[11px] text-slate-400">No workers reporting.</div>
+                    </div>
+                  </template>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Outcomes · timeouts</div>
+                  <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600">
+                    <template x-if="dash.data.telemetry && dash.data.telemetry.snapshot && dash.data.telemetry.snapshot.outcomes">
+                      <template x-for="(v,k) in dash.data.telemetry.snapshot.outcomes" :key="k">
+                        <span><span class="text-slate-400" x-text="k"></span> ok <b class="font-mono text-emerald-600" x-text="v.success||0"></b></span>
+                      </template>
+                    </template>
+                  </div>
+                  <div class="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
+                    timeouts — explore <b class="font-mono text-amber-600" x-text="dash.data.timeouts.explore"></b>,
+                    reason <b class="font-mono text-amber-600" x-text="dash.data.timeouts.reason"></b>,
+                    bootstrap <b class="font-mono text-amber-600" x-text="dash.data.timeouts.bootstrap"></b>
+                  </div>
+                  <div class="mt-2 space-y-0.5 max-h-24 overflow-auto" x-show="dash.data.timeouts.recent && dash.data.timeouts.recent.length">
+                    <template x-for="(t,i) in dash.data.timeouts.recent.slice().reverse()" :key="i">
+                      <div class="text-[11px] text-slate-400 font-mono truncate"><span x-text="t.ts"></span> · <span x-text="t.task"></span> <span x-text="t.intent"></span> <span class="text-amber-500" x-text="t.kind"></span></div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Config / dispatcher control -->
+              <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Config &amp; dispatcher</div>
+                  <button @click="openWizard()" class="px-3 py-1.5 rounded-lg bg-brand-500 text-white text-xs font-semibold shadow-sm hover:bg-brand-600 transition inline-flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+                    Конфигуратор
+                  </button>
+                </div>
+                <!-- supervisor state -->
+                <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-slate-600">
+                  <span class="inline-flex items-center gap-1.5">supervisor
+                    <b class="inline-flex items-center gap-1" :class="supColor()">
+                      <span class="w-1.5 h-1.5 rounded-full" :class="supDot()"></span>
+                      <span x-text="(dash.data.supervisor && dash.data.supervisor.state) || 'absent'"></span>
+                    </b>
+                  </span>
+                  <span>worker ceiling <b class="font-mono text-slate-800" x-text="dash.data.ceilings.max_workers"></b></span>
+                  <span>active config <span class="font-mono text-slate-500" x-text="supActiveConfig()"></span></span>
+                </div>
+                <div x-show="dash.data.supervisor && dash.data.supervisor.reason" class="mt-1 text-[11px]" :class="(dash.data.supervisor && dash.data.supervisor.state==='error') ? 'text-red-500' : 'text-slate-400'" x-text="dash.data.supervisor && dash.data.supervisor.reason"></div>
+                <!-- supervisor-absent fallback: manual command -->
+                <div x-show="!dash.data.supervisor || !dash.data.supervisor.present" class="mt-3">
+                  <div class="text-[11px] text-slate-400 mb-1">Supervisor not running — the server can't restart the dispatcher. Use the wizard's "Save as" and launch the dispatcher manually, or start the supervisor:</div>
+                  <div class="flex items-center gap-2">
+                    <code class="flex-1 text-[11px] font-mono bg-slate-900 text-slate-100 rounded-lg px-3 py-2 overflow-auto whitespace-nowrap">uv run --project cairn cairn supervise --config dispatch.yaml.kolya</code>
+                    <button @click="copyText('uv run --project cairn cairn supervise --config dispatch.yaml.kolya')" class="shrink-0 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs">Copy</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Projects -->
+              <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Projects</div>
+                <div class="space-y-1.5">
+                  <template x-for="p in dash.data.projects" :key="p.id">
+                    <div class="flex items-center justify-between gap-3 text-xs py-1 border-b border-slate-50 last:border-0">
+                      <div class="min-w-0 flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="p.running.length ? 'bg-brand-500 animate-pulse' : (p.status==='active' ? 'bg-emerald-400' : 'bg-slate-300')"></span>
+                        <span class="font-medium text-slate-700 truncate" x-text="p.title"></span>
+                        <span class="font-mono text-slate-300 shrink-0" x-text="p.id"></span>
+                      </div>
+                      <div class="flex items-center gap-3 shrink-0 font-mono text-slate-500">
+                        <span x-text="p.fact_count+'f'"></span>
+                        <span x-text="p.open_intents+' open'"></span>
+                        <span x-show="p.avg_explore_s" class="text-slate-400" x-text="'~'+Math.round(p.avg_explore_s)+'s'"></span>
+                        <span x-show="p.running.length" class="text-brand-500" x-text="p.running.length+' running'"></span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Topology view -->
+      <div x-show="graphView === 'topology'" class="absolute inset-0 z-0">
+        <div id="cyTopo" class="w-full h-full"></div>
+
+        <!-- Topology toolbar (top-left, under the Facts/Topology toggle) -->
+        <div class="absolute top-12 left-3 z-10 flex flex-col items-start gap-1.5">
+          <button @click="refreshTopology()" :disabled="topo.loading"
+            class="px-3 py-1.5 bg-white/90 backdrop-blur border border-brand-200 text-brand-600 rounded-lg shadow-sm text-xs font-medium hover:bg-brand-50 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" :class="topo.loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4v5h5M20 20v-5h-5"/><path d="M20 9a8 8 0 0 0-14.3-3.3L4 9M4 15a8 8 0 0 0 14.3 3.3L20 15"/></svg>
+            <span x-text="topo.loading ? 'Analyzing…' : (topo.exists ? 'Refresh' : 'Generate map')"></span>
+          </button>
+
+          <!-- Model settings (gear + dropdown) -->
+          <div class="relative" @keydown.escape.window="topoModelOpen = false">
+            <button @click="topoModelOpen = !topoModelOpen" :disabled="topo.loading"
+              class="h-[30px] px-2 bg-white/90 backdrop-blur border border-slate-200/60 text-slate-500 hover:text-slate-700 hover:bg-white rounded-lg shadow-sm text-xs transition inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              :title="`Extractor model: ${currentTopoModelLabel()}`" aria-label="Model settings">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M10.3 3.3a1.1 1.1 0 0 1 3.4 0l.1.9a7.5 7.5 0 0 1 1.9 1.1l.9-.4a1.1 1.1 0 0 1 1.5.5l.8 1.4a1.1 1.1 0 0 1-.3 1.5l-.7.5a7.5 7.5 0 0 1 0 2.2l.7.5a1.1 1.1 0 0 1 .3 1.5l-.8 1.4a1.1 1.1 0 0 1-1.5.5l-.9-.4a7.5 7.5 0 0 1-1.9 1.1l-.1.9a1.1 1.1 0 0 1-3.4 0l-.1-.9a7.5 7.5 0 0 1-1.9-1.1l-.9.4a1.1 1.1 0 0 1-1.5-.5l-.8-1.4a1.1 1.1 0 0 1 .3-1.5l.7-.5a7.5 7.5 0 0 1 0-2.2l-.7-.5a1.1 1.1 0 0 1-.3-1.5l.8-1.4a1.1 1.1 0 0 1 1.5-.5l.9.4a7.5 7.5 0 0 1 1.9-1.1z"/><circle cx="12" cy="12" r="2.6"/></svg>
+              <span class="hidden sm:inline max-w-[9rem] truncate" x-text="currentTopoModelLabel()"></span>
+              <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div x-show="topoModelOpen" x-transition @click.outside="topoModelOpen = false"
+              class="absolute left-0 mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-20" style="display:none">
+              <div class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Extractor model</div>
+              <template x-for="m in topoModels" :key="m.id">
+                <button @click="selectTopoModel(m.id)" :disabled="!m.available"
+                  class="w-full text-left px-2 py-1.5 rounded-lg transition flex items-start gap-2 disabled:opacity-45 disabled:cursor-not-allowed hover:bg-slate-50"
+                  :class="m.id === topoModel ? 'bg-brand-50' : ''">
+                  <span class="mt-0.5 shrink-0 w-3.5 h-3.5 rounded-full border flex items-center justify-center"
+                    :class="m.id === topoModel ? 'border-brand-500' : 'border-slate-300'">
+                    <span x-show="m.id === topoModel" class="w-2 h-2 rounded-full bg-brand-500"></span>
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="flex items-center gap-1.5">
+                      <span class="text-xs font-medium"
+                        :class="m.recommended ? 'text-emerald-600' : (m.available ? 'text-slate-700' : 'text-slate-400')"
+                        x-text="m.label"></span>
+                      <span x-show="m.recommended" class="text-[9px] font-semibold uppercase tracking-wide text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-px">Recommended</span>
+                      <span x-show="m.discouraged" class="text-[9px] font-semibold uppercase tracking-wide text-rose-500 bg-rose-50 border border-rose-200 rounded px-1 py-px">Avoid</span>
+                    </span>
+                    <span class="block text-[10px] text-slate-400 leading-snug mt-0.5"
+                      x-text="m.available ? m.note : (m.unavailable_reason || 'Unavailable')"></span>
+                  </span>
+                </button>
+              </template>
+              <div x-show="topoModels.length === 0" class="px-2 py-2 text-[11px] text-slate-400">No extractor CLI found on the host.</div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap max-w-[22rem]">
+            <template x-if="topo.exists && topo.generated_at">
+              <span class="text-[11px] text-slate-400 bg-white/80 rounded-md px-2 py-1 shadow-sm" x-text="`${formatTime(topo.generated_at)}`"></span>
+            </template>
+            <template x-if="topo.stale && !topo.error">
+              <span class="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 shadow-sm" x-text="`${topo.live_facts - topo.facts_count} new facts — refresh`"></span>
+            </template>
+            <template x-if="topo.error && topo.exists">
+              <span class="text-[11px] text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-2 py-1 shadow-sm" x-text="`Refresh failed: ${topo.error}`"></span>
+            </template>
+          </div>
+        </div>
+
+        <!-- Empty / loading / error state -->
+        <template x-if="!topo.exists && !topo.loading">
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-6 py-8 text-center shadow-sm pointer-events-auto max-w-xs">
+              <p class="text-sm text-slate-500" x-text="topo.error ? 'Extraction failed' : 'No network map yet'"></p>
+              <p class="text-xs text-slate-400 mt-1" x-text="topo.error || 'Click Generate map to build a topology from the facts.'"></p>
+            </div>
+          </div>
+        </template>
+        <template x-if="topo.loading">
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="rounded-2xl border border-slate-200 bg-white/90 px-6 py-5 text-center shadow-md">
+              <svg class="w-6 h-6 mx-auto text-brand-500 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
+              <p class="text-xs text-slate-500 mt-2">Reading facts & building map…</p>
+            </div>
+          </div>
+        </template>
+
+        <!-- Legend (bottom left) -->
+        <template x-if="topo.exists">
+          <div class="absolute bottom-3 left-3 z-10 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200/60 px-3 py-2 text-[10px] text-slate-500 space-y-1">
+            <div class="font-semibold text-slate-600 mb-0.5">Access</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded" style="background:#dc2626"></span>root / NT SYSTEM</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded" style="background:#f59e0b"></span>admin</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded" style="background:#0ea5e9"></span>user shell</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded" style="background:#94a3b8"></span>scanned only</div>
+            <div class="pt-1 mt-1 border-t border-slate-100 flex items-center gap-1.5"><span class="inline-block w-5 border-t-2 border-dashed" style="border-color:#94a3b8"></span>visibility</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-5 border-t-2" style="border-color:#6366f1"></span>pivot</div>
+            <div class="flex items-center gap-1.5"><span class="inline-block w-5 border-t-2" style="border-color:#10b981"></span>cred works</div>
+          </div>
+        </template>
+
+        <!-- Host detail card (bottom right) -->
+        <template x-if="topoSelected">
+          <div class="absolute bottom-3 right-3 z-10 w-72 max-h-[60%] overflow-y-auto bg-white rounded-xl shadow-lg border border-slate-200 p-3.5 text-xs">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="font-semibold text-slate-700 break-words" x-text="topoSelected.name || topoSelected.id"></div>
+                <div class="text-slate-400 break-words" x-text="topoSelected.id"></div>
+              </div>
+              <button @click="topoSelected = null" class="text-slate-300 hover:text-slate-500 shrink-0">✕</button>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" x-text="topoSelected.zone"></span>
+              <span class="px-1.5 py-0.5 rounded text-white" :style="`background:${accessColor(topoSelected.access)}`" x-text="'access: ' + topoSelected.access"></span>
+            </div>
+            <template x-if="topoSelected.ports && topoSelected.ports.length">
+              <div class="mt-2">
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ports</div>
+                <div class="mt-0.5 flex flex-wrap gap-1">
+                  <template x-for="p in topoSelected.ports" :key="p.port">
+                    <span class="px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100" x-text="p.port + (p.service ? '/' + p.service : '')"></span>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <template x-if="topoSelected.creds_found && topoSelected.creds_found.length">
+              <div class="mt-2">
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Creds found</div>
+                <template x-for="(c,i) in topoSelected.creds_found" :key="i"><div class="text-slate-600 break-words font-mono text-[11px]" x-text="c"></div></template>
+              </div>
+            </template>
+            <template x-if="topoSelected.creds_work && topoSelected.creds_work.length">
+              <div class="mt-2">
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-emerald-500">Creds that work</div>
+                <template x-for="(c,i) in topoSelected.creds_work" :key="i"><div class="text-emerald-700 break-words font-mono text-[11px]" x-text="c"></div></template>
+              </div>
+            </template>
+            <template x-if="topoSelected.notes">
+              <p class="mt-2 text-slate-500 leading-relaxed whitespace-pre-wrap break-words" x-text="topoSelected.notes"></p>
+            </template>
+          </div>
+        </template>
+      </div>
     </div>
 
     <div @pointerdown.prevent="startPanelResize($event)" class="w-2 shrink-0 cursor-col-resize group flex items-stretch justify-center touch-none relative z-20">
@@ -714,21 +1212,43 @@
           </div>
         </template>
         <template x-for="h in project.hints" :key="h.id">
-          <button type="button" @click="openHintTimelineEntry(h.id)"
-            class="w-full text-left rounded-2xl border border-amber-200/80 bg-white shadow-sm overflow-hidden transition hover:bg-amber-50/40">
+          <div class="w-full text-left rounded-2xl border border-amber-200/80 bg-white shadow-sm overflow-hidden transition hover:bg-amber-50/40">
             <div class="px-4 py-3 border-b border-amber-100 bg-amber-50/80">
               <div class="flex items-center justify-between gap-3 text-[11px]">
-                <div class="flex items-center gap-2 min-w-0">
+                <div class="flex items-center gap-2 min-w-0 cursor-pointer" @click="openHintTimelineEntry(h.id)">
                   <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
-                  <span class="font-medium text-amber-800 truncate" x-text="h.creator"></span>
+                  <span class="font-medium text-amber-800 truncate" x-text="h.id + ' · ' + h.creator"></span>
                 </div>
-                <span class="text-amber-600/80 shrink-0 tabular-nums" x-text="formatTime(h.created_at)"></span>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="text-amber-600/80 tabular-nums" x-text="formatTime(h.created_at)"></span>
+                  <button type="button" @click.stop="startEditHint(h)" title="Edit"
+                    class="p-1 rounded hover:bg-amber-200/60 text-amber-500 hover:text-amber-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button type="button" @click.stop="deleteHint(h.id)" title="Delete"
+                    class="p-1 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                  </button>
+                </div>
               </div>
             </div>
-            <div class="p-4">
-              <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="h.content"></p>
-            </div>
-          </button>
+            <template x-if="editingHint && editingHint.id === h.id">
+              <div class="p-4 space-y-2">
+                <textarea x-model="editingHint.content" rows="5"
+                  class="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400 transition"></textarea>
+                <div class="flex gap-2 justify-end">
+                  <button @click="editingHint = null" class="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 transition">Cancel</button>
+                  <button @click="saveEditHint()" :disabled="!editingHint.content.trim()"
+                    class="px-3 py-1.5 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition disabled:opacity-40">Save</button>
+                </div>
+              </div>
+            </template>
+            <template x-if="!editingHint || editingHint.id !== h.id">
+              <div class="p-4 cursor-pointer" @click="openHintTimelineEntry(h.id)">
+                <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="h.content"></p>
+              </div>
+            </template>
+          </div>
         </template>
       </div>
 
@@ -791,9 +1311,189 @@
 </div>
 </template>
 
+<!-- Activity detail popup -->
+<div x-show="activityDetail" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center overlay p-4"
+     @click.self="activityDetail = null" @keydown.escape.window="activityDetail && (activityDetail = null)">
+  <template x-if="activityDetail">
+  <div class="bg-white rounded-2xl shadow-2xl w-[50vw] min-w-[320px] max-h-[80vh] flex flex-col" @click.stop>
+    <div class="px-5 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="w-2.5 h-2.5 rounded-full shrink-0"
+              :class="activityDetail.type === 'running' ? (activityDetail.kind === 'reason' ? 'bg-violet-500 animate-pulse' : 'bg-sky-500 animate-pulse') : activityDetail.type === 'fact' ? 'bg-indigo-500' : 'bg-emerald-500'"></span>
+        <span class="text-sm font-semibold text-slate-700" x-text="activityDetail.id || activityDetail.kind"></span>
+        <span class="text-xs text-slate-400" x-text="activityDetail.type === 'running' ? activityDetail.kind : activityDetail.type"></span>
+      </div>
+      <button @click="activityDetail = null" class="text-slate-400 hover:text-slate-600 text-xl leading-none ml-3">&times;</button>
+    </div>
+    <div class="px-5 py-4 overflow-auto flex-1 space-y-3">
+      <div x-show="activityDetail.project" class="flex items-center gap-2 text-xs">
+        <span class="text-slate-400">Project</span>
+        <span class="font-medium text-slate-700" x-text="activityDetail.project"></span>
+      </div>
+      <div x-show="activityDetail.worker" class="flex items-center gap-2 text-xs">
+        <span class="text-slate-400">Worker</span>
+        <span class="font-mono text-slate-700" x-text="activityDetail.worker"></span>
+      </div>
+      <div x-show="activityDetail.elapsed_s != null" class="flex items-center gap-2 text-xs">
+        <span class="text-slate-400">Elapsed</span>
+        <span class="font-mono text-slate-700" x-text="activityDetail.elapsed_s != null ? (activityDetail.elapsed_s < 60 ? Math.round(activityDetail.elapsed_s)+'s' : Math.round(activityDetail.elapsed_s/60)+'m '+Math.round(activityDetail.elapsed_s%60)+'s') : ''"></span>
+      </div>
+      <div x-show="activityDetail.concluded_age_s != null" class="flex items-center gap-2 text-xs">
+        <span class="text-slate-400">Concluded</span>
+        <span class="font-mono text-slate-700" x-text="activityDetail.concluded_age_s != null ? (activityDetail.concluded_age_s < 60 ? Math.round(activityDetail.concluded_age_s)+'s ago' : Math.round(activityDetail.concluded_age_s/60)+'m ago') : ''"></span>
+      </div>
+      <div class="pt-2 border-t border-slate-100">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Description</div>
+        <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words" x-text="activityDetail.description"></p>
+      </div>
+    </div>
+  </div>
+  </template>
+</div>
+
 <!-- ═══════════ MODALS ═══════════ -->
 
 <!-- New Project -->
+<!-- Config wizard modal -->
+<div x-show="wizard.open" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center overlay p-4" @click.self="closeWizard()" @keydown.escape.window="wizard.open && closeWizard()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" x-show="wizard.form">
+    <div class="px-5 pt-4 pb-3 border-b border-slate-100">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-slate-700">Конфигуратор диспетчера</h3>
+        <button @click="closeWizard()" class="text-slate-400 hover:text-slate-600 text-lg leading-none">&times;</button>
+      </div>
+      <div class="mt-3 flex items-center gap-2 text-xs">
+        <template x-for="(t,i) in ['Воркеры и модели','Скорость и таймауты','Имя и запуск']" :key="i">
+          <button @click="wizard.step=i+1" class="px-2.5 py-1 rounded-full transition" :class="wizard.step===i+1 ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'">
+            <span x-text="(i+1)+'. '+t"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-auto px-5 py-4 space-y-4" x-show="wizard.form">
+      <div x-show="wizard.error" class="rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 whitespace-pre-wrap" x-text="wizard.error"></div>
+
+      <!-- STEP 1: workers -->
+      <div x-show="wizard.step===1" class="space-y-4">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-slate-500">Редактировать существующий:</span>
+          <select @change="loadExisting($event.target.value); $event.target.value=''" class="border border-slate-200 rounded-lg px-2 py-1 text-xs">
+            <option value="">— новый с нуля —</option>
+            <template x-for="c in wizard.existingConfigs" :key="c"><option :value="c" x-text="c"></option></template>
+          </select>
+        </div>
+        <template x-for="(w,i) in wizard.form.workers" :key="i">
+          <div class="rounded-xl border border-slate-200 p-3 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Воркер</span>
+                <input x-model="w.name" class="text-sm font-medium border-b border-slate-200 focus:border-brand-400 outline-none w-32">
+              </div>
+              <button x-show="wizard.form.workers.length>1" @click="removeWorker(i)" class="text-xs text-red-400 hover:text-red-600">удалить</button>
+            </div>
+            <label class="block">
+              <span class="text-xs text-slate-600">Провайдер / пресет</span>
+              <select x-model="w.preset" @change="applyPreset(w)" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm">
+                <template x-for="p in wizard.presets" :key="p.id"><option :value="p.id" x-text="p.label"></option></template>
+              </select>
+              <span class="text-[11px] text-slate-400" x-text="(presetById(w.preset)||{}).hint"></span>
+            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="block"><span class="text-xs text-slate-600">Модель</span>
+                <input x-model="w.model" placeholder="model-id" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono"></label>
+              <label class="block"><span class="text-xs text-slate-600">Base URL</span>
+                <input x-model="w.base_url" placeholder="https://…/v1" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono"></label>
+            </div>
+            <label class="block"><span class="text-xs text-slate-600">API-ключ
+              <span x-show="w.has_key" class="text-emerald-500">(сохранён <span class="font-mono" x-text="w.api_key_masked"></span> — оставь пустым, чтобы не менять)</span></span>
+              <input x-model="w.api_key" type="password" :placeholder="w.has_key ? 'оставить текущий' : 'sk-…'" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono">
+              <span class="text-[11px] text-slate-400" x-text="wizard.fieldHelp.api_key"></span></label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="block"><span class="text-xs text-slate-600">Reasoning — сколько «думать»</span>
+                <select x-model="w.thinking" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm">
+                  <template x-for="lvl in wizard.thinkingLevels" :key="lvl"><option :value="lvl" x-text="lvl===''?'(по умолчанию провайдера)':lvl"></option></template>
+                </select>
+                <span class="text-[11px] text-slate-400" x-text="wizard.fieldHelp.thinking"></span></label>
+              <label class="block"><span class="text-xs text-slate-600">Context window (токенов)</span>
+                <input x-model.number="w.context_window" type="number" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"></label>
+            </div>
+            <details class="text-xs">
+              <summary class="cursor-pointer text-slate-500 select-none">Цена за 1М токенов <span class="text-slate-300">(необязательно — для денег на дашборде)</span></summary>
+              <div class="grid grid-cols-3 gap-2 mt-2">
+                <label class="text-slate-500">вход<input x-model.number="w.price_input" type="number" step="0.01" class="mt-0.5 w-full border border-slate-200 rounded px-2 py-1 text-slate-700"></label>
+                <label class="text-slate-500">выход<input x-model.number="w.price_output" type="number" step="0.01" class="mt-0.5 w-full border border-slate-200 rounded px-2 py-1 text-slate-700"></label>
+                <label class="text-slate-500">валюта<input x-model="w.price_currency" placeholder="USD/RUB" class="mt-0.5 w-full border border-slate-200 rounded px-2 py-1 text-slate-700"></label>
+              </div>
+            </details>
+          </div>
+        </template>
+        <button @click="addWorker()" class="text-xs text-brand-600 hover:text-brand-700 font-medium">+ добавить воркер</button>
+      </div>
+
+      <!-- STEP 2: speed & timeouts -->
+      <div x-show="wizard.step===2" class="space-y-4">
+        <div class="text-[11px] text-slate-400">Чем больше воркеров/проектов — тем быстрее, но дороже и прожорливее по памяти. Таймауты — сколько ждать одну задачу.</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label class="block"><span class="text-xs text-slate-600">Задач одновременно (на всё)</span>
+            <input x-model.number="wizard.form.max_workers" type="number" min="1" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm">
+            <span class="text-[11px] text-slate-400" x-text="wizard.fieldHelp.max_workers"></span></label>
+          <label class="block"><span class="text-xs text-slate-600">Проектов одновременно</span>
+            <input x-model.number="wizard.form.max_running_projects" type="number" min="1" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm">
+            <span class="text-[11px] text-slate-400" x-text="wizard.fieldHelp.max_running_projects"></span></label>
+          <label class="block"><span class="text-xs text-slate-600">Задач на один проект</span>
+            <input x-model.number="wizard.form.max_project_workers" type="number" min="1" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm">
+            <span class="text-[11px] text-slate-400" x-text="wizard.fieldHelp.max_project_workers"></span></label>
+          <label class="block"><span class="text-xs text-slate-600">Reason: направлений за раз</span>
+            <input x-model.number="wizard.form.reason_max_intents" type="number" min="1" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm">
+            <span class="text-[11px] text-slate-400" x-text="wizard.fieldHelp.reason_max_intents"></span></label>
+          <label class="block"><span class="text-xs text-slate-600">Explore timeout, с</span>
+            <input x-model.number="wizard.form.explore_timeout" type="number" min="30" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm">
+            <span class="text-[11px] text-slate-400" x-text="wizard.fieldHelp.explore_timeout"></span></label>
+          <label class="block"><span class="text-xs text-slate-600">Explore conclude timeout, с</span>
+            <input x-model.number="wizard.form.explore_conclude_timeout" type="number" min="15" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"></label>
+          <label class="block"><span class="text-xs text-slate-600">Reason timeout, с</span>
+            <input x-model.number="wizard.form.reason_timeout" type="number" min="30" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"></label>
+          <label class="block"><span class="text-xs text-slate-600">Bootstrap timeout, с</span>
+            <input x-model.number="wizard.form.bootstrap_timeout" type="number" min="30" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"></label>
+        </div>
+      </div>
+
+      <!-- STEP 3: name & apply -->
+      <div x-show="wizard.step===3" class="space-y-4">
+        <label class="block"><span class="text-xs text-slate-600">Имя конфига (файл dispatch.yaml.&lt;имя&gt;)</span>
+          <input x-model="wizard.form.name" placeholder="my-config" class="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono">
+          <span class="text-[11px] text-slate-400">Буквы, цифры, _ и - . Существующее имя перезапишется.</span></label>
+        <div class="flex flex-wrap gap-2">
+          <button @click="saveConfig()" :disabled="wizard.saving"
+            class="px-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-40">
+            <span x-text="wizard.saving ? 'Сохраняю…' : 'Сохранить как…'"></span></button>
+          <button @click="applyConfig()" :disabled="wizard.applying || !(dash.data && dash.data.supervisor && dash.data.supervisor.present)"
+            class="px-3 py-2 rounded-lg bg-brand-500 text-white text-sm font-semibold shadow-sm hover:bg-brand-600 disabled:opacity-40"
+            :title="(dash.data && dash.data.supervisor && dash.data.supervisor.present) ? '' : 'Супервизор не запущен — только сохранение'">
+            <span x-text="wizard.applying ? 'Применяю…' : 'Применить (перезапустить)'"></span></button>
+        </div>
+        <div x-show="!(dash.data && dash.data.supervisor && dash.data.supervisor.present)" class="text-[11px] text-amber-600">Супервизор не запущен — «Применить» недоступно. Сохрани конфиг и запусти его командой из карточки «Config &amp; dispatcher».</div>
+        <template x-if="wizard.saved">
+          <div class="space-y-2">
+            <div x-show="wizard.saved.applied" class="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs px-3 py-2">Применено — супервизор перезапускает диспетчер с новым конфигом.</div>
+            <div x-show="!wizard.saved.applied" class="rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-xs px-3 py-2">Сохранено: <span class="font-mono" x-text="wizard.saved.path"></span></div>
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Предпросмотр (ключ замаскирован)</div>
+            <pre class="text-[11px] font-mono bg-slate-900 text-slate-100 rounded-lg p-3 overflow-auto max-h-56" x-text="wizard.saved.masked_preview"></pre>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="px-5 py-3 border-t border-slate-100 flex items-center">
+      <button x-show="wizard.step>1" @click="wizard.step--" class="px-3 py-1.5 rounded-lg text-sm text-slate-600 hover:bg-slate-50">← Назад</button>
+      <div class="ml-auto">
+        <button x-show="wizard.step<3" @click="wizard.step++" class="px-4 py-1.5 rounded-lg bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600">Далее →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div x-show="showNewProject" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showNewProject = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200/60" @click.stop>
     <h3 class="text-base font-semibold text-slate-700 mb-4">New Project</h3>
@@ -1080,6 +1780,19 @@ function cairnApp() {
     pollTimer: null,
     cy: null,
     sideTab: 'detail',
+    graphView: 'facts',
+    cyTopo: null,
+    topoSelected: null,
+    topo: { exists: false, loading: false, error: null, data: null, generated_at: null, facts_count: 0, live_facts: 0, stale: false },
+    topoModels: [],
+    topoModel: null,
+    topoModelOpen: false,
+    dash: { data: null, loading: false, saving: false, error: null },
+    dashTimer: null,
+    dashRefreshSec: 10,
+    activityDetail: null,
+    wizard: { open: false, step: 1, loading: false, saving: false, applying: false, error: null,
+              presets: [], fieldHelp: {}, thinkingLevels: [''], existingConfigs: [], saved: null, form: null },
     selectedNode: null,
     selectedFacts: [],
     selectedTimelineEntryId: null,
@@ -1106,6 +1819,7 @@ function cairnApp() {
     concludeForm: { description: '', intentId: '' },
     completeForm: { description: '' },
     hintForm: { content: '' },
+    editingHint: null,
     reopenForm: { projectId: '', projectTitle: '', description: '' },
     renameForm: { projectId: '', originalTitle: '', title: '' },
     localPrefs: { actor_name: 'Human', layout_mode: 'dagre_tb' },
@@ -2084,6 +2798,9 @@ function cairnApp() {
       this.selectedNode = null;
       this.selectedFacts = [];
       this.selectedTimelineEntryId = null;
+      this.graphView = 'facts';
+      this.topoSelected = null;
+      this.topo = { exists: false, loading: false, error: null, data: null, generated_at: null, facts_count: 0, live_facts: 0, stale: false };
       await this.loadProject(id);
       this.view = 'graph';
       if (location.hash !== `#/projects/${id}`) location.hash = `/projects/${id}`;
@@ -2095,6 +2812,7 @@ function cairnApp() {
         }
         this.teardownAutoFit();
         if (this.cy) { this.cy.destroy(); this.cy = null; }
+        if (this.cyTopo) { this.cyTopo.destroy(); this.cyTopo = null; }
         this.initGraph();
       });
     },
@@ -2201,6 +2919,329 @@ function cairnApp() {
       rawCy.on('tap', e => { if (e.target === rawCy) self.clearSelection(); });
       this.pulseActive();
       this.setupAutoFit();
+    },
+
+    // ---- Topology view ----
+    accessColor(level) {
+      return ({ root: '#dc2626', system: '#dc2626', admin: '#f59e0b', user: '#0ea5e9' })[level] || '#94a3b8';
+    },
+
+    switchGraphView(view) {
+      this.graphView = view;
+      if (view !== 'navigation') this.stopDashPoll();
+      if (view === 'topology') {
+        if (this.topo.data === null) this.loadTopology();
+        if (this.topoModels.length === 0) this.loadTopoModels();
+        this.$nextTick(() => {
+          this.initTopoGraph();
+          if (this.cyTopo) { this.cyTopo.resize(); this.cyTopo.fit(undefined, 40); }
+        });
+      } else if (view === 'navigation') {
+        this.loadDashboard();
+        this.startDashPoll();
+      } else {
+        this.$nextTick(() => { if (this.cy) { this.cy.resize(); this.fitGraph(); } });
+      }
+    },
+
+    // ---- Navigation / engine ops dashboard ----
+    async loadDashboard() {
+      if (!this.dash.data) this.dash.loading = true;
+      try {
+        const r = await fetch('/dashboard');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        this.dash.data = await r.json();
+        this.dash.error = null;
+      } catch (e) {
+        this.dash.error = 'dashboard: ' + String(e);
+      } finally {
+        this.dash.loading = false;
+      }
+    },
+
+    startDashPoll() {
+      this.stopDashPoll();
+      const ms = this.dashRefreshSec * 1000;
+      this.dashTimer = setInterval(() => {
+        if (this.graphView === 'navigation' && this.view !== 'list' && !this.dash.saving) this.loadDashboard();
+      }, ms);
+    },
+
+    stopDashPoll() {
+      if (this.dashTimer) { clearInterval(this.dashTimer); this.dashTimer = null; }
+    },
+
+    // PUT the whole settings object (the API requires every field). The slider's
+    // x-model has already written the new value into dash.data.settings, so callers
+    // without an explicit value just persist the current object; `value` overrides one field.
+    async applySetting(field, value) {
+      if (!this.dash.data) return;
+      const settings = { ...this.dash.data.settings };
+      if (value !== undefined) { settings[field] = value; this.dash.data.settings[field] = value; }
+      this.dash.saving = true;
+      try {
+        const r = await fetch('/settings', {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(settings),
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        this.dash.data.settings = await r.json();
+        this.dash.error = null;
+      } catch (e) {
+        this.dash.error = 'save: ' + String(e);
+      } finally {
+        this.dash.saving = false;
+      }
+    },
+
+    togglePause() {
+      this.applySetting('paused', !(this.dash.data && this.dash.data.settings.paused));
+    },
+
+    dashPct(used, total) {
+      if (!total || total <= 0) return 0;
+      return Math.min(100, Math.max(0, Math.round((used / total) * 100)));
+    },
+
+    dashRestartCmd() {
+      const cfg = (this.dash.data && this.dash.data.ceilings && this.dash.data.ceilings.config_path) || 'dispatch.yaml';
+      return 'uv run --project cairn cairn dispatch --config ' + cfg;
+    },
+
+    dashCost() {
+      return this.dash.data && this.dash.data.telemetry && this.dash.data.telemetry.snapshot
+        ? this.dash.data.telemetry.snapshot.cost : null;
+    },
+
+    fmtMoney(amt, cur) {
+      const n = Number(amt) || 0;
+      const s = Math.abs(n) < 1 ? n.toFixed(4) : n.toFixed(2);
+      const sym = { USD: '$', EUR: '€', GBP: '£' }[cur];
+      if (cur === 'RUB') return s + ' ₽';
+      return sym ? sym + s : s + ' ' + (cur || '');
+    },
+
+    fmtTok(n) {
+      n = Number(n) || 0;
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+      return String(n);
+    },
+
+    // ---- supervisor state (dashboard plaque) ----
+    supState() { return (this.dash.data && this.dash.data.supervisor && this.dash.data.supervisor.state) || 'absent'; },
+    supColor() {
+      return { running: 'text-emerald-600', waiting: 'text-amber-600', error: 'text-red-500', stopped: 'text-slate-400', absent: 'text-slate-400' }[this.supState()] || 'text-slate-400';
+    },
+    supDot() {
+      return { running: 'bg-emerald-500', waiting: 'bg-amber-400', error: 'bg-red-400', stopped: 'bg-slate-300', absent: 'bg-slate-300' }[this.supState()] || 'bg-slate-300';
+    },
+    supActiveConfig() {
+      const c = this.dash.data && this.dash.data.supervisor && this.dash.data.supervisor.active_config;
+      return c ? String(c).split('/').pop() : '—';
+    },
+
+    // ---- config wizard ----
+    wizardBlankWorker() {
+      return { name: 'worker1', preset: 'glm_routerai', model: '', base_url: '', api_key: '',
+        provider_api: 'openai-completions', context_window: 128000, thinking: 'low',
+        thinking_format: 'reasoning_effort', price_input: null, price_output: null, price_currency: '',
+        task_types: ['bootstrap', 'reason', 'explore'], max_running: 1, priority: 0, has_key: false };
+    },
+    wizardBlankForm() {
+      return { name: 'my-config', server: 'http://127.0.0.1:8000', prompt_group: 'default',
+        execution: 'container', container_image: 'ghcr.io/oritera/cairn-worker-container:latest',
+        network_mode: 'host', interval: 3, healthcheck_timeout: 20,
+        max_workers: 2, max_running_projects: 1, max_project_workers: 2,
+        explore_timeout: 240, explore_conclude_timeout: 90, reason_timeout: 240, reason_max_intents: 3,
+        bootstrap_timeout: 120, bootstrap_conclude_timeout: 60, workers: [this.wizardBlankWorker()] };
+    },
+    async openWizard() {
+      this.wizard.open = true; this.wizard.step = 1; this.wizard.error = null; this.wizard.saved = null;
+      this.wizard.loading = true;
+      if (!this.wizard.form) this.wizard.form = this.wizardBlankForm();
+      try {
+        const r = await fetch('/wizard/presets'); const j = await r.json();
+        this.wizard.presets = j.presets || [];
+        this.wizard.fieldHelp = j.field_help || {};
+        this.wizard.thinkingLevels = j.thinking_levels || [''];
+        this.wizard.existingConfigs = j.existing_configs || [];
+        // seed worker1 defaults from its preset if still blank
+        this.wizard.form.workers.forEach(w => { if (!w.model && !w.base_url) this.applyPreset(w); });
+      } catch (e) { this.wizard.error = String(e); }
+      finally { this.wizard.loading = false; }
+    },
+    closeWizard() { this.wizard.open = false; },
+    presetById(id) { return this.wizard.presets.find(p => p.id === id); },
+    applyPreset(w) {
+      const p = this.presetById(w.preset); if (!p) return;
+      w.provider_api = p.provider_api; w.base_url = p.base_url; w.model = p.model;
+      w.context_window = p.context_window; w.thinking = p.thinking; w.thinking_format = p.thinking_format;
+    },
+    addWorker() {
+      const w = this.wizardBlankWorker();
+      w.name = 'worker' + (this.wizard.form.workers.length + 1);
+      this.applyPreset(w);
+      this.wizard.form.workers.push(w);
+    },
+    removeWorker(i) { if (this.wizard.form.workers.length > 1) this.wizard.form.workers.splice(i, 1); },
+    async loadExisting(name) {
+      if (!name) return;
+      this.wizard.loading = true; this.wizard.error = null; this.wizard.saved = null;
+      try {
+        const r = await fetch('/wizard/config/' + encodeURIComponent(name));
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        j.workers = (j.workers || []).map(w => ({ ...this.wizardBlankWorker(), ...w, preset: 'custom', api_key: '' }));
+        this.wizard.form = { ...this.wizardBlankForm(), ...j };
+      } catch (e) { this.wizard.error = String(e); }
+      finally { this.wizard.loading = false; }
+    },
+    async saveConfig() {
+      this.wizard.saving = true; this.wizard.error = null; this.wizard.saved = null;
+      try {
+        const r = await fetch('/wizard/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(this.wizard.form) });
+        const j = await r.json();
+        if (!r.ok) throw new Error((j && j.detail) ? (typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail)) : ('HTTP ' + r.status));
+        this.wizard.saved = j;
+      } catch (e) { this.wizard.error = String(e); }
+      finally { this.wizard.saving = false; }
+    },
+    async applyConfig() {
+      this.wizard.applying = true; this.wizard.error = null;
+      try {
+        if (!this.wizard.saved) await this.saveConfig();
+        if (this.wizard.error) return;
+        const r = await fetch('/supervisor/apply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: this.wizard.form.name }) });
+        const j = await r.json();
+        if (!r.ok) throw new Error((j && j.detail) || ('HTTP ' + r.status));
+        this.wizard.saved = { ...(this.wizard.saved || {}), applied: true };
+        this.loadDashboard();
+      } catch (e) { this.wizard.error = String(e); }
+      finally { this.wizard.applying = false; }
+    },
+
+    async copyText(txt) {
+      try { await navigator.clipboard.writeText(txt); }
+      catch (e) { /* clipboard blocked; ignore */ }
+    },
+
+    async loadTopology() {
+      const pid = this.project?.project?.id;
+      if (!pid) return;
+      try {
+        const r = await fetch(`/projects/${pid}/topology`);
+        const j = await r.json();
+        this.topo = { ...this.topo, ...j, loading: false, error: null };
+        if (j.exists) this.$nextTick(() => this.renderTopo());
+      } catch (e) { this.topo.error = String(e); }
+    },
+
+    async loadTopoModels() {
+      try {
+        const r = await fetch('/topology/models');
+        const j = await r.json();
+        this.topoModels = j.models || [];
+        // restore a valid saved choice, else fall back to the recommended default
+        let saved = null;
+        try { saved = localStorage.getItem('cairn.topoModel'); } catch (e) {}
+        const ok = m => m && m.available;
+        const savedModel = this.topoModels.find(m => m.id === saved);
+        if (ok(savedModel)) this.topoModel = saved;
+        else this.topoModel = j.default || (this.topoModels.find(ok) || {}).id || null;
+      } catch (e) { /* leave topoModel null -> backend auto-picks */ }
+    },
+
+    selectTopoModel(id) {
+      const m = this.topoModels.find(x => x.id === id);
+      if (!m || !m.available) return;
+      this.topoModel = id;
+      this.topoModelOpen = false;
+      try { localStorage.setItem('cairn.topoModel', id); } catch (e) {}
+    },
+
+    currentTopoModelLabel() {
+      const m = this.topoModels.find(x => x.id === this.topoModel);
+      return m ? m.label : 'Auto';
+    },
+
+    async refreshTopology() {
+      const pid = this.project?.project?.id;
+      if (!pid || this.topo.loading) return;
+      this.topoModelOpen = false;
+      this.topo.loading = true; this.topo.error = null;
+      try {
+        const qs = this.topoModel ? `?model=${encodeURIComponent(this.topoModel)}` : '';
+        const r = await fetch(`/projects/${pid}/topology/refresh${qs}`, { method: 'POST' });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${r.status}`);
+        }
+        const j = await r.json();
+        this.topo = { ...this.topo, ...j, loading: false, error: null };
+        this.$nextTick(() => this.renderTopo());
+      } catch (e) {
+        this.topo.loading = false;
+        this.topo.error = String(e.message || e);
+      }
+    },
+
+    buildTopoElements() {
+      const data = this.topo.data || { hosts: [], edges: [] };
+      const ids = new Set((data.hosts || []).map(h => h.id));
+      const nodes = (data.hosts || []).map(h => ({
+        data: {
+          id: h.id,
+          label: (h.name && h.name !== h.id) ? `${h.name}\n${h.id}` : h.id,
+          access: h.access || 'none',
+          zone: h.zone || 'internal',
+          host: h,
+        },
+      }));
+      const edges = (data.edges || [])
+        .filter(e => ids.has(e.from) && ids.has(e.to))
+        .map((e, i) => ({ data: { id: `te${i}`, source: e.from, target: e.to, etype: e.type || 'visibility', label: e.label || '' } }));
+      return { nodes, edges };
+    },
+
+    topoStyles() {
+      const common = { 'text-valign': 'center', 'text-halign': 'center', 'font-family': '-apple-system,BlinkMacSystemFont,Inter,sans-serif' };
+      return [
+        { selector: 'node', style: { ...common, shape: 'round-rectangle', label: 'data(label)', color: '#fff', 'font-size': '10px', 'font-weight': 'bold', 'text-wrap': 'wrap', 'text-max-width': '120px', width: 'label', height: 'label', padding: '10px', 'border-width': 0, 'background-color': ele => this.accessColor(ele.data('access')) } },
+        { selector: 'node[zone="attacker"]', style: { shape: 'diamond', 'background-color': '#312e81' } },
+        { selector: 'node[zone="ics"]', style: { 'border-width': 3, 'border-color': '#f43f5e', 'border-style': 'double' } },
+        { selector: 'node.topo-focus', style: { 'border-width': 3, 'border-color': '#312e81', 'border-opacity': 0.9, 'z-index': 1000 } },
+
+        { selector: 'edge', style: { width: 2, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle', 'arrow-scale': 0.9, label: 'data(label)', 'font-size': '8px', color: '#64748b', 'text-rotation': 'autorotate', 'text-margin-y': -8, 'text-background-color': '#f8fafc', 'text-background-opacity': 0.9, 'text-background-padding': '2px', 'text-max-width': '90px', 'text-wrap': 'ellipsis' } },
+        { selector: 'edge[etype="visibility"]', style: { 'line-color': '#94a3b8', 'line-style': 'dashed', 'target-arrow-color': '#94a3b8' } },
+        { selector: 'edge[etype="pivot"]', style: { 'line-color': '#6366f1', width: 3, 'target-arrow-color': '#6366f1' } },
+        { selector: 'edge[etype="cred-works"]', style: { 'line-color': '#10b981', width: 2.5, 'target-arrow-color': '#10b981' } },
+      ];
+    },
+
+    initTopoGraph() {
+      const container = document.getElementById('cyTopo');
+      if (!container) return;
+      if (this.cyTopo) return;
+      this.cyTopo = cytoscape({
+        container,
+        elements: [],
+        style: this.topoStyles(),
+        minZoom: 0.15, maxZoom: 3.5,
+      });
+      const self = this;
+      this.cyTopo.on('tap', 'node', e => { self.topoSelected = e.target.data('host'); self.cyTopo.nodes().removeClass('topo-focus'); e.target.addClass('topo-focus'); });
+      this.cyTopo.on('tap', e => { if (e.target === self.cyTopo) self.topoSelected = null; });
+      if (this.topo.data) this.renderTopo();
+    },
+
+    renderTopo() {
+      if (!this.cyTopo) { this.initTopoGraph(); if (!this.cyTopo) return; }
+      const { nodes, edges } = this.buildTopoElements();
+      this.cyTopo.elements().remove();
+      this.cyTopo.add([...nodes, ...edges]);
+      this.cyTopo.layout({ name: 'dagre', rankDir: 'LR', nodeSep: 45, rankSep: 90, padding: 40, fit: true, animate: true, animationDuration: 350 }).run();
     },
 
     graphStyles() {
@@ -3377,6 +4418,39 @@ function cairnApp() {
         await this.loadProject(this.selectedProjectId);
         this.sideTab = 'hints';
         this.showToast('Hint added');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    startEditHint(h) {
+      this.editingHint = { id: h.id, content: h.content };
+    },
+
+    async saveEditHint() {
+      if (!this.editingHint || !this.editingHint.content.trim()) return;
+      try {
+        await this.api('PUT', `/projects/${this.selectedProjectId}/hints/${this.editingHint.id}`, { content: this.editingHint.content });
+        this.editingHint = null;
+        await this.loadProject(this.selectedProjectId);
+        this.showToast('Hint updated');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async deleteHint(hintId) {
+      if (!confirm(`Delete hint ${hintId}?`)) return;
+      try {
+        await this.api('DELETE', `/projects/${this.selectedProjectId}/hints/${hintId}`);
+        await this.loadProjects();
+        await this.loadProject(this.selectedProjectId);
+        this.showToast('Hint deleted');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async cleanupTmp() {
+      if (!confirm('Clean /tmp dispatcher garbage (cairn-prompts)?')) return;
+      try {
+        const r = await this.api('POST', '/dashboard/cleanup-tmp');
+        const msg = r.removed.length ? `Freed ${r.freed_mb} MB (${r.removed.join(', ')})` : 'Nothing to clean';
+        this.showToast(msg);
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 

@@ -4,3 +4,13 @@ __pycache__/
 .playwright-cli/
 datas/
 dispatch.yaml
+# all generated/wizard config variants hold real API keys — never commit them
+dispatch.yaml.*
+!dispatch.yaml.example
+# ad-hoc config backups also carry real keys
+dispatch.*backup*.yaml
+# runtime logs, dispatcher runs, and CTF engagement artifacts (targets, creds, writeups)
+logs/
+runs/
+proj_001_*.md
+proj_003/

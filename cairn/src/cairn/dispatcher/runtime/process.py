@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass
 import logging
+import os
 import threading
 import time
 from typing import Any, Protocol, runtime_checkable
@@ -12,6 +14,56 @@ from docker.models.containers import Container
 
 LOG = logging.getLogger(__name__)
 EXEC_KILL_JOIN_TIMEOUT_SECONDS = 5.0
+
+# Workers stream their whole run to stdout. A worker whose output runs away (an LLM
+# looping and emitting hundreds of MB of tokens before it times out) would grow an
+# unbounded in-memory buffer until the dispatcher itself is OOM-killed — observed in
+# practice on heavy exploration intents. BoundedChunks caps the retained output and
+# drops the OLDEST data first; the task's result JSON is emitted at the END of the
+# stream, so keeping the tail preserves what the parser needs while bounding memory.
+STDERR_CAP_BYTES = 8 * 1024 * 1024
+
+
+def worker_stream_cap_bytes(default_mb: int = 32) -> int:
+    raw = os.environ.get("CAIRN_WORKER_STDOUT_CAP_MB")
+    try:
+        mb = int(raw) if raw else default_mb
+    except ValueError:
+        mb = default_mb
+    return max(1, mb) * 1024 * 1024
+
+
+class BoundedChunks:
+    """Accumulate stream chunks but retain only the last ``max_chars`` worth,
+    dropping the oldest first so a runaway worker cannot OOM the dispatcher."""
+
+    __slots__ = ("_chunks", "_size", "_max", "_dropped")
+
+    def __init__(self, max_chars: int) -> None:
+        self._chunks: deque[str] = deque()
+        self._size = 0
+        self._max = max(1, max_chars)
+        self._dropped = 0
+
+    def append(self, text: str) -> None:
+        if not text:
+            return
+        self._chunks.append(text)
+        self._size += len(text)
+        while self._size > self._max and len(self._chunks) > 1:
+            dropped = self._chunks.popleft()
+            self._size -= len(dropped)
+            self._dropped += len(dropped)
+
+    def text(self) -> str:
+        return "".join(self._chunks)
+
+    def __bool__(self) -> bool:
+        return self._size > 0
+
+    @property
+    def dropped_chars(self) -> int:
+        return self._dropped
 
 
 @dataclass(slots=True)
@@ -49,8 +101,8 @@ class ManagedProcess:
         self._api = container.client.api
         self._exec_id: str | None = None
         self._reader: threading.Thread | None = None
-        self._stdout: list[str] = []
-        self._stderr: list[str] = []
+        self._stdout = BoundedChunks(worker_stream_cap_bytes())
+        self._stderr = BoundedChunks(STDERR_CAP_BYTES)
         self._returncode: int | None = None
         self._timed_out = False
         self._cancel_reason: str | None = None
@@ -87,8 +139,8 @@ class ManagedProcess:
             self._stderr.append(self._read_error)
         return ProcessResult(
             returncode=self._returncode if self._returncode is not None else 1,
-            stdout="".join(self._stdout),
-            stderr="".join(self._stderr),
+            stdout=self._stdout.text(),
+            stderr=self._stderr.text(),
             timed_out=self._timed_out,
             cancelled=self._cancel_reason is not None,
             cancel_reason=self._cancel_reason,

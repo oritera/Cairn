@@ -7,7 +7,12 @@ import subprocess
 import threading
 from contextlib import suppress
 
-from cairn.dispatcher.runtime.process import ProcessResult
+from cairn.dispatcher.runtime.process import (
+    STDERR_CAP_BYTES,
+    BoundedChunks,
+    ProcessResult,
+    worker_stream_cap_bytes,
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -39,8 +44,8 @@ class LocalProcess:
         self._timeout_seconds = timeout_seconds
         self._term_grace = max(1.0, float(term_grace_seconds))
         self._process: subprocess.Popen[str] | None = None
-        self._stdout_chunks: list[str] = []
-        self._stderr_chunks: list[str] = []
+        self._stdout_chunks = BoundedChunks(worker_stream_cap_bytes())
+        self._stderr_chunks = BoundedChunks(STDERR_CAP_BYTES)
         self._stdout_thread: threading.Thread | None = None
         self._stderr_thread: threading.Thread | None = None
         self._timed_out = False
@@ -87,8 +92,8 @@ class LocalProcess:
             returncode = 137 if self._timed_out else 1
         return ProcessResult(
             returncode=returncode,
-            stdout="".join(self._stdout_chunks),
-            stderr="".join(self._stderr_chunks),
+            stdout=self._stdout_chunks.text(),
+            stderr=self._stderr_chunks.text(),
             timed_out=self._timed_out,
             cancelled=self._cancel_reason is not None,
             cancel_reason=self._cancel_reason,
@@ -124,7 +129,7 @@ class LocalProcess:
                 process.send_signal(sig)
 
     @staticmethod
-    def _drain(pipe, sink: list[str]) -> None:
+    def _drain(pipe, sink: BoundedChunks) -> None:
         try:
             for chunk in iter(lambda: pipe.read(READ_CHUNK_SIZE), ""):
                 sink.append(chunk)

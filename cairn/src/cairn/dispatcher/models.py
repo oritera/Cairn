@@ -14,11 +14,14 @@ class RunningTask:
     intent_id: str | None = None
     fact_count: int | None = None
     hint_count: int | None = None
+    hint_digest: str | None = None
     open_intent_count: int | None = None
+    started_at: float = 0.0  # time.monotonic() when submitted; for telemetry "elapsed"
 
 
 @dataclass(slots=True)
 class ReasonCheckpoint:
     fact_count: int
     hint_count: int
+    hint_digest: str
     open_intent_count: int

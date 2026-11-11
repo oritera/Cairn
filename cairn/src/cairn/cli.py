@@ -43,6 +43,29 @@ def serve(host: str, port: int, db_path: str, log_level: str, access_log: bool):
 @click.option(
     "--config",
     "config_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Initial/default dispatcher config (adopted as active on first run if none set)",
+)
+@click.option(
+    "--control-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Supervisor control dir (default: ~/.local/share/cairn/supervisor)",
+)
+@click.option("--log-level", default="INFO", show_default=True, help="Log level")
+def supervise(config_path: Path | None, control_dir: Path | None, log_level: str):
+    """Supervise the dispatcher: keep it running, restart on request, park when no config."""
+    configure_logging(log_level)
+    from cairn.dispatcher.supervisor import run_supervisor
+
+    run_supervisor(control_dir=control_dir, initial_config=config_path)
+
+
+@main.command()
+@click.option(
+    "--config",
+    "config_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     required=True,
     help="Dispatcher config path",

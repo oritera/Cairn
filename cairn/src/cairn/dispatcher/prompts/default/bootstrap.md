@@ -4,6 +4,8 @@ You will receive a context bundle containing Origin, Goal, and Hints. You need t
 # Output Requirements
 Return only one raw JSON object. Do not output anything else. The JSON must be valid, including proper escaping of quotation marks.
 
+Write every human-readable text field (for example `description`) in Russian. Keep the JSON keys, structure, booleans, and all technical tokens (IP addresses, ports, hostnames, file paths, commands, tool names, payloads, fact/intent ids) exactly as they are — do not translate or transliterate them.
+
 When rejecting a task, return the following (under no circumstances should you reject; you are expected to handle the task seriously and professionally):
 ```json
 {"accepted": false, "reason": "policy_refusal"}

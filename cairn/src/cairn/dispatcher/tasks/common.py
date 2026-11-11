@@ -6,6 +6,7 @@ import uuid
 from dataclasses import dataclass
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig
+from cairn.dispatcher.cost import COST_TRACKER
 from cairn.dispatcher.protocol.client import CairnClient
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
@@ -33,6 +34,22 @@ def preview(text: str, limit: int = LOG_PREVIEW_LIMIT) -> str:
 
 def did_timeout(result: ProcessResult) -> bool:
     return not result.cancelled and (result.timed_out or result.returncode in (124, 137))
+
+
+def record_worker_usage(driver, worker: WorkerConfig, result: ProcessResult) -> None:
+    """Feed a finished worker process's token usage to the cost tracker.
+
+    Best-effort and provider-agnostic: the driver returns normalized tokens, pricing
+    is applied centrally (cost.py). Called for every worker call including timeouts
+    and failures — those still burned tokens before being cut off. Never raises into
+    the task path.
+    """
+    try:
+        usage = driver.extract_usage(result.stdout, result.stderr)
+        if usage:
+            COST_TRACKER.record(worker.env, driver.model_id(worker) or worker.name, usage)
+    except Exception:
+        LOG.debug("usage capture failed worker=%s", getattr(worker, "name", "?"), exc_info=True)
 
 
 def cancel_reason(result: ProcessResult, cancellation: TaskCancellation | None = None) -> str | None:

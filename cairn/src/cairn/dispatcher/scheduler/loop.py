@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 
 from cairn.dispatcher.config import DispatchConfig, LocalConfig, WorkerConfig
+from cairn.dispatcher.cost import COST_TRACKER
 from cairn.dispatcher.models import ReasonCheckpoint, RunningTask
 from cairn.dispatcher.protocol.client import CairnClient
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
@@ -29,6 +32,27 @@ UNHEALTHY_RETRY_AFTER_SECONDS = 5
 REJECTED_RETRY_AFTER_SECONDS = 5
 BOOTSTRAP_INTENT_DESCRIPTION = "bootstrap"
 BOOTSTRAP_INTENT_CREATOR = "dispatcher.bootstrap"
+
+_MEM_UNITS = {"B": 1 / 1024**2, "KIB": 1 / 1024, "KB": 1 / 1024, "MIB": 1.0, "MB": 1.0, "GIB": 1024.0, "GB": 1024.0}
+
+
+def _parse_mem_mb(text: str) -> float | None:
+    """Parse a docker-stats memory token like '358MiB' or '1.2GiB' into MB."""
+    text = text.strip()
+    for unit in ("GiB", "MiB", "KiB", "GB", "MB", "KB", "B"):
+        if text.endswith(unit):
+            try:
+                return round(float(text[: -len(unit)]) * _MEM_UNITS[unit.upper()], 1)
+            except ValueError:
+                return None
+    return None
+
+
+def _parse_pct(text: str) -> float | None:
+    try:
+        return round(float(text.strip().rstrip("%")), 1)
+    except ValueError:
+        return None
 
 
 @dataclass(slots=True)
@@ -50,8 +74,17 @@ class DispatcherLoop:
         else:
             assert self.config.container is not None
             self.container_manager = ContainerManager(self.config.container)
-        self.executor = ThreadPoolExecutor(max_workers=self.config.runtime.max_workers)
-        self.cleanup_executor = ThreadPoolExecutor(max_workers=max(1, min(8, self.config.runtime.max_workers)))
+        # The ThreadPool is sized once to a CEILING; the live `max_workers` setting throttles
+        # dispatch BELOW it each tick (the dispatch gate reads config.runtime.max_workers live).
+        # This lets the UI slider raise concurrency up to the ceiling without a restart; raising
+        # the ceiling itself needs a restart. Ceiling defaults to max(config, 8), env-overridable.
+        try:
+            env_ceiling = int(os.environ.get("CAIRN_WORKER_CEILING", "8"))
+        except ValueError:
+            env_ceiling = 8
+        self._worker_ceiling = max(self.config.runtime.max_workers, max(1, env_ceiling))
+        self.executor = ThreadPoolExecutor(max_workers=self._worker_ceiling)
+        self.cleanup_executor = ThreadPoolExecutor(max_workers=max(1, min(8, self._worker_ceiling)))
         self.futures: dict[Future[str], RunningTask] = {}
         self.cleanup_futures: dict[Future[bool], tuple[str, str | None, str | None]] = {}
         self.reason_checkpoints: dict[str, ReasonCheckpoint] = {}
@@ -64,6 +97,15 @@ class DispatcherLoop:
         self.project_cursor = 0
         self._settings_checked = False
         self._startup_healthchecks_checked = False
+        # Live controls + telemetry state
+        self._paused = False
+        self._ceilings_published = False
+        self._outcome_counts: dict[str, dict[str, int]] = {}
+        self._start_monotonic = time.monotonic()
+        self._telemetry_warned = False
+        self._settings_warned = False
+        self._container_stats: list[dict] = []
+        self._container_stats_at = 0.0
 
     def close(self) -> None:
         if self.futures:
@@ -85,6 +127,11 @@ class DispatcherLoop:
                     if not self._settings_checked:
                         self._validate_server_settings()
                         self._settings_checked = True
+                    if not self._ceilings_published:
+                        self._publish_ceilings()
+                        self._seed_settings_from_config()
+                        self._ceilings_published = True
+                    self._apply_live_settings()
                     self._reap_futures()
                     self._reap_cleanup_futures()
                     summaries = self.client.list_projects()
@@ -93,6 +140,7 @@ class DispatcherLoop:
                     self._cancel_inactive_tasks(summaries)
                     self._queue_container_cleanups(summaries)
                     self._dispatch_available(summaries)
+                    self._push_telemetry(summaries)
                 except requests.RequestException as exc:
                     if once:
                         raise
@@ -189,6 +237,9 @@ class DispatcherLoop:
         return path, result.returncode == 0
 
     def _dispatch_available(self, summaries: list[ProjectSummary]) -> None:
+        if self._paused:
+            self._log_changed("dispatch/global", logging.INFO, "dispatch paused by operator (live setting)")
+            return
         if len(self.futures) >= self.config.runtime.max_workers:
             self._log_changed(
                 "dispatch/global",
@@ -420,7 +471,9 @@ class DispatcherLoop:
             intent_id=None,
             fact_count=len(project.facts),
             hint_count=len(project.hints),
+            hint_digest=self._compute_hint_digest(project),
             open_intent_count=self._project_open_intent_count(project),
+            started_at=time.monotonic(),
         )
         self.runtime_project_ids.add(project.project.id)
         self._clear_project_log_state(project.project.id)
@@ -479,7 +532,9 @@ class DispatcherLoop:
             LOG.exception("failed to submit bootstrap task project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
             self._best_effort_release(project.project.id, intent.id, worker.name)
             return False
-        self.futures[future] = RunningTask(project.project.id, "bootstrap", worker.name, cancellation, intent_id=intent.id)
+        self.futures[future] = RunningTask(
+            project.project.id, "bootstrap", worker.name, cancellation, intent_id=intent.id, started_at=time.monotonic()
+        )
         self.runtime_project_ids.add(project.project.id)
         self._clear_project_log_state(project.project.id)
         LOG.info("dispatched bootstrap project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
@@ -538,7 +593,9 @@ class DispatcherLoop:
             LOG.exception("failed to submit explore task project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
             self._best_effort_release(project.project.id, intent.id, worker.name)
             return False
-        self.futures[future] = RunningTask(project.project.id, "explore", worker.name, cancellation, intent_id=intent.id)
+        self.futures[future] = RunningTask(
+            project.project.id, "explore", worker.name, cancellation, intent_id=intent.id, started_at=time.monotonic()
+        )
         self.runtime_project_ids.add(project.project.id)
         self._clear_project_log_state(project.project.id)
         LOG.info("dispatched explore project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
@@ -701,6 +758,10 @@ class DispatcherLoop:
         LOG.info("created bootstrap intent project=%s intent=%s", project_id, intent.id)
         return intent
 
+    @staticmethod
+    def _compute_hint_digest(project: ProjectDetail) -> str:
+        return ";".join(f"{h.id}:{len(h.content)}" for h in project.hints)
+
     def _reason_trigger(self, project: ProjectDetail) -> str | None:
         open_intent_count = self._project_open_intent_count(project)
         checkpoint = self.reason_checkpoints.get(project.project.id)
@@ -709,7 +770,8 @@ class DispatcherLoop:
         changes: list[str] = []
         if len(project.facts) > checkpoint.fact_count:
             changes.append(f"facts:{checkpoint.fact_count}->{len(project.facts)}")
-        if len(project.hints) > checkpoint.hint_count:
+        current_digest = self._compute_hint_digest(project)
+        if len(project.hints) != checkpoint.hint_count or current_digest != checkpoint.hint_digest:
             changes.append(f"hints:{checkpoint.hint_count}->{len(project.hints)}")
         if checkpoint.open_intent_count > 0 and open_intent_count == 0:
             changes.append(f"open_intents:{checkpoint.open_intent_count}->0")
@@ -723,6 +785,7 @@ class DispatcherLoop:
             task = self.futures.pop(future)
             try:
                 outcome = future.result()
+                self._record_outcome(task.task_type, outcome)
                 if outcome == "cancelled":
                     LOG.info(
                         "task cancelled project=%s task=%s worker=%s",
@@ -765,10 +828,12 @@ class DispatcherLoop:
                 if outcome == "success" and task.task_type == "reason":
                     assert task.fact_count is not None
                     assert task.hint_count is not None
+                    assert task.hint_digest is not None
                     assert task.open_intent_count is not None
                     self.reason_checkpoints[task.project_id] = ReasonCheckpoint(
                         fact_count=task.fact_count,
                         hint_count=task.hint_count,
+                        hint_digest=task.hint_digest,
                         open_intent_count=task.open_intent_count,
                     )
                     LOG.debug(
@@ -867,6 +932,7 @@ class DispatcherLoop:
             self.reason_checkpoints[summary.id] = ReasonCheckpoint(
                 fact_count=summary.fact_count,
                 hint_count=summary.hint_count,
+                hint_digest=summary.hint_digest,
                 open_intent_count=open_intent_count,
             )
             LOG.debug(
@@ -927,6 +993,219 @@ class DispatcherLoop:
                 value,
                 interval,
             )
+
+    # --- Live controls + telemetry -------------------------------------------------------
+
+    def _server_url(self, path: str) -> str:
+        return f"{self.config.server.rstrip('/')}{path}"
+
+    def _publish_ceilings(self) -> None:
+        """Tell the server the upper bounds the UI sliders may use without a restart."""
+        payload = {
+            "max_workers": self._worker_ceiling,
+            "max_running_projects": max(self._worker_ceiling, self.config.runtime.max_running_projects),
+            "max_project_workers": max(self._worker_ceiling, self.config.runtime.max_project_workers),
+            "config_path": str(self.config_path),
+            "reported_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            requests.put(self._server_url("/dispatcher/ceilings"), json=payload, timeout=5)
+            LOG.info("published dispatcher ceilings max_workers=%s", self._worker_ceiling)
+        except requests.RequestException as exc:
+            LOG.warning("failed to publish ceilings error=%s", exc)
+            self._ceilings_published = False  # retry next tick
+
+    def _seed_settings_from_config(self) -> None:
+        """On startup, align the server's live settings with this dispatcher's config so the UI
+        shows real current values (lease timeouts are preserved)."""
+        try:
+            current = self.client.get_settings()
+            payload = current.model_dump()
+            payload.update(
+                {
+                    "max_workers": self.config.runtime.max_workers,
+                    "max_running_projects": self.config.runtime.max_running_projects,
+                    "max_project_workers": self.config.runtime.max_project_workers,
+                    "explore_timeout": self.config.tasks.explore.timeout,
+                    "explore_conclude_timeout": self.config.tasks.explore.conclude_timeout,
+                    "reason_task_timeout": self.config.tasks.reason.timeout,
+                    "bootstrap_timeout": self.config.tasks.bootstrap.timeout,
+                    "bootstrap_conclude_timeout": self.config.tasks.bootstrap.conclude_timeout,
+                    "reason_max_intents": self.config.tasks.reason.max_intents,
+                    "paused": False,
+                }
+            )
+            requests.put(self._server_url("/settings"), json=payload, timeout=5)
+            LOG.info("seeded live settings from config")
+        except (requests.RequestException, Exception) as exc:  # noqa: BLE001 - best effort
+            LOG.warning("failed to seed settings error=%s", exc)
+
+    def _apply_live_settings(self) -> None:
+        """Each tick: pull the live settings and apply them to the running config, clamped to the
+        ceiling. Concurrency gates read these live; task timeouts are read when a task dispatches."""
+        try:
+            s = self.client.get_settings()
+        except Exception as exc:  # noqa: BLE001 - never let a settings hiccup kill the loop
+            if not self._settings_warned:
+                LOG.warning("failed to read live settings, keeping current error=%s", exc)
+                self._settings_warned = True
+            return
+        self._settings_warned = False
+        rt = self.config.runtime
+        rt.max_workers = max(0, min(s.max_workers, self._worker_ceiling))
+        rt.max_running_projects = max(1, s.max_running_projects)
+        rt.max_project_workers = max(1, min(s.max_project_workers, max(1, rt.max_workers)))
+        self.config.tasks.explore.timeout = s.explore_timeout
+        self.config.tasks.explore.conclude_timeout = s.explore_conclude_timeout
+        self.config.tasks.reason.timeout = s.reason_task_timeout
+        self.config.tasks.reason.max_intents = s.reason_max_intents
+        self.config.tasks.bootstrap.timeout = s.bootstrap_timeout
+        self.config.tasks.bootstrap.conclude_timeout = s.bootstrap_conclude_timeout
+        self._paused = bool(s.paused)
+
+    def _record_outcome(self, task_type: str, outcome: str) -> None:
+        bucket = self._outcome_counts.setdefault(task_type, {})
+        bucket[outcome] = bucket.get(outcome, 0) + 1
+
+    def _dispatcher_rss_mb(self) -> float | None:
+        try:
+            with open("/proc/self/status") as fh:
+                for line in fh:
+                    if line.startswith("VmRSS:"):
+                        return round(int(line.split()[1]) / 1024, 1)
+        except OSError:
+            return None
+        return None
+
+    def _cost_snapshot(self) -> dict:
+        try:
+            return COST_TRACKER.snapshot()
+        except Exception:
+            return {"available": False}
+
+    def _collect_host_metrics(self) -> dict:
+        host: dict = {}
+        try:
+            meminfo: dict[str, int] = {}
+            with open("/proc/meminfo") as fh:
+                for line in fh:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        meminfo[parts[0].rstrip(":")] = int(parts[1])  # kB
+            total = meminfo.get("MemTotal", 0) / 1024
+            avail = meminfo.get("MemAvailable", 0) / 1024
+            host["mem_total_mb"] = round(total, 1)
+            host["mem_used_mb"] = round(total - avail, 1)
+            swap_total = meminfo.get("SwapTotal", 0) / 1024
+            host["swap_used_mb"] = round(swap_total - meminfo.get("SwapFree", 0) / 1024, 1)
+            host["swap_total_mb"] = round(swap_total, 1)
+        except OSError:
+            pass
+        try:
+            with open("/proc/loadavg") as fh:
+                host["cpu_load1"] = float(fh.read().split()[0])
+        except (OSError, ValueError):
+            pass
+        try:
+            usage = shutil.disk_usage("/")
+            host["disk_free_gb"] = round(usage.free / 1024**3, 1)
+            host["disk_total_gb"] = round(usage.total / 1024**3, 1)
+        except OSError:
+            pass
+        try:
+            tmp_usage = shutil.disk_usage("/tmp")
+            host["tmp_free_mb"] = round(tmp_usage.free / 1024**2, 1)
+            host["tmp_total_mb"] = round(tmp_usage.total / 1024**2, 1)
+        except OSError:
+            pass
+        return host
+
+    def _collect_container_stats(self) -> list[dict]:
+        """docker stats for cairn-dispatch-* containers, throttled to ~every 8s (it is slow)."""
+        if self.config.runtime.execution != "container":
+            return []
+        now = time.monotonic()
+        if now - self._container_stats_at < 8.0:
+            return self._container_stats
+        self._container_stats_at = now
+        stats: list[dict] = []
+        try:
+            proc = subprocess.run(
+                ["docker", "stats", "--no-stream", "--format", "{{.Name}};{{.MemUsage}};{{.CPUPerc}}"],
+                capture_output=True,
+                text=True,
+                timeout=4,
+            )
+            for line in proc.stdout.splitlines():
+                name, _, rest = line.partition(";")
+                if not name.startswith("cairn-dispatch"):
+                    continue
+                mem_part, _, cpu_part = rest.partition(";")
+                stats.append(
+                    {
+                        "name": name,
+                        "mem_mb": _parse_mem_mb(mem_part.split("/")[0].strip()),
+                        "cpu_pct": _parse_pct(cpu_part.strip()),
+                    }
+                )
+        except (subprocess.SubprocessError, OSError):
+            pass
+        self._container_stats = stats
+        return stats
+
+    def _push_telemetry(self, summaries: list[ProjectSummary]) -> None:
+        try:
+            counts = self._worker_counts()
+        except Exception:  # noqa: BLE001
+            counts = {}
+        now_mono = time.monotonic()
+        running = []
+        for task in self.futures.values():
+            running.append(
+                {
+                    "project": task.project_id,
+                    "phase": task.task_type,
+                    "intent": task.intent_id,
+                    "worker": task.worker_name,
+                    "elapsed_s": round(now_mono - task.started_at, 1) if task.started_at else None,
+                }
+            )
+        workers = []
+        unhealthy_until = self.worker_unhealthy_until
+        for w in self.config.workers:
+            workers.append(
+                {
+                    "name": w.name,
+                    "healthy": time.time() >= unhealthy_until.get(w.name, 0),
+                    "running": counts.get(w.name, 0),
+                    "max_running": w.max_running,
+                    "priority": w.priority,
+                }
+            )
+        snapshot = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "dispatcher": {
+                "pid": os.getpid(),
+                "rss_mb": self._dispatcher_rss_mb(),
+                "uptime_s": round(now_mono - self._start_monotonic, 1),
+                "paused": self._paused,
+                "worker_ceiling": self._worker_ceiling,
+                "max_workers_live": self.config.runtime.max_workers,
+            },
+            "host": self._collect_host_metrics(),
+            "running": running,
+            "workers": workers,
+            "containers": self._collect_container_stats(),
+            "outcomes": self._outcome_counts,
+            "cost": self._cost_snapshot(),
+        }
+        try:
+            requests.post(self._server_url("/dispatcher/telemetry"), json=snapshot, timeout=5)
+            self._telemetry_warned = False
+        except requests.RequestException as exc:
+            if not self._telemetry_warned:
+                LOG.warning("failed to push telemetry error=%s", exc)
+                self._telemetry_warned = True
 
     def _run_startup_healthchecks(self, *, show_commands: bool) -> None:
         results = run_startup_healthchecks(self.config, show_commands=show_commands)
