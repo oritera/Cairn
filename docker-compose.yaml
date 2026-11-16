@@ -6,7 +6,12 @@ services:
     image: cairn-app
     container_name: cairn-server
     ports:
-      - "8000:8000"
+      # Bind to host loopback only. "<port>:<port>" publishes on 0.0.0.0 -- every host
+      # interface -- which is what made the UI reachable from the network. The server
+      # still listens on 0.0.0.0 *inside* the container because cairn-dispatcher reaches
+      # it over the compose network and Docker forwards published ports to the
+      # container's network IP, so loopback-inside-the-container would break both.
+      - "127.0.0.1:7200:7200"
     volumes:
       - ./datas/cairn/:/root/.local/share/cairn/
     environment:
@@ -16,13 +21,24 @@ services:
         - "CMD"
         - "python"
         - "-c"
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/projects', timeout=5)"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7200/projects', timeout=5)"
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 3s
     restart: unless-stopped
-    command: ["uv", "run", "cairn", "serve", "--host", "0.0.0.0", "--no-access-log"]
+    # Call the synced venv directly. `uv run` re-resolves and re-builds the project on every
+    # start, which needs PyPI; this container's egress is dropped by the sandbox firewall, so
+    # that fetch times out and the server never listens. The image already has the venv.
+    command: ["/cairn/.venv/bin/cairn", "serve", "--host", "0.0.0.0", "--port", "7200", "--no-access-log"]
+    # The worker runs on cairn-sandbox-net, and Docker's DNS only resolves a service name inside
+    # a network the caller is attached to. The worker's Pi extension posts its safety preflight to
+    # CAIRN_SAFETY_ENDPOINT (cairn-server:7200/internal/safety) and is fail-closed, so without
+    # this the worker cannot run a single command. Publishing 127.0.0.1:7200 is NOT enough: a
+    # container cannot reach the host's loopback.
+    networks:
+      - default
+      - cairn-sandbox-net
   cairn-dispatcher:
     build:
       context: .
@@ -38,4 +54,15 @@ services:
       cairn-server:
         condition: service_healthy
     restart: unless-stopped
-    command: ["uv", "run", "cairn", "dispatch", "--config", "dispatch.yaml"]
+    # Same reason as cairn-server: no PyPI access at container start.
+    command: ["/cairn/.venv/bin/cairn", "dispatch", "--config", "dispatch.yaml"]
+    # Stays on the compose network only: it drives worker containers through the Docker socket,
+    # not over the network, so it never needs the sandbox.
+    networks:
+      - default
+# cairn-sandbox-net is created by hand (docker network create --driver bridge cairn-sandbox-net)
+# and is where worker containers run. external: true stops compose from creating or owning it.
+networks:
+  default:
+  cairn-sandbox-net:
+    external: true

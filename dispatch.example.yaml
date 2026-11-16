@@ -1,9 +1,9 @@
 # Cairn server API endpoint.
-server: "http://cairn-server:8000"
+server: "http://cairn-server:7200"
 
 safety:
   enabled: true
-  endpoint: "http://cairn-server:8000/internal/safety"
+  endpoint: "http://cairn-server:7200/internal/safety"
   token_env: "CAIRN_SAFETY_TOKEN"
   request_timeout_ms: 2000
   max_payload_bytes: 65536
@@ -46,6 +46,7 @@ tasks:
     # Reason decides whether the goal is met and whether new intents should be proposed.
     timeout: 300
     # Hard cap on how many new intents one reason step may create.
+    # This is the only structural brake on branch explosion -- keep it small.
     max_intents: 2
   explore:
     # Main execution timeout for exploring a claimed intent.
@@ -56,21 +57,67 @@ tasks:
 container:
   # Base worker container. The dispatcher execs agent commands inside one container per project.
   image: "ghcr.io/oritera/cairn-worker-container:latest"
-  network_mode: "host"
-  # "stop" keeps finished containers for inspection; "remove" is cleaner but loses post-run state.
-  completed_action: "stop"
-  # Add Linux capabilities only when a task truly needs them, such as packet crafting or network admin actions.
+
+  # Do NOT use "host". It hands every worker the dispatcher host's network stack, which
+  # bypasses the egress boundary the container is supposed to be, and lets an autonomous
+  # agent reach anything the host can reach. Use a dedicated network and allow-list it at
+  # the firewall instead:
+  #   docker network create --driver bridge cairn-sandbox-net
+  #   # containers get a dedicated subnet; allow only the engagement target outbound
+  #   iptables -I DOCKER-USER -s <subnet> -d <allowed-target> -j ACCEPT
+  #   iptables -I DOCKER-USER -s <subnet> -j DROP
+  # "host" is refused at config load unless container.allow_host_network is set to true.
+  network_mode: "cairn-sandbox-net"
+  allow_host_network: false
+
+  # "remove" destroys the per-project container once the project completes, so nothing the
+  # agent left behind survives. "stop" keeps it for post-run inspection at that cost.
+  completed_action: "remove"
+
+  # Add Linux capabilities only when a task truly needs them, such as packet crafting.
   # cap_add:
   #   - "NET_RAW"
-  #   - "NET_ADMIN"
 
+  # Fan-out guard: a runaway fork bomb cannot take the host down with it.
+  pids_limit: 4096
+
+  # --- optional hardening: enable what your workflow tolerates ---------------------
+  # Read-only rootfs. Enabling this REQUIRES writable mounts for everything the agent must
+  # write (at minimum /tmp and /home/kali/workspace), otherwise evidence capture breaks.
+  # read_only: true
+  # tmpfs:
+  #   /tmp: "rw,noexec,nosuid,size=512m"
+  # volumes:
+  #   - "cairn-workspace:/home/kali/workspace:rw"
+
+  # Bound memory and CPU (the reference host is 4 vCPU / 8 GB).
+  # mem_limit: "6g"
+  # nano_cpus: 2000000000        # 2 CPUs
+
+  # Restrict DNS to an internal resolver so the sandbox cannot resolve its way out
+  # (also closes the DNS-tunnel exfiltration path).
+  # dns:
+  #   - "10.0.0.53"
+
+  # NOTE: "no-new-privileges:true" blocks setuid, which breaks the worker image's
+  # passwordless sudo (`kali ALL=(ALL) NOPASSWD:ALL`). Only enable it after the image
+  # stops requiring sudo at runtime.
+  # security_opt:
+  #   - "no-new-privileges:true"
 
 workers:
   # Worker priority is ascending: lower numbers are preferred first.
   # max_running is per-worker concurrency. Keep it within the local host budget.
-  - name: "pi_qwen3.6-plus"
+  #
+  # Pi is the only supported type. Two workers are declared so that capability follows the
+  # task type: exploration needs a shell, planning needs nothing but reads.
+  #
+  # Explore / bootstrap worker: keeps bash because scanning and HTTP tooling need it.
+  # Note there is no `edit` tool -- `write` covers evidence capture, and dropping `edit`
+  # removes one class of incidental file rewriting (bash redirection still works).
+  - name: "pi-explore"
     type: "pi"
-    task_types: [bootstrap, reason, explore]
+    task_types: [bootstrap, explore]
     max_running: 2
     priority: 0
     env:
@@ -79,3 +126,20 @@ workers:
       PI_API_KEY: "sk-xxx"
       PI_PROVIDER_API: "openai-completions"
       PI_MODEL_CONTEXT_WINDOW: "262144"
+      PI_TOOLS: "read,write,bash,grep,find,ls"
+
+  # Reason worker: reasoning only reads the graph and proposes intents, so it needs no
+  # execution capability at all. With bash removed this worker is genuinely read-only --
+  # it cannot run a command even if it wanted to.
+  - name: "pi-reason-readonly"
+    type: "pi"
+    task_types: [reason]
+    max_running: 1
+    priority: 1
+    env:
+      PI_MODEL: "qwen3.6-plus"
+      PI_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      PI_API_KEY: "sk-xxx"
+      PI_PROVIDER_API: "openai-completions"
+      PI_MODEL_CONTEXT_WINDOW: "262144"
+      PI_TOOLS: "read,grep,find,ls"

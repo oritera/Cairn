@@ -75,10 +75,40 @@ class TasksConfig(BaseModel):
 
 
 class ContainerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     image: str
     network_mode: str
     completed_action: CompletedAction
     cap_add: list[str] = Field(default_factory=list)
+
+    # --- hardening -----------------------------------------------------------------
+    # "host" hands every worker the dispatcher host's network stack, which defeats the
+    # egress boundary the container is supposed to be. It needs an explicit opt-in so a
+    # stale config cannot quietly lose the boundary.
+    allow_host_network: bool = False
+    # Read-only rootfs. Pair it with writable tmpfs/volumes for every path the agent writes
+    # (at minimum /tmp and the workspace), otherwise evidence capture breaks.
+    read_only: bool = False
+    tmpfs: dict[str, str] = Field(default_factory=dict)
+    volumes: list[str] = Field(default_factory=list)
+    # NOTE: "no-new-privileges:true" blocks setuid and therefore breaks the worker image's
+    # passwordless sudo. Leave empty unless the image stops needing sudo at runtime.
+    security_opt: list[str] = Field(default_factory=list)
+    pids_limit: int | None = Field(default=None, gt=0)
+    mem_limit: str | None = None
+    nano_cpus: int | None = Field(default=None, gt=0)
+    dns: list[str] = Field(default_factory=list)
+    user: str | None = None
+
+    @model_validator(mode="after")
+    def validate_host_network(self) -> "ContainerConfig":
+        if self.network_mode == "host" and not self.allow_host_network:
+            raise ValueError(
+                "container.network_mode 'host' shares the dispatcher host network stack and "
+                "bypasses the egress boundary; set container.allow_host_network: true to accept it"
+            )
+        return self
 
 
 class LocalConfig(BaseModel):

@@ -148,7 +148,7 @@ def test_run_startup_healthchecks_reports_each_worker(monkeypatch) -> None:
                 "reason": {"timeout": 10, "max_intents": 3},
                 "explore": {"timeout": 10, "conclude_timeout": 5},
             },
-            "container": {"image": "img", "network_mode": "host", "completed_action": "stop"},
+            "container": {"image": "img", "network_mode": "host", "allow_host_network": True, "completed_action": "stop"},
             "safety": {"endpoint": "http://127.0.0.1:8000/internal/safety"},
             "workers": [
                 {"name": "ok-worker", "type": "pi", "task_types": ["reason"], "max_running": 1, "priority": 0,

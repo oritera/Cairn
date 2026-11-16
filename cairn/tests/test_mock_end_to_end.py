@@ -247,7 +247,7 @@ def _config(
             },
             "container": {
                 "image": "unused",
-                "network_mode": "host",
+                "network_mode": "host", "allow_host_network": True,
                 "completed_action": "stop",
             },
             "safety": {"endpoint": "http://127.0.0.1:8000/internal/safety"},
@@ -499,7 +499,7 @@ def _failover_config() -> DispatchConfig:
                 "reason": {"timeout": 2, "max_intents": 1},
                 "explore": {"timeout": 2, "conclude_timeout": 2},
             },
-            "container": {"image": "unused", "network_mode": "host", "completed_action": "stop"},
+            "container": {"image": "unused", "network_mode": "host", "allow_host_network": True, "completed_action": "stop"},
             "safety": {"endpoint": "http://127.0.0.1:8000/internal/safety"},
             "workers": [
                 worker("bad", 0, _phase("fail", zero_outcomes=["ok"])),

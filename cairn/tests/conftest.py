@@ -28,7 +28,7 @@ def make_config() -> DispatchConfig:
             },
             "container": {
                 "image": "test-image",
-                "network_mode": "host",
+                "network_mode": "host", "allow_host_network": True,
                 "completed_action": "stop",
             },
             "safety": {

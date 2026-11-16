@@ -12,6 +12,23 @@ from cairn.dispatcher.workers.base import DriverResult, RuntimeAsset, WorkerDriv
 from cairn.dispatcher.workers.health import HealthResult, http_ping, proxies_from_env
 
 
+# Pi's tool allow-list. The default is the recon/exploration set Cairn has always used. A
+# worker can narrow it through PI_TOOLS, which is how a plan-only worker is made genuinely
+# read-only: PI_TOOLS="read,grep,find,ls" gives it no execution capability at all.
+DEFAULT_PI_TOOLS = "read,write,edit,bash,grep,find,ls"
+
+
+def resolve_pi_tools(worker: WorkerConfig) -> str:
+    """Comma-separated Pi tool allow-list for this worker.
+
+    A blank or whitespace-only PI_TOOLS falls back to DEFAULT_PI_TOOLS. Entries are trimmed
+    and empties dropped, so a trailing or doubled comma cannot introduce an empty tool name.
+    """
+    raw = worker.env.get("PI_TOOLS", "")
+    tools = [item.strip() for item in raw.split(",") if item.strip()]
+    return ",".join(tools) if tools else DEFAULT_PI_TOOLS
+
+
 class PiDriver(WorkerDriver):
     type_name = "pi"
 
@@ -174,12 +191,18 @@ class PiDriver(WorkerDriver):
         return "\n".join(parts).strip() or stdout
 
     def _wrap_with_models(self, worker: WorkerConfig, pi_argv: list[str], *, enable_tools: bool = True) -> list[str]:
+        # The dispatcher writes the safety extension into $agent_dir through the Docker API, which
+        # creates that directory as root; this wrapper then runs as the container user (kali), so a
+        # plain `mkdir -p "$agent_dir/sessions"` fails with EACCES and every task dies at startup.
+        # sudo is available (NOPASSWD in the worker image). The chown is deliberately NOT recursive:
+        # $agent_dir/cairn-safety holds the safety extension and must stay root-owned, so that the
+        # agent cannot rewrite its own gate.
         script = (
             'agent_dir="$1"\n'
             'models_json="$2"\n'
             "shift 2\n"
-            'mkdir -p "$agent_dir"\n'
-            'mkdir -p "$agent_dir/sessions"\n'
+            'sudo mkdir -p "$agent_dir" "$agent_dir/sessions"\n'
+            'sudo chown "$(id -un):$(id -gn)" "$agent_dir" "$agent_dir/sessions"\n'
             'printf "%s" "$models_json" > "$agent_dir/models.json"\n'
             'exec env PI_CODING_AGENT_DIR="$agent_dir" pi "$@"\n'
         )
@@ -244,7 +267,7 @@ class PiDriver(WorkerDriver):
             "--no-context-files",
         ]
         if enable_tools:
-            argv.extend(["--tools", "read,write,edit,bash,grep,find,ls"])
+            argv.extend(["--tools", resolve_pi_tools(worker)])
         return argv
 
     @staticmethod

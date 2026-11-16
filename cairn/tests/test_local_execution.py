@@ -282,7 +282,7 @@ def test_container_execution_still_requires_worker_env() -> None:
     payload = _local_payload()
     payload["runtime"]["execution"] = "container"
     payload["runtime"]["worker_healthcheck"] = "startup_only"
-    payload["container"] = {"image": "img", "network_mode": "host", "completed_action": "stop"}
+    payload["container"] = {"image": "img", "network_mode": "host", "allow_host_network": True, "completed_action": "stop"}
     payload["safety"] = make_config().safety.model_dump()
 
     with pytest.raises(ValidationError, match="missing env keys"):

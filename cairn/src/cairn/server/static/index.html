@@ -584,6 +584,49 @@
         </button>
         <button @click="sideTab = 'log'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
           :class="sideTab === 'log' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Log</button>
+        <button @click="openActivity()" class="flex-1 px-3 py-2.5 text-xs font-medium transition whitespace-nowrap"
+          :class="sideTab === 'activity' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">
+          Activity <span x-show="activityAuto" class="ml-0.5 text-[10px] text-emerald-500">&#9679;</span>
+        </button>
+      </div>
+
+      <!-- Activity: live feed of what the agent is doing, inside the project view -->
+      <div x-show="sideTab === 'activity'" class="flex-1 flex flex-col overflow-hidden bg-slate-50/40">
+        <div class="px-3 py-2 border-b border-slate-100 bg-white flex items-center gap-1.5 shrink-0">
+          <button @click="toggleActivityAuto()" x-text="activityAuto ? 'LIVE' : 'Paused'"
+            :class="activityAuto ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'"
+            class="px-2 py-1 text-[11px] rounded-md font-medium"></button>
+          <button @click="activityOnlyBlocks = !activityOnlyBlocks; loadActivity(true)"
+            :class="activityOnlyBlocks ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'"
+            class="px-2 py-1 text-[11px] rounded-md">Blocks</button>
+          <span class="text-[10px] text-slate-400 ml-auto" x-text="activityItems.length + ' shown'"></span>
+          <button @click="loadActivity(true)" class="px-2 py-1 text-[11px] rounded-md bg-slate-100 text-slate-600">Reload</button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-3 space-y-2">
+          <p x-show="activityLoading" class="text-[11px] text-slate-400">Loading...</p>
+          <p x-show="!activityLoading && activityItems.length === 0" class="text-[11px] text-slate-400">
+            No actions recorded yet. They appear here as soon as the agent runs a tool.
+          </p>
+          <template x-for="item in activityItems" :key="item.event_id">
+            <article class="rounded-xl border bg-white p-2.5 text-[11px] space-y-1.5"
+              :class="item.decision === 'block' ? 'border-rose-200' : (item.decision === 'resource_pause' ? 'border-amber-200' : 'border-slate-200')">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-mono text-slate-400" x-text="activityTime(item)"></span>
+                <span class="px-1.5 py-0.5 rounded font-mono"
+                  :class="item.decision === 'block' ? 'bg-rose-50 text-rose-600' : (item.decision === 'resource_pause' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500')"
+                  x-text="item.decision || item.event_type"></span>
+                <span class="font-mono text-slate-500" x-text="item.tool_name || ''"></span>
+                <span x-show="item.rule_id" class="font-mono text-rose-500" x-text="item.rule_id"></span>
+              </div>
+              <pre x-show="auditCommand(item)"
+                class="whitespace-pre-wrap break-all rounded-lg bg-slate-900 text-slate-100 p-2 text-[10px] leading-4"
+                x-text="auditCommand(item)"></pre>
+              <div x-show="item.reason" class="text-slate-400" x-text="(item.reason || '').slice(0, 240)"></div>
+              <div class="font-mono text-[9px] text-slate-300"
+                x-text="`intent=${item.intent_id || '-'} worker=${item.worker || '-'} phase=${item.phase || '-'}`"></div>
+            </article>
+          </template>
+        </div>
       </div>
 
       <!-- Detail -->
@@ -1040,7 +1083,12 @@
           <option value="">All decisions</option><option value="block">Blocked only</option><option value="resource_pause">Resource paused</option><option value="allow">Allowed</option>
         </select>
         <input x-model="auditFilters.tool_name" @change="loadAudit(true)" placeholder="Tool" class="px-2 py-1.5 text-xs border border-slate-200 rounded-lg">
-        <button @click="loadAudit(true)" class="px-2 py-1.5 text-xs rounded-lg bg-slate-100 text-slate-600">Refresh</button>
+        <div class="flex gap-2">
+          <button @click="loadAudit(true)" class="flex-1 px-2 py-1.5 text-xs rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">Refresh</button>
+          <button @click="toggleAuditAutoRefresh()" x-text="auditAutoRefresh ? 'LIVE' : 'Auto'"
+            :class="auditAutoRefresh ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'"
+            class="flex-1 px-2 py-1.5 text-xs rounded-lg"></button>
+        </div>
       </div>
       <p x-show="auditLoading" class="text-xs text-slate-400">Loading audit events...</p>
       <p x-show="!auditLoading && auditItems.length === 0" class="text-xs text-slate-400">No matching audit events.</p>
@@ -1054,7 +1102,23 @@
           </div>
           <div class="text-slate-500" x-text="`intent=${item.intent_id || 'none'} run=${item.run_id} worker=${item.worker} phase=${item.phase} tool=${item.tool_name || 'none'}`"></div>
           <div x-show="item.rule_id || item.reason" class="text-amber-700" x-text="`${item.rule_id || 'no-rule'}: ${item.reason || ''}`"></div>
-          <pre class="whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600" x-text="JSON.stringify(item.payload, null, 2)"></pre>
+
+          <!-- The command, lifted out of payload.proposal.input (bash -> input.command). -->
+          <div x-show="auditCommand(item)" class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="text-slate-400">Command</span>
+              <button @click="copyText(auditCommand(item))"
+                class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200">Copy</button>
+            </div>
+            <pre class="whitespace-pre-wrap break-all rounded-lg bg-slate-900 text-slate-100 p-2 text-[11px]"
+              x-text="auditCommand(item)"></pre>
+          </div>
+
+          <details class="text-[11px]">
+            <summary class="cursor-pointer text-slate-400 select-none hover:text-slate-600">Raw payload</summary>
+            <pre class="mt-1 whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-2 text-slate-600"
+              x-text="JSON.stringify(item.payload, null, 2)"></pre>
+          </details>
           <div class="font-mono text-[10px] text-slate-400" x-text="`sha256=${item.payload_sha256} truncated=${item.truncated}`"></div>
         </article>
       </template>
@@ -1134,6 +1198,13 @@ function cairnApp() {
     auditItems: [],
     auditCursor: null,
     auditFilters: { intent_id: '', event_type: '', decision: '', tool_name: '' },
+    auditAutoRefresh: false,
+    auditTimer: null,
+    activityItems: [],
+    activityAuto: false,
+    activityOnlyBlocks: false,
+    activityTimer: null,
+    activityLoading: false,
     auditLoading: false,
     showDeleteModal: false,
 
@@ -1580,6 +1651,76 @@ function cairnApp() {
         this.yamlPreviewHtml = tab === 'yaml' ? this.highlightYaml(text) : this.highlightTimeline(text);
       } catch (e) {
         this.showToast(e.message, 'error');
+      }
+    },
+
+    // Pull the command out of an audit event. The extension posts
+    // payload = { proposal: { tool_name, input, cwd } }; for bash, input.command is the command.
+    auditCommand(item) {
+      const payload = item && item.payload;
+      if (!payload) return '';
+      const proposal = payload.proposal || payload;
+      const input = proposal.input || {};
+      if (typeof input === 'string') return input;
+      if (input.command) return input.command;
+      const bits = [];
+      for (const [k, v] of Object.entries(input)) {
+        if (v === null || v === undefined || v === '') continue;
+        bits.push(`${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`);
+      }
+      if (bits.length) return bits.join(' ');
+      return proposal.tool_name ? `(no arguments for ${proposal.tool_name})` : '';
+    },
+
+    copyText(text) {
+      if (!text) return;
+      try { navigator.clipboard.writeText(text); } catch (err) { /* needs a secure context */ }
+    },
+
+    toggleAuditAutoRefresh() {
+      this.auditAutoRefresh = !this.auditAutoRefresh;
+      if (this.auditTimer) { clearInterval(this.auditTimer); this.auditTimer = null; }
+      if (this.auditAutoRefresh) {
+        this.auditTimer = setInterval(() => {
+          if (this.exportTab === 'audit' && !this.auditLoading) this.loadAudit(true);
+        }, 5000);
+      }
+    },
+
+    activityTime(item) {
+      const raw = (item && item.created_at) || '';
+      return raw.replace('T', ' ').slice(11, 19) || raw.slice(0, 19);
+    },
+
+    openActivity() {
+      this.sideTab = 'activity';
+      this.loadActivity(true);
+      this.toggleActivityAuto(true);
+    },
+
+    async loadActivity(reset) {
+      if (!this.selectedProjectId || this.activityLoading) return;
+      this.activityLoading = true;
+      try {
+        const params = new URLSearchParams({ event_type: 'ACTION_DECISION' });
+        if (this.activityOnlyBlocks) params.set('decision', 'block');
+        const page = await this.api('GET', `/projects/${this.selectedProjectId}/audit?${params.toString()}`);
+        const items = (page && page.items) ? page.items.slice().reverse() : [];  // newest first
+        this.activityItems = items.slice(0, 200);
+      } catch (err) {
+        /* keep the previous list; the header still shows LIVE/Paused */
+      } finally {
+        this.activityLoading = false;
+      }
+    },
+
+    toggleActivityAuto(force) {
+      this.activityAuto = (force === true) ? true : (!this.activityAuto);
+      if (this.activityTimer) { clearInterval(this.activityTimer); this.activityTimer = null; }
+      if (this.activityAuto) {
+        this.activityTimer = setInterval(() => {
+          if (this.view === 'graph' && this.sideTab === 'activity') this.loadActivity(true);
+        }, 4000);
       }
     },
 

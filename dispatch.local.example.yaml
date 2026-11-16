@@ -13,13 +13,13 @@
 # - Local mode runs the agents with your user's permissions and no sandbox. Only use it in
 #   environments you are authorized to operate in.
 
-server: "http://127.0.0.1:8000"
+server: "http://127.0.0.1:7200"
 
 # Local mode is best-effort because Pi and the safety extension share host permissions.
 # Export CAIRN_SAFETY_TOKEN in both the server and dispatcher shells.
 safety:
   enabled: true
-  endpoint: "http://127.0.0.1:8000/internal/safety"
+  endpoint: "http://127.0.0.1:7200/internal/safety"
   token_env: "CAIRN_SAFETY_TOKEN"
   request_timeout_ms: 2000
   max_payload_bytes: 65536
