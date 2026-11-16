@@ -22,6 +22,12 @@ class ProcessResult:
     timed_out: bool = False
     cancelled: bool = False
     cancel_reason: str | None = None
+    stdout_truncated: bool = False
+    stderr_truncated: bool = False
+    stdout_path: str | None = None
+    stderr_path: str | None = None
+    stdout_spool_incomplete: bool = False
+    stderr_spool_incomplete: bool = False
 
 
 @runtime_checkable

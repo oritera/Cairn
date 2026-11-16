@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 
 from cairn.dispatcher.config import LocalConfig
-from cairn.dispatcher.runtime.local_process import LocalProcess
+from cairn.dispatcher.runtime.local_process import LocalProcess, spool_root, sweep_orphan_spools
 
 LOG = logging.getLogger(__name__)
 
@@ -25,9 +25,20 @@ class LocalBackend:
         self._config = config
         root = config.workspace_root
         self._root = Path(root).expanduser() if root else Path.cwd()
+        self._sweep_spools("startup")
 
     def close(self) -> None:
-        return None
+        self._sweep_spools("shutdown")
+
+    def _sweep_spools(self, when: str) -> None:
+        root = spool_root(self._root)
+        try:
+            removed = sweep_orphan_spools(root)
+        except OSError as exc:
+            LOG.warning("spool sweep failed when=%s path=%s error=%s", when, root, exc)
+            return
+        if removed:
+            LOG.info("removed orphan spools when=%s path=%s count=%s", when, root, removed)
 
     def container_name(self, project_id: str) -> str:
         return str(self._project_dir(project_id))

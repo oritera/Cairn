@@ -3,9 +3,13 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
+from pathlib import Path
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig
+from cairn.dispatcher.contracts import parse_json_output
+from cairn.dispatcher.output_parser import extract_json_object_from_file
 from cairn.dispatcher.protocol.client import CairnClient
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
@@ -25,10 +29,84 @@ class ConcludeWriteResult:
 
 
 def preview(text: str, limit: int = LOG_PREVIEW_LIMIT) -> str:
-    compact = " ".join(text.split())
-    if len(compact) <= limit:
-        return compact
-    return compact[:limit] + "..."
+    """Collapse whitespace like ``str.split`` without building a token list.
+
+    Scanning stops once ``limit`` normalized characters are produced and another
+    non-space character still remains. The ``...`` marker is the same three
+    characters the previous implementation appended after ``compact[:limit]``.
+    """
+    if limit <= 0:
+        for char in text:
+            if not char.isspace():
+                return "..."
+        return ""
+    out: list[str] = []
+    size = 0
+    pending_space = False
+    seen_word = False
+    for char in text:
+        if char.isspace():
+            if seen_word:
+                pending_space = True
+            continue
+        if pending_space:
+            if size >= limit:
+                return "".join(out) + "..."
+            out.append(" ")
+            size += 1
+            pending_space = False
+        if size >= limit:
+            return "".join(out) + "..."
+        out.append(char)
+        size += 1
+        seen_word = True
+    return "".join(out)
+
+
+def resolve_session(driver, session: str | None, result: ProcessResult) -> str | None:
+    """Recover a worker session without assuming the in-memory stderr is complete."""
+    if session:
+        return driver.extract_session(session, result.stdout, result.stderr)
+    from_files = getattr(driver, "extract_session_from_files", None)
+    if callable(from_files):
+        stdout_path = None if result.stdout_spool_incomplete else result.stdout_path
+        stderr_path = None if result.stderr_spool_incomplete else result.stderr_path
+        found = from_files(stdout_path, stderr_path)
+        if found:
+            return found
+    return driver.extract_session(None, result.stdout, result.stderr)
+
+
+def parse_worker_json(driver, result: ProcessResult):
+    """Parse the model JSON from a process result.
+
+    Untruncated stdout stays on the original in-memory path. A truncated raw
+    stdout is scanned from the spool file so an object outside the retained
+    head and tail is still visible. Drivers that understand their own stream
+    format can supply ``extract_response_text_from_file``.
+    """
+    if result.stdout_spool_incomplete and result.stdout_truncated:
+        raise ValueError("stdout spool incomplete")
+    from_file = getattr(driver, "extract_response_text_from_file", None)
+    if result.stdout_truncated and result.stdout_path and callable(from_file):
+        extracted = from_file(result.stdout_path)
+        if extracted:
+            return parse_json_output(extracted)
+    text = driver.extract_response_text(result.stdout, result.stderr)
+    if result.stdout_truncated and result.stdout_path and text == result.stdout:
+        return extract_json_object_from_file(result.stdout_path)
+    return parse_json_output(text)
+
+
+def release_output_files(result: ProcessResult | None) -> None:
+    """Delete spool files after the caller has finished reading them."""
+    if result is None:
+        return
+    for path in (result.stdout_path, result.stderr_path):
+        if not path:
+            continue
+        with suppress(OSError):
+            Path(path).unlink()
 
 
 def did_timeout(result: ProcessResult) -> bool:
