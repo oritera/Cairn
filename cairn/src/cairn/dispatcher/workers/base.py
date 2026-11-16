@@ -4,6 +4,7 @@ import abc
 import re
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 from cairn.dispatcher.config import WorkerConfig
 from cairn.dispatcher.workers.health import HealthResult
@@ -69,3 +70,34 @@ class RegexSessionDriver(WorkerDriver):
         if match:
             return match.group(1)
         return None
+
+    def extract_session_from_files(self, stdout_path: str | None, stderr_path: str | None) -> str | None:
+        return search_first_group_in_file(stderr_path, self.session_pattern)
+
+
+def search_first_group_in_file(path: str | None, pattern: re.Pattern[str]) -> str | None:
+    """Leftmost regex match over a file, keeping only a chunk plus a small overlap."""
+    if not path:
+        return None
+    try:
+        handle = Path(path).open("r", encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    overlap = 256
+    pending = ""
+    with handle:
+        while True:
+            chunk = handle.read(65536)
+            if chunk == "":
+                match = pattern.search(pending)
+                if match is None:
+                    return None
+                return match.group(1) if match.lastindex else match.group(0)
+            data = pending + chunk
+            match = pattern.search(data)
+            if match is not None and match.end() < len(data):
+                return match.group(1) if match.lastindex else match.group(0)
+            if match is not None:
+                pending = data[match.start():]
+                continue
+            pending = data[-overlap:] if len(data) > overlap else data

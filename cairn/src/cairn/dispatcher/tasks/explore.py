@@ -4,7 +4,7 @@ import logging
 import time
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig
-from cairn.dispatcher.contracts import parse_json_output, validate_explore_payload
+from cairn.dispatcher.contracts import validate_explore_payload
 from cairn.dispatcher.prompting import load_prompt, render_prompt
 from cairn.dispatcher.protocol.client import CairnClient
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
@@ -15,7 +15,10 @@ from cairn.dispatcher.tasks.common import (
     cancel_reason,
     did_timeout,
     project_allows_conclude_fallback,
+    parse_worker_json,
     preview,
+    release_output_files,
+    resolve_session,
     run_worker_process,
     task_healthcheck_enabled,
     write_conclude_result,
@@ -42,6 +45,7 @@ def run_explore_task(
     healthcheck_timeout = config.runtime.healthcheck_timeout
     lease = HeartbeatLease.for_intent(client, project.project.id, intent.id, worker.name, config.runtime.interval)
     lease.start()
+    artifacts = []
     try:
         container_name = container_manager.ensure_running(project.project.id)
 
@@ -115,7 +119,8 @@ def run_explore_task(
             cancellation=cancellation,
         )
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
-        session = driver.extract_session(session, first.stdout, first.stderr)
+        artifacts.append(first)
+        session = resolve_session(driver, session, first)
         cancelled = cancel_reason(first, cancellation)
         if cancelled is not None:
             LOG.info(
@@ -141,8 +146,7 @@ def run_explore_task(
             return "failed"
         if not did_timeout(first) and first.returncode == 0:
             try:
-                model_output = driver.extract_response_text(first.stdout, first.stderr)
-                payload = parse_json_output(model_output)
+                payload = parse_worker_json(driver, first)
                 kind, description = validate_explore_payload(payload)
             except Exception as exc:
                 LOG.warning(
@@ -169,6 +173,7 @@ def run_explore_task(
                     session,
                     lease,
                     cancellation,
+                    artifacts,
                 )
             if kind == "rejected":
                 LOG.warning(
@@ -216,6 +221,7 @@ def run_explore_task(
                 session,
                 lease,
                 cancellation,
+                artifacts,
             )
         LOG.warning(
             "explore command failed project=%s intent=%s worker=%s code=%s execute_ms=%s total_ms=%s stdout_preview=%s stderr_preview=%s",
@@ -236,6 +242,8 @@ def run_explore_task(
         return "failed"
     finally:
         lease.stop()
+        for item in artifacts:
+            release_output_files(item)
 
 
 def _try_conclude_fallback(
@@ -251,6 +259,7 @@ def _try_conclude_fallback(
     session: str | None,
     lease: HeartbeatLease,
     cancellation: TaskCancellation,
+    artifacts: list,
 ) -> str:
     if not driver.supports_conclude() or not session:
         LOG.info(
@@ -316,6 +325,7 @@ def _try_conclude_fallback(
         cancellation=cancellation,
     )
     conclude_ms = int((time.perf_counter() - conclude_started) * 1000)
+    artifacts.append(result)
     cancelled = cancel_reason(result, cancellation)
     if cancelled is not None:
         LOG.info(
@@ -346,8 +356,7 @@ def _try_conclude_fallback(
         best_effort_release(client, project_id, intent.id, worker.name)
         return "failed"
     try:
-        model_output = driver.extract_response_text(result.stdout, result.stderr)
-        payload = parse_json_output(model_output)
+        payload = parse_worker_json(driver, result)
         kind, description = validate_explore_payload(payload)
     except Exception as exc:
         LOG.warning(

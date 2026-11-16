@@ -144,19 +144,37 @@ class PiDriver(WorkerDriver):
                             break
         if assistant_message is None:
             return stdout
-        content = assistant_message.get("content")
-        if not isinstance(content, list):
-            return stdout
-        parts: list[str] = []
-        for item in content:
-            if not isinstance(item, dict):
+        return _assistant_text(assistant_message) or stdout
+
+    def extract_session_from_files(self, stdout_path: str | None, stderr_path: str | None) -> str | None:
+        if not stdout_path:
+            return None
+        for event in _iter_events_file(stdout_path):
+            if event.get("type") != "session":
                 continue
-            if item.get("type") != "text":
-                continue
-            text = item.get("text")
-            if isinstance(text, str) and text:
-                parts.append(text)
-        return "\n".join(parts).strip() or stdout
+            session_id = event.get("id")
+            if isinstance(session_id, str) and session_id:
+                return session_id
+        return None
+
+    def extract_response_text_from_file(self, path: str) -> str:
+        assistant_message: dict[str, Any] | None = None
+        for event in _iter_events_file(path):
+            event_type = event.get("type")
+            if event_type == "turn_end":
+                message = event.get("message")
+                if isinstance(message, dict) and message.get("role") == "assistant":
+                    assistant_message = message
+            elif event_type == "agent_end":
+                messages = event.get("messages")
+                if isinstance(messages, list):
+                    for message in reversed(messages):
+                        if isinstance(message, dict) and message.get("role") == "assistant":
+                            assistant_message = message
+                            break
+        if assistant_message is None:
+            return ""
+        return _assistant_text(assistant_message)
 
     def _wrap_with_models(self, worker: WorkerConfig, pi_argv: list[str], *, enable_tools: bool = True) -> list[str]:
         script = (
@@ -230,3 +248,48 @@ class PiDriver(WorkerDriver):
         }
         payload = {"providers": {"cairn": provider}}
         return json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
+
+
+_JSONL_LINE_MAX = 2_000_000
+
+
+def _assistant_text(message: dict[str, Any]) -> str:
+    content = message.get("content")
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for item in content:
+        if not isinstance(item, dict) or item.get("type") != "text":
+            continue
+        text = item.get("text")
+        if isinstance(text, str) and text:
+            parts.append(text)
+    return "\n".join(parts).strip()
+
+
+def _iter_events_file(path: str):
+    """Yield JSONL objects without keeping every line or every event."""
+    try:
+        handle = open(path, "r", encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    with handle:
+        while True:
+            line = handle.readline(_JSONL_LINE_MAX + 1)
+            if not line:
+                return
+            if len(line) > _JSONL_LINE_MAX and not line.endswith("\n"):
+                while True:
+                    more = handle.readline(_JSONL_LINE_MAX + 1)
+                    if not more or more.endswith("\n"):
+                        break
+                continue
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                yield payload

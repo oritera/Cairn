@@ -4,7 +4,7 @@ import logging
 import time
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig
-from cairn.dispatcher.contracts import parse_json_output, validate_reason_payload
+from cairn.dispatcher.contracts import validate_reason_payload
 from cairn.dispatcher.prompting import (
     format_fact_ids,
     format_open_intents,
@@ -19,7 +19,10 @@ from cairn.dispatcher.tasks.common import (
     best_effort_release_reason,
     cancel_reason,
     did_timeout,
+    parse_worker_json,
     preview,
+    release_output_files,
+    resolve_session,
     run_worker_process,
     task_healthcheck_enabled,
     write_graph_snapshot_reference,
@@ -44,6 +47,7 @@ def run_reason_task(
     healthcheck_timeout = config.runtime.healthcheck_timeout
     lease = HeartbeatLease.for_reason(client, project.project.id, worker.name, config.runtime.interval)
     lease.start()
+    artifacts = []
     try:
         container_name = container_manager.ensure_running(project.project.id)
 
@@ -130,7 +134,8 @@ def run_reason_task(
         )
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
         total_ms = int((time.perf_counter() - task_started) * 1000)
-        session = driver.extract_session(session, result.stdout, result.stderr)
+        artifacts.append(result)
+        session = resolve_session(driver, session, result)
         cancelled = cancel_reason(result, cancellation)
         if cancelled is not None:
             LOG.info(
@@ -174,8 +179,7 @@ def run_reason_task(
             )
             return "failed"
         try:
-            model_output = driver.extract_response_text(result.stdout, result.stderr)
-            payload = parse_json_output(model_output)
+            payload = parse_worker_json(driver, result)
             kind, data = validate_reason_payload(
                 payload, open_intents_empty=not open_intents, max_intents=config.tasks.reason.max_intents,
             )
@@ -282,3 +286,5 @@ def run_reason_task(
     finally:
         lease.stop()
         best_effort_release_reason(client, project.project.id, worker.name)
+        for item in artifacts:
+            release_output_files(item)
