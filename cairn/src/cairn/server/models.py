@@ -1,8 +1,86 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
+
+from cairn.dispatcher.config import ResourceBudgetConfig
+
+
+AuditEventType = Literal[
+    "ACTION_DECISION",
+    "ACTION_RESULT",
+    "ASSISTANT_MESSAGE",
+    "AGENT_END",
+    "AUDIT_BACKFILL",
+]
+AuditDecision = Literal["allow", "block", "resource_pause"]
+
+
+class AuditEventCreate(BaseModel):
+    schema_version: Literal[1]
+    event_id: str = Field(min_length=1)
+    action_id: str | None = None
+    run_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    intent_id: str | None = None
+    worker: str = Field(min_length=1)
+    phase: str = Field(min_length=1)
+    event_type: AuditEventType
+    tool_name: str | None = None
+    decision: AuditDecision | None = None
+    rule_id: str | None = None
+    reason: str | None = None
+    payload: dict[str, Any]
+
+
+class AuditEvent(BaseModel):
+    event_id: str
+    action_id: str | None = None
+    run_id: str
+    project_id: str
+    intent_id: str | None = None
+    worker: str
+    phase: str
+    event_type: AuditEventType
+    tool_name: str | None = None
+    decision: AuditDecision | None = None
+    rule_id: str | None = None
+    reason: str | None = None
+    payload: dict[str, Any]
+    payload_sha256: str
+    truncated: bool
+    created_at: str
+
+
+class AuditEventPage(BaseModel):
+    items: list[AuditEvent]
+    next: str | None = None
+
+
+class SafetyPreflightRequest(BaseModel):
+    schema_version: Literal[1]
+    event_id: str = Field(min_length=1)
+    action_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    intent_id: str | None = None
+    worker: str = Field(min_length=1)
+    phase: str = Field(min_length=1)
+    tool_name: str = Field(min_length=1)
+    input: dict[str, Any]
+    cwd: str = Field(min_length=1)
+    resource_budget: ResourceBudgetConfig | None = None
+
+
+class SafetyPreflightResponse(BaseModel):
+    event_id: str
+    action_id: str
+    decision: AuditDecision
+    rule_id: str | None = None
+    reason: str
+    target: str | None = None
+    auth_attempt_count: int = Field(default=0, ge=0)
 
 
 class Settings(BaseModel):

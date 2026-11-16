@@ -55,6 +55,15 @@ class ContainerManager:
                 name=name,
                 network_mode=self._config.network_mode,
                 cap_add=self._config.cap_add or None,
+                read_only=self._config.read_only,
+                tmpfs=self._config.tmpfs or None,
+                volumes=self._config.volumes or None,
+                security_opt=self._config.security_opt or None,
+                pids_limit=self._config.pids_limit,
+                mem_limit=self._config.mem_limit,
+                nano_cpus=self._config.nano_cpus,
+                dns=self._config.dns or None,
+                user=self._config.user,
             )
             LOG.info("created container project=%s container=%s", project_id, name)
             return name

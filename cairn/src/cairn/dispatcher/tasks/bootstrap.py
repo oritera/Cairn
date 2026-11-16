@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig
 from cairn.dispatcher.contracts import (
@@ -15,18 +16,23 @@ from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.tasks.common import (
+    backfill_safety_fallbacks,
     best_effort_release,
     cancel_reason,
     did_timeout,
+    latest_blocked_action,
     project_allows_conclude_fallback,
     preview,
     run_worker_process,
+    SafetyRunContext,
     task_healthcheck_enabled,
     write_conclude_result,
     write_conclude_result_with_fact_id,
 )
+from cairn.safety.r1 import is_r1_fact, synthesize_r1_fact
+from cairn.safety.v1 import is_v1_fact, render_safety_decision_context, synthesize_v1_fact
 from cairn.dispatcher.workers.registry import get_driver
-from cairn.server.models import Intent, ProjectDetail
+from cairn.server.models import AuditEvent, Intent, ProjectDetail
 
 LOG = logging.getLogger(__name__)
 
@@ -41,6 +47,7 @@ def run_bootstrap_task(
     cancellation: TaskCancellation,
 ) -> str:
     driver = get_driver(worker.type, config.runtime.execution)
+    run_id = uuid.uuid4().hex
     task_started = time.perf_counter()
     healthcheck_timeout = config.runtime.healthcheck_timeout
     lease = HeartbeatLease.for_intent(client, project.project.id, intent.id, worker.name, config.runtime.interval)
@@ -102,12 +109,22 @@ def run_bootstrap_task(
             container_manager,
             container_name,
             worker,
-            execute.argv,
+            execute,
             phase="bootstrap",
             timeout_seconds=config.tasks.bootstrap.timeout,
+            safety=config.safety,
+            safety_context=SafetyRunContext(
+                run_id=run_id,
+                project_id=project.project.id,
+                intent_id=intent.id,
+                worker=worker.name,
+                phase="bootstrap",
+            ),
             lease=lease,
             cancellation=cancellation,
         )
+        backfill_safety_fallbacks(client, first.stderr, config.safety)
+        safety_decision = latest_blocked_action(client, project.project.id, run_id)
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
         session = driver.extract_session(session, first.stdout, first.stderr)
         cancelled = cancel_reason(first, cancellation)
@@ -160,10 +177,16 @@ def run_bootstrap_task(
                     project,
                     intent,
                     session,
+                    run_id,
                     lease,
                     cancellation,
+                    safety_decision,
                 )
             if kind == "rejected":
+                if safety_decision is not None:
+                    return _write_synthesized_safety_fact(
+                        client, project.project.id, intent, worker.name, safety_decision, execute_ms
+                    )
                 LOG.warning(
                     "bootstrap rejected project=%s intent=%s worker=%s execute_ms=%s total_ms=%s stdout_preview=%s",
                     project.project.id,
@@ -175,6 +198,32 @@ def run_bootstrap_task(
                 )
                 best_effort_release(client, project.project.id, intent.id, worker.name)
                 return "rejected"
+            if safety_decision is not None:
+                if _is_required_safety_fact(data["fact_description"], safety_decision):
+                    return write_conclude_result(
+                        client,
+                        project.project.id,
+                        intent.id,
+                        worker.name,
+                        data["fact_description"],
+                        source="bootstrap_safety",
+                        phase_ms=execute_ms,
+                    )
+                return _try_conclude_fallback(
+                    config,
+                    client,
+                    container_manager,
+                    container_name,
+                    worker,
+                    driver,
+                    project,
+                    intent,
+                    session,
+                    run_id,
+                    lease,
+                    cancellation,
+                    safety_decision,
+                )
             return _write_bootstrap_complete_result(
                 client,
                 project.project.id,
@@ -207,8 +256,26 @@ def run_bootstrap_task(
                 project,
                 intent,
                 session,
+                run_id,
                 lease,
                 cancellation,
+                safety_decision,
+            )
+        if safety_decision is not None:
+            return _try_conclude_fallback(
+                config,
+                client,
+                container_manager,
+                container_name,
+                worker,
+                driver,
+                project,
+                intent,
+                session,
+                run_id,
+                lease,
+                cancellation,
+                safety_decision,
             )
         LOG.warning(
             "bootstrap command failed project=%s intent=%s worker=%s code=%s execute_ms=%s total_ms=%s stdout_preview=%s stderr_preview=%s",
@@ -241,8 +308,10 @@ def _try_conclude_fallback(
     project: ProjectDetail,
     intent: Intent,
     session: str | None,
+    run_id: str,
     lease: HeartbeatLease,
     cancellation: TaskCancellation,
+    safety_decision: AuditEvent | None = None,
 ) -> str:
     if not driver.supports_conclude() or not session:
         LOG.info(
@@ -253,6 +322,10 @@ def _try_conclude_fallback(
             driver.supports_conclude(),
             bool(session),
         )
+        if safety_decision is not None:
+            return _write_synthesized_safety_fact(
+                client, project.project.id, intent, worker.name, safety_decision, 0
+            )
         best_effort_release(client, project.project.id, intent.id, worker.name)
         return "failed"
     if lease.failure is not None:
@@ -288,21 +361,34 @@ def _try_conclude_fallback(
 
     prompt = render_prompt(
         load_prompt(config.runtime.prompt_group, "bootstrap_conclude.md"),
-        _bootstrap_prompt_replacements(project),
+        {
+            **_bootstrap_prompt_replacements(project),
+            "safety_decision_context": render_safety_decision_context(safety_decision),
+        },
     )
-    conclude_argv = driver.build_conclude(worker, prompt, session)
+    conclude_command = driver.build_conclude(worker, prompt, session)
     LOG.info("starting bootstrap conclude fallback project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
     conclude_started = time.perf_counter()
     result = run_worker_process(
         container_manager,
         container_name,
         worker,
-        conclude_argv,
+        conclude_command,
         phase="bootstrap_conclude",
         timeout_seconds=config.tasks.bootstrap.conclude_timeout,
+        safety=config.safety,
+        safety_context=SafetyRunContext(
+            run_id=run_id,
+            project_id=project.project.id,
+            intent_id=intent.id,
+            worker=worker.name,
+            phase="bootstrap_conclude",
+        ),
         lease=lease,
         cancellation=cancellation,
     )
+    backfill_safety_fallbacks(client, result.stderr, config.safety)
+    safety_decision = latest_blocked_action(client, project.project.id, run_id) or safety_decision
     conclude_ms = int((time.perf_counter() - conclude_started) * 1000)
     cancelled = cancel_reason(result, cancellation)
     if cancelled is not None:
@@ -317,6 +403,10 @@ def _try_conclude_fallback(
         best_effort_release(client, project.project.id, intent.id, worker.name)
         return "cancelled"
     if lease.failure is not None:
+        if safety_decision is not None:
+            return _write_synthesized_safety_fact(
+                client, project.project.id, intent, worker.name, safety_decision, conclude_ms
+            )
         best_effort_release(client, project.project.id, intent.id, worker.name)
         return "failed"
     if result.timed_out or result.returncode != 0:
@@ -357,9 +447,17 @@ def _try_conclude_fallback(
             preview(result.stdout),
             preview(result.stderr),
         )
+        if safety_decision is not None:
+            return _write_synthesized_safety_fact(
+                client, project.project.id, intent, worker.name, safety_decision, conclude_ms
+            )
         best_effort_release(client, project.project.id, intent.id, worker.name)
         return "failed"
     if kind == "rejected":
+        if safety_decision is not None:
+            return _write_synthesized_safety_fact(
+                client, project.project.id, intent, worker.name, safety_decision, conclude_ms
+            )
         LOG.warning(
             "bootstrap conclude rejected project=%s intent=%s worker=%s conclude_ms=%s stdout_preview=%s",
             project.project.id,
@@ -370,6 +468,10 @@ def _try_conclude_fallback(
         )
         best_effort_release(client, project.project.id, intent.id, worker.name)
         return "rejected"
+    if safety_decision is not None and not _is_required_safety_fact(fact_description, safety_decision):
+        return _write_synthesized_safety_fact(
+            client, project.project.id, intent, worker.name, safety_decision, conclude_ms
+        )
     return write_conclude_result(
         client,
         project.project.id,
@@ -378,6 +480,35 @@ def _try_conclude_fallback(
         fact_description,
         source="bootstrap_conclude",
         phase_ms=conclude_ms,
+    )
+
+
+def _is_required_safety_fact(description: str, event: AuditEvent) -> bool:
+    if event.decision == "resource_pause":
+        return is_r1_fact(description)
+    return is_v1_fact(description)
+
+
+def _write_synthesized_safety_fact(
+    client: CairnClient,
+    project_id: str,
+    intent: Intent,
+    worker_name: str,
+    event: AuditEvent,
+    phase_ms: int,
+) -> str:
+    if event.decision == "resource_pause":
+        description = synthesize_r1_fact(intent.description, event)
+    else:
+        description = synthesize_v1_fact(intent.description, event)
+    return write_conclude_result(
+        client,
+        project_id,
+        intent.id,
+        worker_name,
+        description,
+        source="safety_synthesized",
+        phase_ms=phase_ms,
     )
 
 

@@ -108,7 +108,7 @@ System architecture:
 
 Workers can also run directly on the dispatcher host instead of in per-project containers — **local mode**, no Docker required. See [Local mode](#local-mode-no-docker) below.
 
-Supported worker backends: **Claude Code**, **Codex**, and **Pi**.
+Production worker backend: **Pi Coding Agent only**.
 
 ## Results
 
@@ -163,7 +163,7 @@ docker pull ghcr.io/astral-sh/uv:python3.13-trixie
 docker compose up --build
 ```
  
-This starts `cairn-server` on port `8000` and `cairn-dispatcher` once the server passes its health check. The dispatcher mounts `dispatch.yaml` from the project root and connects to Docker via the host socket. Data is persisted to `./datas/cairn/`.
+This starts `cairn-server` on port `7200` and `cairn-dispatcher` once the server passes its health check. The dispatcher mounts `dispatch.yaml` from the project root and connects to Docker via the host socket. Data is persisted to `./datas/cairn/`.
  
 ### Manual
  
@@ -180,7 +180,7 @@ uv run --project cairn cairn dispatch --config dispatch.yaml --startup-healthche
 
 ### Local mode (no Docker)
 
-Instead of one container per project, workers can run directly on the dispatcher host, reusing the machine's already-configured `claude` / `codex` / `pi` CLIs — no Docker, and no API keys in the config.
+Instead of one container per project, workers can run directly on the dispatcher host, reusing the machine's already-configured `pi` CLI — no Docker, and no API keys in the config.
 
 ```bash
 cp dispatch.local.example.yaml dispatch.yaml
@@ -222,3 +222,12 @@ This project is licensed under **GNU AGPLv3** for personal and educational use.
 **Commercial Use**: If you wish to use this project in a commercial or proprietary environment without the AGPL-3.0 open-source obligations, **please contact me to obtain a commercial license.**
 
 **Contributions**: By submitting a Pull Request, you agree that your contributions may be used under both the AGPL-3.0 and the project's commercial license.
+
+
+## Pi-only safety boundary
+
+Cairn loads one packaged, trusted Pi extension while keeping automatic extension discovery disabled. Every proposed tool call is sent to the Server preflight endpoint. Explicit high-confidence destructive patterns are blocked, resource-heavy or over-budget credential validation is paused, and ambiguous actions remain available and audited.
+
+The Server commits the decision before Pi receives a block whenever it is reachable. A destructive block closes only the current Intent with a `[V1][BRANCH_CLOSED]` Fact. A resource pause closes only the current Intent with an `[R1][RESOURCE_PAUSED]` Fact and is not vulnerability confirmation. Other project directions continue normally.
+
+The Web export dialog includes an Audit tab showing proposal, decision, rule, execution result, assistant messages, correlation IDs, truncation state, and payload hash. Container mode is the production enforcement boundary; local mode is best-effort because Pi runs with the dispatcher's user permissions.

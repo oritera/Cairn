@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig
 from cairn.dispatcher.contracts import parse_json_output, validate_reason_payload
@@ -16,11 +17,14 @@ from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.tasks.common import (
+    backfill_safety_fallbacks,
     best_effort_release_reason,
     cancel_reason,
     did_timeout,
+    latest_blocked_action,
     preview,
     run_worker_process,
+    SafetyRunContext,
     task_healthcheck_enabled,
     write_graph_snapshot_reference,
 )
@@ -40,6 +44,7 @@ def run_reason_task(
     cancellation: TaskCancellation,
 ) -> str:
     driver = get_driver(worker.type, config.runtime.execution)
+    run_id = uuid.uuid4().hex
     task_started = time.perf_counter()
     healthcheck_timeout = config.runtime.healthcheck_timeout
     lease = HeartbeatLease.for_reason(client, project.project.id, worker.name, config.runtime.interval)
@@ -122,12 +127,31 @@ def run_reason_task(
             container_manager,
             container_name,
             worker,
-            command.argv,
+            command,
             phase="reason_execute",
             timeout_seconds=config.tasks.reason.timeout,
+            safety=config.safety,
+            safety_context=SafetyRunContext(
+                run_id=run_id,
+                project_id=project.project.id,
+                intent_id=None,
+                worker=worker.name,
+                phase="reason_execute",
+            ),
             lease=lease,
             cancellation=cancellation,
         )
+        backfill_safety_fallbacks(client, result.stderr, config.safety)
+        safety_decision = latest_blocked_action(client, project.project.id, run_id)
+        if safety_decision is not None:
+            LOG.info(
+                "reason branch limited by safety decision project=%s worker=%s action=%s decision=%s; releasing reason lease",
+                project.project.id,
+                worker.name,
+                safety_decision.action_id,
+                safety_decision.decision,
+            )
+            return "success"
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
         total_ms = int((time.perf_counter() - task_started) * 1000)
         session = driver.extract_session(session, result.stdout, result.stderr)

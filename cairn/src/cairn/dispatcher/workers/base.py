@@ -9,10 +9,17 @@ from cairn.dispatcher.config import WorkerConfig
 from cairn.dispatcher.workers.health import HealthResult
 
 
+@dataclass(frozen=True, slots=True)
+class RuntimeAsset:
+    path: str
+    content: str
+
+
 @dataclass(slots=True)
 class DriverResult:
     argv: list[str]
     session: str | None = None
+    assets: tuple[RuntimeAsset, ...] = ()
 
 
 class WorkerDriver(abc.ABC):
@@ -44,7 +51,7 @@ class WorkerDriver(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> list[str]:
+    def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> DriverResult:
         raise NotImplementedError
 
     def extract_session(self, session: str | None, stdout: str, stderr: str) -> str | None:

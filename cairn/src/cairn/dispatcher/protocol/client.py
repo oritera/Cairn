@@ -9,7 +9,7 @@ from pydantic import TypeAdapter
 import requests
 from requests.adapters import HTTPAdapter
 
-from cairn.server.models import Intent, ProjectDetail, ProjectSummary, Settings
+from cairn.server.models import AuditEvent, Intent, ProjectDetail, ProjectSummary, Settings
 
 LOG = logging.getLogger(__name__)
 
@@ -72,6 +72,39 @@ class CairnClient:
         response.raise_for_status()
         return response.text
 
+    def list_audit_events(
+        self,
+        project_id: str,
+        *,
+        intent_id: str | None = None,
+        run_id: str | None = None,
+        event_type: str | None = None,
+        decision: str | None = None,
+        limit: int = 100,
+    ) -> list[AuditEvent]:
+        params = {
+            "intent_id": intent_id,
+            "run_id": run_id,
+            "event_type": event_type,
+            "decision": decision,
+            "limit": limit,
+        }
+        response = self._session().get(
+            self._url(f"/projects/{project_id}/audit"),
+            params={key: value for key, value in params.items() if value is not None},
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        return TypeAdapter(list[AuditEvent]).validate_python(response.json()["items"])
+
+    def backfill_audit_event(self, payload: dict[str, Any], token: str) -> ApiResult:
+        return self._request_json(
+            "POST",
+            "/internal/safety/events",
+            json=payload,
+            headers={"X-Cairn-Safety-Token": token},
+        )
+
     def heartbeat(self, project_id: str, intent_id: str, worker: str) -> ApiResult:
         return self._request_json(
             "POST",
@@ -128,12 +161,19 @@ class CairnClient:
             json={"from": from_ids, "description": description, "creator": creator, "worker": None},
         )
 
-    def _request_json(self, method: str, path: str, json: dict[str, Any]) -> ApiResult:
+    def _request_json(
+        self,
+        method: str,
+        path: str,
+        json: dict[str, Any],
+        headers: dict[str, str] | None = None,
+    ) -> ApiResult:
         try:
             response = self._session().request(
                 method,
                 self._url(path),
                 json=json,
+                headers=headers,
                 timeout=self._timeout,
             )
         except requests.RequestException as exc:
