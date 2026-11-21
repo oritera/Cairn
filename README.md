@@ -12,7 +12,7 @@
   <a href="https://zc.tencent.com/hackathon" target="_blank" rel="noopener noreferrer">
     <img src="./README/tch.png" alt="TCH" height="55" />
   </a>
-  <a href="https://wiki.chainreactors.red" target="_blank" rel="noopener noreferrer">
+  <a href="https://www.chainreactors.ai" target="_blank" rel="noopener noreferrer">
     <img src="./README/c.png" alt="ChainReactors" height="45" />
   </a>
 </p>
