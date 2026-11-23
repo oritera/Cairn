@@ -63,6 +63,8 @@ workers:
   #   task_types: [explore]
   #   max_running: 1
   #   priority: 1
+  #   env:
+  #     CODEX_MODEL: "your-model-id"  # Optional; otherwise uses the host Codex default.
 
   # - name: "local-pi"
   #   type: "pi"
