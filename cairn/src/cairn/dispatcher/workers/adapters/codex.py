@@ -36,11 +36,13 @@ class CodexDriver(RegexSessionDriver):
 
     def build_execute(self, worker: WorkerConfig, prompt: str, session: str | None) -> DriverResult:
         if self.local:
+            model = worker.env.get("CODEX_MODEL")
             return DriverResult(
                 argv=[
                     "codex",
                     "exec",
                     "--dangerously-bypass-approvals-and-sandbox",
+                    *(["--model", model] if model else []),
                     "--",
                     prompt,
                 ]
@@ -72,12 +74,14 @@ class CodexDriver(RegexSessionDriver):
 
     def build_conclude(self, worker: WorkerConfig, prompt: str, session: str) -> list[str]:
         if self.local:
+            model = worker.env.get("CODEX_MODEL")
             return [
                 "codex",
                 "exec",
                 "resume",
                 session,
                 "--dangerously-bypass-approvals-and-sandbox",
+                *(["--model", model] if model else []),
                 "--",
                 prompt,
             ]

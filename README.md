@@ -194,6 +194,8 @@ uv run --project cairn cairn dispatch --config dispatch.yaml
 
 Local mode is selected by `runtime.execution: local` (see `dispatch.local.example.yaml`). On startup the dispatcher checks each configured worker CLI is installed and runnable, and reminds you they must already be logged in. Each project gets an isolated working directory under `local.workspace_root` (default: the dispatcher's current directory). Run the dispatcher directly on the host — not inside Docker — since the agents run with your user's permissions and no sandbox.
 
+To select a model for one local Codex worker, set `env.CODEX_MODEL` on that worker in `dispatch.yaml`. Cairn passes it to `codex exec` and `codex exec resume`. If omitted, Codex uses its host default model.
+
 ### Tests
 
 Run the fast regression suite without Docker or live model endpoints:

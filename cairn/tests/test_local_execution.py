@@ -330,6 +330,22 @@ def test_codex_local_driver_omits_provider_injection() -> None:
     assert not any("model_providers" in part for part in conclude)
 
 
+def test_codex_local_driver_uses_worker_model_for_execute_and_resume() -> None:
+    worker = _bare_worker("codex").model_copy(update={"env": {"CODEX_MODEL": "gpt-test"}})
+    driver = CodexDriver(local=True)
+
+    execute = driver.build_execute(worker, "PROMPT", None).argv
+    conclude = driver.build_conclude(worker, "PROMPT", "sess-1")
+
+    assert execute == [
+        "codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--model", "gpt-test", "--", "PROMPT",
+    ]
+    assert conclude == [
+        "codex", "exec", "resume", "sess-1", "--dangerously-bypass-approvals-and-sandbox",
+        "--model", "gpt-test", "--", "PROMPT",
+    ]
+
+
 def test_pi_local_driver_omits_models_json_and_provider() -> None:
     worker = _bare_worker("pi")
     argv = PiDriver(local=True).build_execute(worker, "PROMPT", None).argv
