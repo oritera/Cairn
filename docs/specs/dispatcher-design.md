@@ -86,6 +86,7 @@ Worker 不是协议参与者本身，而是 Dispatcher 管理下的执行单元�
 
 - Claude Code CLI
 - Codex CLI
+- Grok Build CLI
 
 它们负责：
 
@@ -610,7 +611,7 @@ Dispatcher 固定从 `stdout` 取全文作为模型正文输出。
 | 字段 | 含义 | 说明 |
 | --- | --- | --- |
 | `name` | Worker 静态标识 | 协议写回时作为 `creator` 或 `worker` |
-| `type` | Worker driver 名 | 支持 `claudecode`、`codex`、`mock` |
+| `type` | Worker driver 名 | 支持 `claudecode`、`codex`、`grok`、`pi`、`mock` |
 | `task_types` | 支持的任务类型 | `bootstrap`、`reason`、`explore` |
 | `max_running` | Worker 并发上限 | 达到上限后暂不派发 |
 | `priority` | 选择优先级 | 数字越小越优先 |
@@ -662,7 +663,7 @@ Dispatcher 固定从 `stdout` 取全文作为模型正文输出。
 - API key 有效
 - model 可调用
 
-driver 按各自 provider 的协议构造请求：`claudecode` 打 `{base}/v1/messages`，`codex` 打 `{base}/responses`，`pi` 按 `PI_PROVIDER_API` 选择 `/chat/completions`、`/responses` 或 `/v1/messages`。请求会带上 worker 环境里的 `http(s)_proxy`，从而与 worker 实际出网路径一致。
+driver 按各自 provider 的协议构造请求：`claudecode` 打 `{base}/v1/messages`，`codex` 打 `{base}/responses`，`grok` 打 `{base}/chat/completions`，`pi` 按 `PI_PROVIDER_API` 选择 `/chat/completions`、`/responses` 或 `/v1/messages`。请求会带上 worker 环境里的 `http(s)_proxy`，从而与 worker 实际出网路径一致。
 
 执行规则：
 
@@ -765,6 +766,42 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
   -- "{prompt}"
 ```
 
+#### `grok` driver
+
+依赖环境变量：
+
+- `GROK_MODEL`
+- `GROK_BASE_URL`
+- `XAI_API_KEY`
+
+健康检查等价于下面这条请求（实现为 Dispatcher 进程内的 HTTP 调用，不再在容器里执行 curl）：
+
+```bash
+curl -sS --fail -o /dev/null \
+  "$GROK_BASE_URL/chat/completions" \
+  -H "Authorization: Bearer $XAI_API_KEY" \
+  -H "content-type: application/json" \
+  -d "{\"model\":\"$GROK_MODEL\",\"max_tokens\":10,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}"
+```
+
+已知行为：
+
+- driver 预先生成 session id（与 `claudecode` 相同）
+- CLI 使用 `--output-format json`；顶层 `text` 字段才是 agent 回复正文，需先 unwrap 再做 Cairn 契约解析
+- `local` 模式不注入 `-m`，复用本机已登录的 `grok` 配置
+
+第一阶段执行：
+
+```bash
+grok --no-auto-update --always-approve --output-format json -m "{env.GROK_MODEL}" --session-id "{session}" -p "{prompt}"
+```
+
+二阶段收尾：
+
+```bash
+grok --no-auto-update --always-approve --output-format json -m "{env.GROK_MODEL}" -r "{session}" -p "{prompt}"
+```
+
 #### `mock` driver
 
 `mock` driver 用于本地观察 dispatcher 的成功、失败和超时路径。
@@ -826,7 +863,7 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 - 每个 Worker 都必须有 `type`
 - 每个 Worker 都必须有 `max_running`
 - `task_types` 只允许 `bootstrap`、`reason`、`explore`
-- `type` 只允许 `claudecode`、`codex`、`mock`
+- `type` 只允许 `claudecode`、`codex`、`grok`、`pi`、`mock`
 - `max_running` 必须是正整数
 - `claudecode`、`codex`、`mock` 都支持双阶段 `explore`
 - `runtime.prompt_group` 对应的 prompt 目录必须存在
@@ -923,7 +960,7 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 | 字段 | 必填 | 含义 |
 | --- | --- | --- |
 | `name` | 是 | Worker 静态标识；协议写回时使用这个值作为 `creator` 或 `worker` |
-| `type` | 是 | Worker driver 名；支持 `claudecode`、`codex`、`mock` |
+| `type` | 是 | Worker driver 名；支持 `claudecode`、`codex`、`grok`、`pi`、`mock` |
 | `task_types` | 是 | 该 Worker 支持的任务类型列表 |
 | `max_running` | 是 | 该 Worker 自身的并发上限 |
 | `priority` | 是 | 当前任务类型的候选 Worker 中，数字越小优先级越高 |

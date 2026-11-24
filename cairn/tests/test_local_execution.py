@@ -14,6 +14,7 @@ from cairn.dispatcher.scheduler import loop as loop_module
 from cairn.dispatcher.tasks import common, explore
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.workers.adapters.codex import CodexDriver
+from cairn.dispatcher.workers.adapters.grok import GrokDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
 from cairn.dispatcher.workers.registry import get_driver
 
@@ -232,6 +233,7 @@ def _local_payload() -> dict:
             {"name": "local-claude", "type": "claudecode", "task_types": ["explore"], "max_running": 1, "priority": 0},
             {"name": "local-codex", "type": "codex", "task_types": ["explore"], "max_running": 1, "priority": 1},
             {"name": "local-pi", "type": "pi", "task_types": ["reason"], "max_running": 1, "priority": 2},
+            {"name": "local-grok", "type": "grok", "task_types": ["explore"], "max_running": 1, "priority": 3},
         ],
     }
 
@@ -341,10 +343,28 @@ def test_pi_local_driver_omits_models_json_and_provider() -> None:
     assert argv[-2:] == ["-p", "PROMPT"]
 
 
+def test_grok_local_driver_omits_model_flag() -> None:
+    worker = _bare_worker("grok")
+    session = "22222222-2222-2222-2222-222222222222"
+    argv = GrokDriver(local=True).build_execute(worker, "PROMPT", session).argv
+
+    assert argv[0] == "grok"
+    assert "-m" not in argv
+    assert "--session-id" in argv
+    assert session in argv
+    assert argv[-2:] == ["-p", "PROMPT"]
+
+    conclude = GrokDriver(local=True).build_conclude(worker, "PROMPT", session)
+    assert "-m" not in conclude
+    assert conclude[5:7] == ["-r", session]
+
+
 def test_get_driver_selects_local_or_container_variant() -> None:
     assert get_driver("codex", "local").local is True
     assert get_driver("codex").local is False
     assert get_driver("pi", "local").local is True
+    assert get_driver("grok", "local").local is True
+    assert get_driver("grok").local is False
     # claudecode and mock are shared instances across both modes
     assert get_driver("claudecode", "local") is get_driver("claudecode")
     assert get_driver("mock", "local") is get_driver("mock")
