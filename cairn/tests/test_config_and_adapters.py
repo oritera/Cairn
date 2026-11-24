@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig, validate_prompt_resources
 from cairn.dispatcher.workers.adapters.codex import CodexDriver
+from cairn.dispatcher.workers.adapters.grok import GrokDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
 
 from conftest import make_config
@@ -133,3 +134,49 @@ def test_codex_driver_execute_argv_passes_model_endpoint_and_prompt() -> None:
     assert "gpt-test" in argv
     assert 'model_providers.cairn.base_url="http://api/v1"' in argv
     assert argv[-2:] == ["--", "prompt"]
+
+
+def test_grok_driver_execute_and_conclude_argv() -> None:
+    worker = WorkerConfig.model_validate(
+        {
+            "name": "grok",
+            "type": "grok",
+            "task_types": ["explore"],
+            "max_running": 1,
+            "priority": 0,
+            "env": {
+                "GROK_MODEL": "grok-4",
+                "GROK_BASE_URL": "https://api.x.ai/v1",
+                "XAI_API_KEY": "xai-secret",
+            },
+        }
+    )
+
+    session = "11111111-1111-1111-1111-111111111111"
+    result = GrokDriver().build_execute(worker, "prompt", session)
+
+    assert result.argv[:5] == ["grok", "--no-auto-update", "--always-approve", "--output-format", "json"]
+    assert result.argv[5:7] == ["-m", "grok-4"]
+    assert result.argv[7:9] == ["--session-id", session]
+    assert result.argv[-2:] == ["-p", "prompt"]
+    assert result.session == session
+
+    conclude = GrokDriver().build_conclude(worker, "wrap-up", session)
+    assert conclude[5:7] == ["-m", "grok-4"]
+    assert conclude[7:9] == ["-r", session]
+    assert conclude[-2:] == ["-p", "wrap-up"]
+
+
+def test_grok_driver_extracts_session_and_text_from_json_output() -> None:
+    driver = GrokDriver()
+    stdout = json.dumps(
+        {
+            "text": '{"accepted":true,"data":{"fact":{"description":"done"}}}',
+            "stopReason": "end_turn",
+            "sessionId": "sess-grok-1",
+        }
+    )
+
+    assert driver.extract_session(None, stdout, "") == "sess-grok-1"
+    assert driver.extract_response_text(stdout, "") == '{"accepted":true,"data":{"fact":{"description":"done"}}}'
+    assert driver.extract_session("seeded", stdout, "") == "seeded"

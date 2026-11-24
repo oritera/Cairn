@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 TaskType = Literal["reason", "explore", "bootstrap"]
-WorkerType = Literal["claudecode", "codex", "pi", "mock"]
+WorkerType = Literal["claudecode", "codex", "grok", "pi", "mock"]
 CompletedAction = Literal["remove", "stop"]
 WorkerHealthcheckMode = Literal["startup_and_task", "startup_only", "disabled"]
 ExecutionMode = Literal["container", "local"]
@@ -27,6 +27,11 @@ WORKER_ENV_KEYS: dict[WorkerType, tuple[str, ...]] = {
         "CODEX_MODEL",
         "CODEX_BASE_URL",
         "OPENAI_API_KEY",
+    ),
+    "grok": (
+        "GROK_MODEL",
+        "GROK_BASE_URL",
+        "XAI_API_KEY",
     ),
     "pi": (
         "PI_MODEL",

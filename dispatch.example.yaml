@@ -86,3 +86,13 @@ workers:
   #     PI_API_KEY: "sk-xxx"
   #     PI_PROVIDER_API: "openai-completions"
   #     PI_MODEL_CONTEXT_WINDOW: "262144"
+
+  # - name: "grok_grok-4"
+  #   type: "grok"
+  #   task_types: [bootstrap, reason, explore]
+  #   max_running: 2
+  #   priority: 0
+  #   env:
+  #     GROK_MODEL: "grok-4"
+  #     GROK_BASE_URL: "https://api.x.ai/v1"
+  #     XAI_API_KEY: "xai-xxx"
